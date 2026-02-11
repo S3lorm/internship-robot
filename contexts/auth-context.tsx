@@ -2,7 +2,8 @@
 
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { User, AuthState, LoginFormData, RegisterFormData } from '@/types';
-import { authApi } from '@/lib/api';
+import { authApi } from '@/lib/supabase/api';
+import { supabase } from '@/lib/supabase/client';
 
 interface AuthContextType extends AuthState {
   login: (data: LoginFormData) => Promise<{ success: boolean; error?: string }>;
@@ -22,56 +23,72 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isAuthenticated: false,
   });
 
-  // Check for existing session on mount (token + user)
+  // Check for existing session on mount
   useEffect(() => {
     const init = async () => {
-      const storedUser = typeof window !== 'undefined' ? localStorage.getItem('rmu_user') : null;
-      const token = typeof window !== 'undefined' ? localStorage.getItem('rmu_token') : null;
-
-      if (!token) {
+      // Get initial session
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
         setState(prev => ({ ...prev, isLoading: false }));
         return;
       }
 
-      // Try to fetch current user from backend using token
+      // Fetch user profile
       try {
         const { data, error } = await authApi.getProfile();
         if (error || !data) {
-          // Token might be invalid or expired, clear it
-          localStorage.removeItem('rmu_token');
-          localStorage.removeItem('rmu_user');
           setState(prev => ({ ...prev, isLoading: false, isAuthenticated: false, user: null }));
           return;
         }
 
         const apiUser = (data as any).user as User;
-        localStorage.setItem('rmu_user', JSON.stringify(apiUser));
         setState({
           user: apiUser,
           isLoading: false,
           isAuthenticated: true,
         });
       } catch (err) {
-        // If API call fails completely (network error, etc.), just clear and continue
         console.warn('Failed to restore session:', err);
-        localStorage.removeItem('rmu_token');
-        localStorage.removeItem('rmu_user');
         setState(prev => ({ ...prev, isLoading: false, isAuthenticated: false, user: null }));
-    }
-
+      }
     };
 
     void init();
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (event === 'SIGNED_IN' && session) {
+        const { data, error } = await authApi.getProfile();
+        if (!error && data) {
+          const apiUser = (data as any).user as User;
+          setState({
+            user: apiUser,
+            isLoading: false,
+            isAuthenticated: true,
+          });
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setState({
+          user: null,
+          isLoading: false,
+          isAuthenticated: false,
+        });
+      }
+    });
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, []);
 
   const login = useCallback(
     async (data: LoginFormData): Promise<{ success: boolean; error?: string }> => {
-    setState(prev => ({ ...prev, isLoading: true }));
-    
+      setState(prev => ({ ...prev, isLoading: true }));
+      
       const result = await authApi.login(data.email, data.password);
       if (result.error || !result.data) {
         setState(prev => ({ ...prev, isLoading: false }));
-        // Check if error is due to unverified email
         const errorData = result.error || '';
         if (errorData.includes('verify') || errorData.includes('verification')) {
           return { success: false, error: result.error, requiresVerification: true };
@@ -79,24 +96,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return { success: false, error: result.error || 'Invalid email or password' };
       }
     
-      const { token, user } = result.data as any;
+      const { user } = result.data as any;
       
-      // TEMPORARILY DISABLED: Email verification check for testing
-      // Check if user needs verification
-      // if (user.role === 'student' && !user.isEmailVerified) {
-      //   setState(prev => ({ ...prev, isLoading: false }));
-      //   return { 
-      //     success: false, 
-      //     error: 'Please verify your email before logging in.',
-      //     requiresVerification: true 
-      //   };
-      // }
-      
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('rmu_token', token);
-        localStorage.setItem('rmu_user', JSON.stringify(user));
-      }
-    
       setState({
         user,
         isLoading: false,
@@ -138,9 +139,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
-  const logout = useCallback(() => {
-    localStorage.removeItem('rmu_user');
-    localStorage.removeItem('rmu_token');
+  const logout = useCallback(async () => {
+    await authApi.logout();
     setState({
       user: null,
       isLoading: false,
@@ -148,11 +148,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const updateUser = useCallback((updates: Partial<User>) => {
+  const updateUser = useCallback(async (updates: Partial<User>) => {
+    const result = await authApi.updateProfile(updates);
+    if (result.error || !result.data) {
+      return;
+    }
+    
+    const updatedUser = (result.data as any).user as User;
     setState(prev => {
       if (!prev.user) return prev;
-      const updatedUser = { ...prev.user, ...updates, updatedAt: new Date().toISOString() };
-      localStorage.setItem('rmu_user', JSON.stringify(updatedUser));
       return { ...prev, user: updatedUser };
     });
   }, []);
