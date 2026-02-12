@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const { body } = require('express-validator');
 
 const jwtConfig = require('../config/jwt');
-const { User } = require('../models');
+const { User } = require('../models/supabase');
 const { randomToken, validateStudentEmail } = require('../utils/helpers');
 const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
 

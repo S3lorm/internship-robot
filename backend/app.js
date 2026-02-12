@@ -7,7 +7,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
-const { sequelize } = require('./models');
+const supabase = require('./config/supabase');
 
 const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
@@ -75,14 +75,16 @@ app.use((err, _req, res, _next) => {
   });
 });
 
-// Initialize DB connection (without forcing sync here)
-sequelize
-  .authenticate()
+// Test Supabase connection
+supabase
+  .from('user_profiles')
+  .select('id')
+  .limit(1)
   .then(() => {
-    console.log('Database connection established');
+    console.log('✅ Supabase connection established');
   })
   .catch((err) => {
-    console.error('Unable to connect to the database:', err);
+    console.error('❌ Unable to connect to Supabase:', err.message);
   });
 
 module.exports = app;

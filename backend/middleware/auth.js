@@ -12,10 +12,13 @@ module.exports = async function auth(req, res, next) {
     }
 
     const decoded = jwt.verify(token, jwtConfig.secret);
-    const user = await User.findByPk(decoded.id, { attributes: { exclude: ['password'] } });
+    const user = await User.findOne({ id: decoded.id });
     if (!user || !user.isActive) {
       return res.status(401).json({ message: 'Invalid token' });
     }
+    
+    // Remove password from user object
+    delete user.password;
 
     // TEMPORARILY DISABLED: Email verification check for testing
     // For students, check email verification (except for auth routes and profile update)
