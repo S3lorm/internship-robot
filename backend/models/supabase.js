@@ -64,10 +64,34 @@ const User = {
     return data.map(mapUserFromSupabase);
   },
 
+  async count(options = {}) {
+    let query = supabase.from('user_profiles').select('*', { count: 'exact', head: true });
+    
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        const mappedKey = mapKeyToSupabase(key);
+        query = query.eq(mappedKey, value);
+      });
+    }
+
+    const { count, error } = await query;
+    
+    if (error) throw error;
+    
+    return count || 0;
+  },
+
   async create(userData) {
+    // Generate UUID if not provided (for Express backend)
+    const { v4: uuidv4 } = require('uuid');
+    const userWithId = {
+      ...userData,
+      id: userData.id || uuidv4(),
+    };
+    
     const { data, error } = await supabase
       .from('user_profiles')
-      .insert(mapUserToSupabase(userData))
+      .insert(mapUserToSupabase(userWithId))
       .select()
       .single();
     
@@ -153,6 +177,25 @@ function mapUserToSupabase(user) {
 
 // Internship model helpers
 const Internship = {
+  async findByPk(id, options = {}) {
+    const data = await this.findOne({ id });
+    if (!data) return null;
+    
+    // Handle includes (joins) if needed
+    if (options.include) {
+      for (const include of options.include) {
+        if (include.model === User && include.as === 'poster') {
+          const user = await User.findOne({ id: data.postedBy });
+          if (user) {
+            data.poster = user;
+          }
+        }
+      }
+    }
+    
+    return data;
+  },
+
   async findOne(where) {
     let query = supabase.from('internships').select('*');
     
@@ -173,6 +216,80 @@ const Internship = {
     }
     
     return data ? mapInternshipFromSupabase(data) : null;
+  },
+
+  async findAndCountAll(options = {}) {
+    const where = options.where || {};
+    let query = supabase.from('internships').select('*', { count: 'exact' });
+    
+    // Apply where conditions
+    Object.entries(where).forEach(([key, value]) => {
+      const mappedKey = mapKeyToSupabase(key);
+      if (value && typeof value === 'object' && value.in) {
+        // Handle Op.in - value is { in: [...] }
+        query = query.in(mappedKey, value.in);
+      } else {
+        query = query.eq(mappedKey, value);
+      }
+    });
+    
+    // Apply order
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      const mappedField = mapKeyToSupabase(field);
+      query = query.order(mappedField, { ascending: direction === 'ASC' });
+    }
+    
+    // Apply pagination
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    if (options.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+
+    const { data, error, count } = await query;
+    
+    if (error) throw error;
+    
+    let rows = data.map(mapInternshipFromSupabase);
+    
+    // Handle includes
+    if (options.include) {
+      for (const include of options.include) {
+        if (include.model === User && include.as === 'poster') {
+          for (const row of rows) {
+            const user = await User.findOne({ id: row.postedBy });
+            if (user) {
+              row.poster = user;
+            }
+          }
+        }
+      }
+    }
+    
+    return { rows, count: count || rows.length };
+  },
+
+  async count(options = {}) {
+    let query = supabase.from('internships').select('*', { count: 'exact', head: true });
+    
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        const mappedKey = mapKeyToSupabase(key);
+        if (value && typeof value === 'object' && value.gte) {
+          query = query.gte(mappedKey, value.gte);
+        } else {
+          query = query.eq(mappedKey, value);
+        }
+      });
+    }
+
+    const { count, error } = await query;
+    
+    if (error) throw error;
+    
+    return count || 0;
   },
 
   async findAll(options = {}) {
@@ -244,10 +361,48 @@ const Internship = {
     
     return true;
   },
+  
+  // Sequelize compatibility method
+  async destroy() {
+    if (!this.id) throw new Error('Cannot destroy without id');
+    const { error } = await supabase
+      .from('internships')
+      .delete()
+      .eq('id', this.id);
+    if (error) throw error;
+    return true;
+  },
 };
 
 // Application model helpers
 const Application = {
+  async findByPk(id, options = {}) {
+    const data = await this.findOne({ id });
+    if (!data) return null;
+    
+    // Handle includes
+    if (options.include) {
+      for (const include of options.include) {
+        if (include.model === Internship) {
+          const internship = await Internship.findOne({ id: data.internshipId });
+          if (internship) data.internship = internship;
+        }
+        if (include.model === User) {
+          if (include.as === 'student') {
+            const student = await User.findOne({ id: data.studentId });
+            if (student) data.student = student;
+          }
+          if (include.as === 'reviewer' && data.reviewedBy) {
+            const reviewer = await User.findOne({ id: data.reviewedBy });
+            if (reviewer) data.reviewer = reviewer;
+          }
+        }
+      }
+    }
+    
+    return data;
+  },
+
   async findOne(where) {
     let query = supabase.from('applications').select('*');
     
@@ -268,6 +423,68 @@ const Application = {
     }
     
     return data ? mapApplicationFromSupabase(data) : null;
+  },
+
+  async findAndCountAll(options = {}) {
+    const where = options.where || {};
+    let query = supabase.from('applications').select('*', { count: 'exact' });
+    
+    // Apply where conditions
+    Object.entries(where).forEach(([key, value]) => {
+      const mappedKey = mapKeyToSupabase(key);
+      query = query.eq(mappedKey, value);
+    });
+    
+    // Apply order
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      const mappedField = mapKeyToSupabase(field);
+      query = query.order(mappedField, { ascending: direction === 'ASC' });
+    }
+    
+    // Apply pagination
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    if (options.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+
+    const { data, error, count } = await query;
+    
+    if (error) throw error;
+    
+    let rows = data.map(mapApplicationFromSupabase);
+    
+    // Handle includes
+    if (options.include) {
+      for (const include of options.include) {
+        if (include.model === Internship) {
+          for (const row of rows) {
+            const internship = await Internship.findOne({ id: row.internshipId });
+            if (internship) row.internship = internship;
+          }
+        }
+        if (include.model === User) {
+          if (include.as === 'student') {
+            for (const row of rows) {
+              const student = await User.findOne({ id: row.studentId });
+              if (student) row.student = student;
+            }
+          }
+          if (include.as === 'reviewer') {
+            for (const row of rows) {
+              if (row.reviewedBy) {
+                const reviewer = await User.findOne({ id: row.reviewedBy });
+                if (reviewer) row.reviewer = reviewer;
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    return { rows, count: count || rows.length };
   },
 
   async findAll(options = {}) {
@@ -301,6 +518,23 @@ const Application = {
     return data.map(mapApplicationFromSupabase);
   },
 
+  async count(options = {}) {
+    let query = supabase.from('applications').select('*', { count: 'exact', head: true });
+    
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        const mappedKey = mapKeyToSupabase(key);
+        query = query.eq(mappedKey, value);
+      });
+    }
+
+    const { count, error } = await query;
+    
+    if (error) throw error;
+    
+    return count || 0;
+  },
+
   async create(applicationData) {
     const { data, error } = await supabase
       .from('applications')
@@ -329,6 +563,25 @@ const Application = {
 
 // Notice model helpers
 const Notice = {
+  async findByPk(id, options = {}) {
+    const data = await this.findOne({ id });
+    if (!data) return null;
+    
+    // Handle includes
+    if (options.include) {
+      for (const include of options.include) {
+        if (include.model === User && include.as === 'creator') {
+          const user = await User.findOne({ id: data.createdBy });
+          if (user) {
+            data.creator = user;
+          }
+        }
+      }
+    }
+    
+    return data;
+  },
+
   async findOne(where) {
     let query = supabase.from('notices').select('*');
     
@@ -346,6 +599,59 @@ const Notice = {
     }
     
     return data ? mapNoticeFromSupabase(data) : null;
+  },
+
+  async findAndCountAll(options = {}) {
+    const where = options.where || {};
+    let query = supabase.from('notices').select('*', { count: 'exact' });
+    
+    // Apply where conditions
+    Object.entries(where).forEach(([key, value]) => {
+      const mappedKey = mapKeyToSupabase(key);
+      if (value && typeof value === 'object' && value.in) {
+        // Handle Op.in - value is { in: [...] }
+        query = query.in(mappedKey, value.in);
+      } else {
+        query = query.eq(mappedKey, value);
+      }
+    });
+    
+    // Apply order
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      const mappedField = mapKeyToSupabase(field);
+      query = query.order(mappedField, { ascending: direction === 'ASC' });
+    }
+    
+    // Apply pagination
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    if (options.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+
+    const { data, error, count } = await query;
+    
+    if (error) throw error;
+    
+    let rows = data.map(mapNoticeFromSupabase);
+    
+    // Handle includes
+    if (options.include) {
+      for (const include of options.include) {
+        if (include.model === User && include.as === 'creator') {
+          for (const row of rows) {
+            const user = await User.findOne({ id: row.createdBy });
+            if (user) {
+              row.creator = user;
+            }
+          }
+        }
+      }
+    }
+    
+    return { rows, count: count || rows.length };
   },
 
   async findAll(options = {}) {
@@ -377,6 +683,23 @@ const Notice = {
     if (error) throw error;
     
     return data.map(mapNoticeFromSupabase);
+  },
+
+  async count(options = {}) {
+    let query = supabase.from('notices').select('*', { count: 'exact', head: true });
+    
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        const mappedKey = mapKeyToSupabase(key);
+        query = query.eq(mappedKey, value);
+      });
+    }
+
+    const { count, error } = await query;
+    
+    if (error) throw error;
+    
+    return count || 0;
   },
 
   async create(noticeData) {
@@ -531,31 +854,8 @@ function mapKeyToSupabase(key) {
 }
 
 // Mapping functions
-  const mapping = {
-    studentId: 'student_id',
-    internshipId: 'internship_id',
-    coverLetter: 'cover_letter',
-    cvUrl: 'cv_url',
-    reviewedBy: 'reviewed_by',
-    appliedAt: 'applied_at',
-    reviewedAt: 'reviewed_at',
-    postedBy: 'posted_by',
-    postedAt: 'posted_at',
-    targetAudience: 'target_audience',
-    isActive: 'is_active',
-    expiresAt: 'expires_at',
-    createdBy: 'created_by',
-    createdAt: 'created_at',
-    updatedAt: 'updated_at',
-    userId: 'user_id',
-    isRead: 'is_read',
-    relatedId: 'related_id',
-  };
-  return mapping[key] || key;
-}
-
 function mapInternshipFromSupabase(row) {
-  return {
+  const internship = {
     id: row.id,
     title: row.title,
     company: row.company,
@@ -575,7 +875,19 @@ function mapInternshipFromSupabase(row) {
     toJSON() {
       return { ...this };
     },
+    async save() {
+      return Internship.update(this.id, this);
+    },
+    async destroy() {
+      const { error } = await supabase
+        .from('internships')
+        .delete()
+        .eq('id', this.id);
+      if (error) throw error;
+      return true;
+    },
   };
+  return internship;
 }
 
 function mapInternshipToSupabase(internship) {
@@ -612,6 +924,9 @@ function mapApplicationFromSupabase(row) {
     toJSON() {
       return { ...this };
     },
+    async save() {
+      return Application.update(this.id, this);
+    },
   };
 }
 
@@ -643,6 +958,17 @@ function mapNoticeFromSupabase(row) {
     updatedAt: row.updated_at,
     toJSON() {
       return { ...this };
+    },
+    async save() {
+      return Notice.update(this.id, this);
+    },
+    async destroy() {
+      const { error } = await supabase
+        .from('notices')
+        .delete()
+        .eq('id', this.id);
+      if (error) throw error;
+      return true;
     },
   };
 }
@@ -687,6 +1013,12 @@ function mapNotificationToSupabase(notification) {
   return mapped;
 }
 
+// Op replacement for Sequelize compatibility
+const Op = {
+  in: 'in',
+  gte: 'gte',
+};
+
 module.exports = {
   User,
   Internship,
@@ -694,5 +1026,6 @@ module.exports = {
   Notice,
   Notification,
   supabase, // Export supabase client for direct queries
+  Op, // Export Op for compatibility
 };
 

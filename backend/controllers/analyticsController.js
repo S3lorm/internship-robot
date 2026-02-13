@@ -1,5 +1,4 @@
-const { Op } = require('sequelize');
-const { User, Internship, Application, Notice } = require('../models');
+const { User, Internship, Application, Notice, Op } = require('../models');
 
 async function dashboard(req, res) {
   const [users, internships, applications, notices] = await Promise.all([
@@ -12,32 +11,73 @@ async function dashboard(req, res) {
 }
 
 async function applications(req, res) {
-  const byStatus = await Application.findAll({
-    attributes: ['status', [Application.sequelize.fn('COUNT', '*'), 'count']],
-    group: ['status'],
+  // Get all applications and group by status
+  const allApplications = await Application.findAll({});
+  const byStatus = {};
+  
+  allApplications.forEach(app => {
+    if (!byStatus[app.status]) {
+      byStatus[app.status] = 0;
+    }
+    byStatus[app.status]++;
   });
-  return res.json({ byStatus });
+  
+  // Convert to array format
+  const byStatusArray = Object.entries(byStatus).map(([status, count]) => ({
+    status,
+    count,
+  }));
+  
+  return res.json({ byStatus: byStatusArray });
 }
 
 async function internships(req, res) {
-  const byStatus = await Internship.findAll({
-    attributes: ['status', [Internship.sequelize.fn('COUNT', '*'), 'count']],
-    group: ['status'],
+  // Get all internships and group by status
+  const allInternships = await Internship.findAll({});
+  const byStatus = {};
+  
+  allInternships.forEach(internship => {
+    if (!byStatus[internship.status]) {
+      byStatus[internship.status] = 0;
+    }
+    byStatus[internship.status]++;
   });
-  const upcomingDeadlines = await Internship.findAll({
-    where: { deadline: { [Op.gte]: new Date() } },
-    order: [['deadline', 'ASC']],
-    limit: 10,
-  });
-  return res.json({ byStatus, upcomingDeadlines });
+  
+  // Convert to array format
+  const byStatusArray = Object.entries(byStatus).map(([status, count]) => ({
+    status,
+    count,
+  }));
+  
+  // Get upcoming deadlines
+  const now = new Date();
+  const upcomingDeadlines = allInternships
+    .filter(internship => new Date(internship.deadline) >= now)
+    .sort((a, b) => new Date(a.deadline) - new Date(b.deadline))
+    .slice(0, 10);
+  
+  return res.json({ byStatus: byStatusArray, upcomingDeadlines });
 }
 
 async function users(req, res) {
-  const byRole = await User.findAll({
-    attributes: ['role', [User.sequelize.fn('COUNT', '*'), 'count']],
-    group: ['role'],
+  // Get all users and group by role
+  const allUsers = await User.findAll({});
+  const byRole = {};
+  
+  allUsers.forEach(user => {
+    if (!byRole[user.role]) {
+      byRole[user.role] = 0;
+    }
+    byRole[user.role]++;
   });
-  return res.json({ byRole });
+  
+  // Convert to array format
+  const byRoleArray = Object.entries(byRole).map(([role, count]) => ({
+    role,
+    count,
+  }));
+  
+  return res.json({ byRole: byRoleArray });
 }
 
 module.exports = { dashboard, applications, internships, users };

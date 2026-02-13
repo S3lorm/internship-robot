@@ -4,6 +4,21 @@ const app = require('./app');
 
 dotenv.config();
 
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (reason, promise) => {
+  console.error('Unhandled Rejection at:', promise);
+  console.error('Reason:', reason);
+  // Don't exit the process - just log the error
+  // The server can continue running
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
+  // For uncaught exceptions, we should exit
+  process.exit(1);
+});
+
 const PORT = process.env.PORT || 5000;
 
 const server = http.createServer(app);

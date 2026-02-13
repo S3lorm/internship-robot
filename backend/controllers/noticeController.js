@@ -1,6 +1,5 @@
-const { Notice, User } = require('../models');
+const { Notice, User, Op } = require('../models');
 const { createNotification } = require('../services/notificationService');
-const { Op } = require('sequelize');
 
 function parsePagination(req) {
   const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
@@ -17,10 +16,10 @@ async function list(req, res) {
 
   // Students shouldn't see admin-only; admins shouldn't see students-only if they filter; default is 'all'
   if (!audience && req.user && req.user.role === 'student') {
-    where.targetAudience = { [Op.in]: ['all', 'students'] };
+    where.targetAudience = { in: ['all', 'students'] };
   }
   if (!audience && req.user && req.user.role === 'admin') {
-    where.targetAudience = { [Op.in]: ['all', 'admins'] };
+    where.targetAudience = { in: ['all', 'admins'] };
   }
 
   const { rows, count } = await Notice.findAndCountAll({

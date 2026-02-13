@@ -1,13 +1,16 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
-import { Inter, Geist_Mono } from 'next/font/google'
+import { Quicksand } from 'next/font/google'
 import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import { AuthProvider } from '@/contexts/auth-context'
 import './globals.css'
 
-const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
-const _geistMono = Geist_Mono({ subsets: ["latin"] });
+const quicksand = Quicksand({ 
+  subsets: ["latin"],
+  weight: ["300", "400", "500", "600", "700"],
+  variable: "--font-quicksand" 
+});
 
 export const metadata: Metadata = {
   title: 'RMU Internship Portal | Regional Maritime University',
@@ -47,7 +50,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.variable} font-sans antialiased`}>
+      <body className={`${quicksand.variable} font-sans antialiased`}>
         <AuthProvider>
           {children}
           <Toaster position="top-right" richColors />

@@ -84,14 +84,14 @@ export default function DashboardPage() {
       {/* Welcome Header */}
       <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground md:text-3xl">
-            Welcome back, {user?.firstName}!
+          <h1 className="text-3xl font-bold text-foreground md:text-4xl">
+            Welcome back, {user?.firstName}! 👋
           </h1>
-          <p className="text-muted-foreground">
+          <p className="mt-2 text-muted-foreground">
             Here&apos;s an overview of your internship applications and opportunities.
           </p>
         </div>
-        <Button asChild>
+        <Button asChild size="lg" className="shadow-md">
           <Link href="/dashboard/internships">
             Browse Internships
             <ArrowRight className="ml-2 h-4 w-4" />

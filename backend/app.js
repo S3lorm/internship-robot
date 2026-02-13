@@ -75,17 +75,25 @@ app.use((err, _req, res, _next) => {
   });
 });
 
-// Test Supabase connection
-supabase
-  .from('user_profiles')
-  .select('id')
-  .limit(1)
-  .then(() => {
-    console.log('✅ Supabase connection established');
-  })
-  .catch((err) => {
-    console.error('❌ Unable to connect to Supabase:', err.message);
-  });
+// Test Supabase connection (non-blocking)
+(async () => {
+  try {
+    const { error } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .limit(1);
+    
+    if (error) {
+      console.error('❌ Supabase query error:', error.message || error);
+    } else {
+      console.log('✅ Supabase connection established');
+    }
+  } catch (err) {
+    console.error('❌ Unable to connect to Supabase:', err.message || err);
+    // Don't crash the server - just log the error
+    // The server can still start, but database operations will fail
+  }
+})();
 
 module.exports = app;
 

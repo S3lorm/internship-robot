@@ -39,7 +39,7 @@ const transporter = nodemailer.createTransport({
   socketTimeout: 10000,
 });
 
-// Verify connection on startup (async)
+// Verify connection on startup (async) - wrapped to prevent unhandled rejections
 (async function verifySMTP() {
   if (!isConfigured) {
     console.error('❌ SMTP not configured. Please set SMTP_HOST, SMTP_USER, and SMTP_PASS in backend/.env');
@@ -54,8 +54,7 @@ const transporter = nodemailer.createTransport({
     console.log(`   User: ${smtpUser}`);
     console.log(`   From: ${process.env.EMAIL_FROM || smtpUser}`);
   } catch (error) {
-    console.error('❌ SMTP Configuration Error:', error.message);
-    console.error('   Full error:', error);
+    console.error('❌ SMTP Configuration Error:', error.message || error);
     console.error('   Please check your SMTP settings in backend/.env');
     console.error('   Email verification will not work until SMTP is configured correctly.');
     
@@ -69,7 +68,10 @@ const transporter = nodemailer.createTransport({
       console.error('   → Socket error. Check network/firewall settings');
     }
   }
-})();
+})().catch((err) => {
+  // Extra safety net for any unhandled rejections
+  console.error('❌ SMTP verification failed:', err.message || err);
+});
 
 module.exports = transporter;
 

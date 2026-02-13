@@ -161,18 +161,18 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
-      <Link href="/" className="mb-8 flex items-center gap-2">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 px-4 py-12">
+      <Link href="/" className="mb-8 flex items-center gap-2 transition-transform hover:scale-105">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary shadow-lg">
           <Anchor className="h-6 w-6 text-primary-foreground" />
         </div>
         <div className="flex flex-col">
-          <span className="font-semibold leading-none text-foreground">RMU</span>
+          <span className="text-lg font-bold leading-none text-foreground">RMU</span>
           <span className="text-xs text-muted-foreground">Internship Portal</span>
         </div>
       </Link>
 
-      <Card className="w-full max-w-md">
+      <Card className="w-full max-w-md shadow-xl border-2">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
           <CardDescription>
