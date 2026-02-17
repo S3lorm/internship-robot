@@ -122,10 +122,10 @@ export const authApi = {
       body: JSON.stringify({ email }),
     }),
 
-  resetPassword: (token: string, password: string) =>
+  resetPassword: (email: string, token: string, password: string) =>
     fetchApi('/auth/reset-password', {
       method: 'POST',
-      body: JSON.stringify({ token, password }),
+      body: JSON.stringify({ email, token, password }),
     }),
 
   // Uses /auth/me endpoint on the backend

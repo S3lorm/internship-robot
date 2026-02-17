@@ -1,29 +1,37 @@
 "use client";
 
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import {
   mockApplications,
   mockInternships,
   mockNotices,
   mockNotifications,
+  mockRegionalCompanies,
 } from "@/lib/mock-data";
 import {
-  Briefcase,
   FileText,
   Clock,
   CheckCircle2,
   XCircle,
-  AlertCircle,
   ArrowRight,
   Bell,
-  Calendar,
   TrendingUp,
   Eye,
+  MapPin,
+  Mail,
 } from "lucide-react";
 
 export default function DashboardPage() {
@@ -43,8 +51,17 @@ export default function DashboardPage() {
   };
 
   const unreadNotifications = mockNotifications.filter((n) => !n.isRead);
-  const recentInternships = mockInternships.slice(0, 3);
   const activeNotices = mockNotices.filter((n) => n.isActive && n.isPinned);
+
+  const [selectedRegion, setSelectedRegion] = useState<string>("all");
+  const regions = useMemo(() => {
+    const unique = [...new Set(mockRegionalCompanies.map((c) => c.region))];
+    return unique.sort();
+  }, []);
+  const filteredCompanies = useMemo(() => {
+    if (selectedRegion === "all") return mockRegionalCompanies;
+    return mockRegionalCompanies.filter((c) => c.region === selectedRegion);
+  }, [selectedRegion]);
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -98,26 +115,6 @@ export default function DashboardPage() {
           </Link>
         </Button>
       </div>
-
-      {/* Email Verification Warning */}
-      {user && !user.isEmailVerified && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardContent className="flex items-center gap-3 p-4">
-            <AlertCircle className="h-5 w-5 text-yellow-600" />
-            <div className="flex-1">
-              <p className="font-medium text-yellow-800">
-                Please verify your email address
-              </p>
-              <p className="text-sm text-yellow-700">
-                Check your inbox for the verification link to access all features.
-              </p>
-            </div>
-            <Button variant="outline" size="sm" className="border-yellow-300 hover:bg-yellow-100 bg-transparent">
-              Resend Email
-            </Button>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Important Notice */}
       {activeNotices.length > 0 && (
@@ -331,59 +328,74 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Recent Opportunities */}
+      {/* Companies by Region - Apply via Email */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between">
+        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-lg">Latest Opportunities</CardTitle>
+            <CardTitle className="text-lg">Companies by Region</CardTitle>
             <CardDescription>
-              New internships matching your profile
+              Browse companies in your region and send your application via email
             </CardDescription>
           </div>
-          <Button variant="ghost" size="sm" asChild>
-            <Link href="/dashboard/internships">View All</Link>
-          </Button>
+          <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+            <SelectTrigger className="w-[180px]">
+              <MapPin className="mr-2 h-4 w-4" />
+              <SelectValue placeholder="Filter by region" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All regions</SelectItem>
+              {regions.map((r) => (
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-3">
-            {recentInternships.map((internship) => (
-              <Link
-                key={internship.id}
-                href={`/dashboard/internships/${internship.id}`}
-                className="group rounded-lg border border-border p-4 transition-all hover:border-primary hover:shadow-sm"
-              >
-                <div className="mb-3 flex items-center justify-between">
-                  <Badge variant="secondary" className="text-xs">
-                    {internship.category}
-                  </Badge>
-                  {internship.isRemote && (
-                    <Badge variant="outline" className="text-xs">
-                      Remote
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+            {filteredCompanies.map((company) => {
+              const subject = encodeURIComponent(`Internship Application - ${user?.firstName} ${user?.lastName}`);
+              const body = encodeURIComponent(
+                `Dear Hiring Team,\n\nI am interested in applying for an internship position at ${company.name}.\n\nPlease find my details below:\nName: ${user?.firstName} ${user?.lastName}\nEmail: ${user?.email}\nStudent ID: ${user?.studentId || "N/A"}\nDepartment: ${user?.department || "N/A"}\n\nI look forward to hearing from you.\n\nBest regards`
+              );
+              const mailtoLink = `mailto:${company.email}?subject=${subject}&body=${body}`;
+              return (
+                <div
+                  key={company.id}
+                  className="flex flex-col rounded-lg border border-border p-4 transition-all hover:border-primary hover:shadow-sm"
+                >
+                  <div className="mb-3 flex items-center justify-between">
+                    <Badge variant="secondary" className="text-xs">
+                      {company.industry}
                     </Badge>
-                  )}
+                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <MapPin className="h-3 w-3" />
+                      {company.region}
+                    </span>
+                  </div>
+                  <h3 className="mb-1 font-medium text-foreground">
+                    {company.name}
+                  </h3>
+                  <p className="mb-3 flex items-center gap-1 text-xs text-muted-foreground">
+                    <Mail className="h-3 w-3" />
+                    {company.email}
+                  </p>
+                  <Button asChild size="sm" className="mt-auto w-full">
+                    <a href={mailtoLink} target="_blank" rel="noopener noreferrer">
+                      <Mail className="mr-2 h-4 w-4" />
+                      Send Application via Email
+                    </a>
+                  </Button>
                 </div>
-                <h3 className="mb-1 font-medium group-hover:text-primary">
-                  {internship.title}
-                </h3>
-                <p className="mb-3 text-sm text-muted-foreground">
-                  {internship.company}
-                </p>
-                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Briefcase className="h-3 w-3" />
-                    {internship.duration}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="h-3 w-3" />
-                    {new Date(internship.applicationDeadline).toLocaleDateString(
-                      "en-GB",
-                      { day: "numeric", month: "short" }
-                    )}
-                  </span>
-                </div>
-              </Link>
-            ))}
+              );
+            })}
           </div>
+          {filteredCompanies.length === 0 && (
+            <p className="py-8 text-center text-muted-foreground">
+              No companies found in this region.
+            </p>
+          )}
         </CardContent>
       </Card>
     </div>

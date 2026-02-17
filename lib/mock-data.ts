@@ -6,8 +6,19 @@ import type {
   DashboardStats,
   ApplicationsByMonth,
   InternshipsByCategory,
-  User
+  User,
+  RegionalCompany
 } from '@/types';
+
+// Companies by region - apply via email
+export const mockRegionalCompanies: RegionalCompany[] = [
+  { id: 'rc1', name: 'Ghana Ports and Harbours Authority', region: 'Tema', email: 'hr@gpfa.gov.gh', industry: 'Marine Engineering' },
+  { id: 'rc2', name: 'Maersk Ghana Ltd', region: 'Accra', email: 'careers.ghana@maersk.com', industry: 'Shipping & Logistics' },
+  { id: 'rc3', name: 'Tema Port Authority', region: 'Tema', email: 'internships@temaport.gov.gh', industry: 'Safety & Security' },
+  { id: 'rc4', name: 'Blue Ocean Technologies', region: 'Accra', email: 'recruit@blueocean.tech', industry: 'Information Technology' },
+  { id: 'rc5', name: 'RMU Research Department', region: 'Accra', email: 'research@rmu.edu.gh', industry: 'Research' },
+  { id: 'rc6', name: 'Western Region Port Services', region: 'Takoradi', email: 'hr@wrps.com.gh', industry: 'Port Management' },
+];
 
 // Mock Internships
 export const mockInternships: Internship[] = [

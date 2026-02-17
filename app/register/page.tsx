@@ -101,21 +101,15 @@ export default function RegisterPage() {
 
   const nextStep = () => {
     if (step === 1) {
-      // Validate step 1
-      if (!formData.email || !formData.password || !formData.confirmPassword) {
-        setError("Please fill in all fields");
+      if (!formData.firstName?.trim() || !formData.lastName?.trim() || !formData.studentId?.trim() || !formData.phone?.trim()) {
+        setError("Please fill in all personal information fields");
         return;
       }
-      if (!formData.email.toLowerCase().endsWith("@st.rmu.edu.gh")) {
-        setError("Please use your RMU student email (@st.rmu.edu.gh)");
-        return;
-      }
-      if (formData.password !== formData.confirmPassword) {
-        setError("Passwords do not match");
-        return;
-      }
-      if (formData.password.length < 8) {
-        setError("Password must be at least 8 characters long");
+      setError(null);
+    }
+    if (step === 2) {
+      if (!formData.department || !formData.program) {
+        setError("Please select your department and program");
         return;
       }
       setError(null);
@@ -198,10 +192,10 @@ export default function RegisterPage() {
           <p className="text-sm text-muted-foreground">
             Step {step} of 3:{" "}
             {step === 1
-              ? "Account Details"
+              ? "Personal Information"
               : step === 2
-                ? "Personal Information"
-                : "Academic Information"}
+                ? "Academic Information"
+                : "Account Details"}
           </p>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -213,58 +207,8 @@ export default function RegisterPage() {
               </Alert>
             )}
 
-            {/* Step 1: Account Details */}
+            {/* Step 1: Personal Information */}
             {step === 1 && (
-              <>
-                <div className="space-y-2">
-                  <Label htmlFor="email">Student Email</Label>
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    placeholder="your.name@st.rmu.edu.gh"
-                    value={formData.email}
-                    onChange={handleChange}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Only @st.rmu.edu.gh emails are allowed
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="Create a strong password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Minimum 8 characters
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    placeholder="Confirm your password"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    required
-                  />
-                </div>
-              </>
-            )}
-
-            {/* Step 2: Personal Information */}
-            {step === 2 && (
               <>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -318,8 +262,8 @@ export default function RegisterPage() {
               </>
             )}
 
-            {/* Step 3: Academic Information */}
-            {step === 3 && (
+            {/* Step 2: Academic Information */}
+            {step === 2 && (
               <>
                 <div className="space-y-2">
                   <Label htmlFor="department">Department</Label>
@@ -381,6 +325,56 @@ export default function RegisterPage() {
                       <SelectItem value="4">4th Year</SelectItem>
                     </SelectContent>
                   </Select>
+                </div>
+              </>
+            )}
+
+            {/* Step 3: Account Details (email & password last) */}
+            {step === 3 && (
+              <>
+                <div className="space-y-2">
+                  <Label htmlFor="email">Student Email</Label>
+                  <Input
+                    id="email"
+                    name="email"
+                    type="email"
+                    placeholder="your.name@st.rmu.edu.gh"
+                    value={formData.email}
+                    onChange={handleChange}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Only @st.rmu.edu.gh emails are allowed
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="password">Password</Label>
+                  <Input
+                    id="password"
+                    name="password"
+                    type="password"
+                    placeholder="Create a strong password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    required
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Minimum 8 characters
+                  </p>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword">Confirm Password</Label>
+                  <Input
+                    id="confirmPassword"
+                    name="confirmPassword"
+                    type="password"
+                    placeholder="Confirm your password"
+                    value={formData.confirmPassword}
+                    onChange={handleChange}
+                    required
+                  />
                 </div>
               </>
             )}

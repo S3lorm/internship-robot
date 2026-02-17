@@ -5,7 +5,7 @@ const { body } = require('express-validator');
 const jwtConfig = require('../config/jwt');
 const { User } = require('../models/supabase');
 const { randomToken, validateStudentEmail } = require('../utils/helpers');
-const { sendVerificationEmail, sendPasswordResetEmail } = require('../services/emailService');
+const { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetOtp } = require('../services/emailService');
 
 function signToken(user) {
   return jwt.sign({ id: user.id }, jwtConfig.secret, { expiresIn: jwtConfig.expiresIn });
@@ -25,7 +25,7 @@ async function register(req, res) {
     return res.status(400).json({ message: 'Only @st.rmu.edu.gh email addresses are allowed' });
   }
 
-  const existing = await User.findOne({ where: { email } });
+  const existing = await User.findOne({ email });
   if (existing) return res.status(400).json({ message: 'Email already in use' });
 
   const hashed = await bcrypt.hash(password, 10);
@@ -78,7 +78,7 @@ const loginValidators = [body('email').isEmail(), body('password').notEmpty()];
 
 async function login(req, res) {
   const { email, password } = req.body;
-  const user = await User.findOne({ where: { email } });
+  const user = await User.findOne({ email });
   if (!user || !user.isActive) return res.status(401).json({ message: 'Invalid credentials' });
 
   const ok = await bcrypt.compare(password, user.password);
@@ -108,7 +108,7 @@ const verifyEmailValidators = [body('token').notEmpty()];
 
 async function verifyEmail(req, res) {
   const { token } = req.body;
-  const user = await User.findOne({ where: { emailVerificationToken: token } });
+  const user = await User.findOne({ emailVerificationToken: token });
   if (!user) return res.status(400).json({ message: 'Invalid token' });
 
   if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
@@ -127,7 +127,7 @@ const resendVerificationValidators = [body('email').isEmail()];
 
 async function resendVerification(req, res) {
   const { email } = req.body;
-  const user = await User.findOne({ where: { email } });
+  const user = await User.findOne({ email });
   if (!user) return res.json({ message: 'If that email exists, a verification link was sent.' });
   if (user.isEmailVerified) return res.json({ message: 'Email already verified' });
 
@@ -154,33 +154,38 @@ const forgotPasswordValidators = [body('email').isEmail()];
 
 async function forgotPassword(req, res) {
   const { email } = req.body;
-  const user = await User.findOne({ where: { email } });
+  const user = await User.findOne({ email });
 
-  if (!user) return res.json({ message: 'If that email exists, a reset link was sent.' });
+  if (!user) return res.json({ message: 'If that email exists, a reset code was sent.' });
 
-  const token = randomToken(24);
-  user.passwordResetToken = token;
+  const otp = String(Math.floor(100000 + Math.random() * 900000));
+  user.passwordResetToken = otp;
   user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
   await user.save();
 
   try {
-    await sendPasswordResetEmail(user, token);
-  } catch (_e) {
-    // ignore
+    await sendPasswordResetOtp(user, otp);
+  } catch (err) {
+    console.error('Failed to send password reset OTP email:', err.message);
   }
 
-  return res.json({ message: 'If that email exists, a reset link was sent.' });
+  return res.json({ message: 'If that email exists, a reset code was sent.' });
 }
 
-const resetPasswordValidators = [body('token').notEmpty(), body('password').isLength({ min: 6 })];
+const resetPasswordValidators = [
+  body('email').isEmail(),
+  body('token').isLength({ min: 6, max: 6 }),
+  body('password').isLength({ min: 6 }),
+];
 
 async function resetPassword(req, res) {
-  const { token, password } = req.body;
-  const user = await User.findOne({ where: { passwordResetToken: token } });
-  if (!user) return res.status(400).json({ message: 'Invalid token' });
+  const { email, token, password } = req.body;
+  const user = await User.findOne({ email });
+  if (!user) return res.status(400).json({ message: 'Invalid request' });
+  if (user.passwordResetToken !== token) return res.status(400).json({ message: 'Invalid or expired code' });
 
   if (user.passwordResetExpires && user.passwordResetExpires < new Date()) {
-    return res.status(400).json({ message: 'Token expired' });
+    return res.status(400).json({ message: 'Code expired. Please request a new one.' });
   }
 
   user.password = await bcrypt.hash(password, 10);

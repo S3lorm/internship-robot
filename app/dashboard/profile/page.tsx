@@ -392,43 +392,6 @@ export default function ProfilePage() {
         <TabsContent value="security" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Email Verification</CardTitle>
-              <CardDescription>
-                Verify your email to access all features
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              {user.isEmailVerified ? (
-                <div className="flex items-center gap-3 rounded-lg bg-green-50 p-4">
-                  <CheckCircle2 className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="font-medium text-green-800">Email Verified</p>
-                    <p className="text-sm text-green-700">
-                      Your email has been verified successfully.
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex items-center justify-between rounded-lg bg-yellow-50 p-4">
-                  <div className="flex items-center gap-3">
-                    <AlertCircle className="h-5 w-5 text-yellow-600" />
-                    <div>
-                      <p className="font-medium text-yellow-800">Email Not Verified</p>
-                      <p className="text-sm text-yellow-700">
-                        Please verify your email to access all features.
-                      </p>
-                    </div>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Resend Link
-                  </Button>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
               <CardTitle>Change Password</CardTitle>
               <CardDescription>
                 Update your password to keep your account secure

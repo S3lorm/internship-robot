@@ -67,6 +67,16 @@ export interface Application {
   updatedAt: string;
 }
 
+// Regional company (apply via email)
+export interface RegionalCompany {
+  id: string;
+  name: string;
+  region: string;
+  email: string;
+  industry: string;
+  description?: string;
+}
+
 // Notice/Announcement types
 export type NoticeType = 'general' | 'deadline' | 'urgent' | 'info';
 export type NoticePriority = 'low' | 'medium' | 'high';

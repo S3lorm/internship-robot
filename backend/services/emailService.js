@@ -121,6 +121,55 @@ async function sendPasswordResetEmail(user, token) {
   });
 }
 
+async function sendPasswordResetOtp(user, otp) {
+  const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const resetUrl = `${frontend}/reset-password?email=${encodeURIComponent(user.email)}`;
+
+  const emailFrom = process.env.EMAIL_FROM || '"RMU Internship Portal" <noreply@rmu.edu.gh>';
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+        .header { background-color: #1e40af; color: white; padding: 20px; text-align: center; }
+        .content { padding: 20px; background-color: #f9fafb; }
+        .otp-box { font-size: 28px; letter-spacing: 8px; font-weight: bold; padding: 16px; text-align: center; background: #e5e7eb; border-radius: 8px; margin: 20px 0; }
+        .button { display: inline-block; padding: 12px 24px; background-color: #1e40af; color: white; text-decoration: none; border-radius: 5px; margin: 20px 0; }
+        .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header"><h1>RMU Internship Portal</h1></div>
+        <div class="content">
+          <h2>Password reset OTP</h2>
+          <p>Hi ${user.firstName},</p>
+          <p>Use this one-time code to reset your password:</p>
+          <div class="otp-box">${otp}</div>
+          <p>Enter this code on the reset password page. It expires in 1 hour.</p>
+          <p style="text-align: center;">
+            <a href="${resetUrl}" class="button">Reset password</a>
+          </p>
+          <p>If you didn't request this, you can ignore this email.</p>
+        </div>
+        <div class="footer">Regional Maritime University Internship Portal</div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await transporter.sendMail({
+    from: emailFrom,
+    to: user.email,
+    subject: 'Your password reset code - RMU Internship Portal',
+    html,
+    text: `Hi ${user.firstName},\n\nYour password reset code is: ${otp}\n\nEnter it on the reset password page. It expires in 1 hour.\n\n${resetUrl}\n\nIf you didn't request this, ignore this email.`,
+  });
+}
+
 async function sendApplicationStatusEmail(user, application, internship) {
   const statusMessages = {
     approved: 'Congratulations! Your application has been approved.',
@@ -144,5 +193,5 @@ async function sendApplicationStatusEmail(user, application, internship) {
   });
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendApplicationStatusEmail };
+module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetOtp, sendApplicationStatusEmail };
 

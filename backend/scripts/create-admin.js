@@ -15,7 +15,7 @@ async function createAdmin() {
     const lastName = process.env.ADMIN_LAST_NAME || 'User';
 
     // Check if admin already exists
-    const existing = await User.findOne({ where: { email } });
+    const existing = await User.findOne({ email });
     if (existing) {
       if (existing.role === 'admin') {
         console.log(`✅ Admin user already exists: ${email}`);

@@ -1,9 +1,9 @@
 import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Quicksand } from 'next/font/google'
-import { Analytics } from '@vercel/analytics/next'
 import { Toaster } from 'sonner'
 import { AuthProvider } from '@/contexts/auth-context'
+import { AnalyticsClient } from '@/components/analytics-client'
 import './globals.css'
 
 const quicksand = Quicksand({ 
@@ -34,7 +34,7 @@ export const metadata: Metadata = {
     ],
     apple: '/apple-icon.png',
   },
-    generator: 'v0.app'
+  generator: 'v0.app',
 }
 
 export const viewport: Viewport = {
@@ -55,7 +55,7 @@ export default function RootLayout({
           {children}
           <Toaster position="top-right" richColors />
         </AuthProvider>
-        <Analytics />
+        <AnalyticsClient />
       </body>
     </html>
   )
