@@ -21,4 +21,12 @@ router.get('/signatures', (req, res) => {
   res.json({ signatures: letterController.programSignatures });
 });
 
+// Letter Request Routes
+router.post('/requests', letterController.createRequest);
+router.get('/requests', letterController.getRequests);
+router.get('/requests/:id', letterController.getRequestById);
+router.patch('/requests/:id/status', letterController.updateRequestStatus);
+router.get('/requests/:id/download', letterController.downloadLetterPDF);
+router.patch('/requests/:id/mark-email-sent', letterController.markEmailSent);
+
 module.exports = router;

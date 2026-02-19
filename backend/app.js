@@ -19,6 +19,12 @@ const analyticsRoutes = require('./routes/analytics');
 const profileRoutes = require('./routes/profile');
 const testRoutes = require('./routes/test');
 const letterRoutes = require('./routes/letters');
+const reminderRoutes = require('./routes/reminders');
+const evaluationRoutes = require('./routes/evaluations');
+const feedbackAcknowledgmentRoutes = require('./routes/feedback-acknowledgment');
+const securityRoutes = require('./routes/security');
+const activityLogger = require('./middleware/activityLogger');
+const { apiLimiter } = require('./middleware/security');
 
 const app = express();
 
@@ -42,6 +48,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(morgan('dev'));
 
+// Apply rate limiting to all API routes
+app.use('/api', apiLimiter);
+
+// Activity logging middleware
+app.use('/api', activityLogger);
+
 // Static files (uploads)
 const uploadPath = process.env.UPLOAD_PATH || path.join(__dirname, 'uploads');
 app.use('/uploads', express.static(uploadPath));
@@ -60,6 +72,10 @@ app.use('/api/analytics', analyticsRoutes);
 app.use('/api/profile', profileRoutes);
 app.use('/api/test', testRoutes);
 app.use('/api/letters', letterRoutes);
+app.use('/api/reminders', reminderRoutes);
+app.use('/api/evaluations', evaluationRoutes);
+app.use('/api/feedback', feedbackAcknowledgmentRoutes);
+app.use('/api/security', securityRoutes);
 
 // Health check
 app.get('/api/health', (_req, res) => {

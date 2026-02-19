@@ -320,6 +320,47 @@ export const lettersApi = {
       return { success: true };
     });
   },
+
+  // Letter Request API
+  createRequest: (data: Record<string, unknown>) =>
+    fetchApi('/letters/requests', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getRequests: (status?: string) => {
+    const query = status ? `?status=${status}` : '';
+    return fetchApi(`/letters/requests${query}`);
+  },
+
+  getRequestById: (id: string) => fetchApi(`/letters/requests/${id}`),
+
+  updateRequestStatus: (id: string, status: string, adminNotes?: string, sendEmail?: boolean) =>
+    fetchApi(`/letters/requests/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, adminNotes, sendEmail }),
+    }),
+
+  downloadLetterPDF: (id: string) => {
+    return fetch(`${API_BASE_URL}/letters/requests/${id}/download`, {
+      method: 'GET',
+      headers:
+        typeof window !== 'undefined' && localStorage.getItem('rmu_token')
+          ? { Authorization: `Bearer ${localStorage.getItem('rmu_token')}` }
+          : undefined,
+    }).then(async res => {
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.message || 'Failed to download letter');
+      }
+      return res.text();
+    });
+  },
+
+  markEmailSent: (id: string) =>
+    fetchApi(`/letters/requests/${id}/mark-email-sent`, {
+      method: 'PATCH',
+    }),
 };
 
 // Analytics API (Admin only)

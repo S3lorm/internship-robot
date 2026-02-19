@@ -849,6 +849,28 @@ function mapKeyToSupabase(key) {
     emailVerificationExpires: 'email_verification_expires',
     passwordResetToken: 'password_reset_token',
     passwordResetExpires: 'password_reset_expires',
+    actionRequired: 'action_required',
+    evaluationType: 'evaluation_type',
+    availableFrom: 'available_from',
+    submissionUrl: 'submission_url',
+    submissionDeadline: 'submission_deadline',
+    submittedAt: 'submitted_at',
+    reportType: 'report_type',
+    actionType: 'action_type',
+    isRequired: 'is_required',
+    isCompleted: 'is_completed',
+    completedAt: 'completed_at',
+    dueDate: 'due_date',
+    actionUrl: 'action_url',
+    viewedAt: 'viewed_at',
+    viewedBy: 'viewed_by',
+    feedbackAcknowledgedAt: 'feedback_acknowledged_at',
+    feedbackAcknowledgedBy: 'feedback_acknowledged_by',
+    requiresAcknowledgment: 'requires_acknowledgment',
+    acknowledgmentDeadline: 'acknowledgment_deadline',
+    feedbackViewedAt: 'feedback_viewed_at',
+    feedbackViewedBy: 'feedback_viewed_by',
+    requiresFeedbackAcknowledgment: 'requires_feedback_acknowledgment',
   };
   return mapping[key] || key;
 }
@@ -994,6 +1016,10 @@ function mapNotificationFromSupabase(row) {
     message: row.message,
     isRead: row.is_read,
     relatedId: row.related_id,
+    link: row.link,
+    priority: row.priority || 'medium',
+    actionRequired: row.action_required || false,
+    expiresAt: row.expires_at,
     createdAt: row.created_at,
     toJSON() {
       return { ...this };
@@ -1009,6 +1035,10 @@ function mapNotificationToSupabase(notification) {
   if (notification.message !== undefined) mapped.message = notification.message;
   if (notification.isRead !== undefined) mapped.is_read = notification.isRead;
   if (notification.relatedId !== undefined) mapped.related_id = notification.relatedId;
+  if (notification.link !== undefined) mapped.link = notification.link;
+  if (notification.priority !== undefined) mapped.priority = notification.priority;
+  if (notification.actionRequired !== undefined) mapped.action_required = notification.actionRequired;
+  if (notification.expiresAt !== undefined) mapped.expires_at = notification.expiresAt;
   if (notification.createdAt !== undefined) mapped.created_at = notification.createdAt;
   return mapped;
 }
@@ -1019,12 +1049,569 @@ const Op = {
   gte: 'gte',
 };
 
+// LetterRequest model helpers
+const LetterRequest = {
+  async findOne(where) {
+    let query = supabase.from('letter_requests').select('*');
+    
+    if (where.id) {
+      query = query.eq('id', where.id);
+    }
+    if (where.studentId) {
+      query = query.eq('student_id', where.studentId);
+    }
+    if (where.status) {
+      query = query.eq('status', where.status);
+    }
+
+    const { data, error } = await query.single();
+    
+    if (error && error.code !== 'PGRST116') {
+      throw error;
+    }
+    
+    return data ? mapLetterRequestFromSupabase(data) : null;
+  },
+
+  async findAll(options = {}) {
+    let query = supabase.from('letter_requests').select('*');
+    
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        const mappedKey = mapKeyToSupabase(key);
+        query = query.eq(mappedKey, value);
+      });
+    }
+    
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      const mappedField = mapKeyToSupabase(field);
+      query = query.order(mappedField, { ascending: direction === 'ASC' });
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
+    
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    
+    if (options.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    
+    return data.map(mapLetterRequestFromSupabase);
+  },
+
+  async findByPk(id, options = {}) {
+    const data = await this.findOne({ id });
+    if (!data) return null;
+    
+    // Handle includes
+    if (options.include) {
+      for (const include of options.include) {
+        if (include.model === User) {
+          if (include.as === 'student') {
+            const student = await User.findOne({ id: data.studentId });
+            if (student) data.student = student;
+          }
+          if (include.as === 'reviewer' && data.reviewedBy) {
+            const reviewer = await User.findOne({ id: data.reviewedBy });
+            if (reviewer) data.reviewer = reviewer;
+          }
+        }
+      }
+    }
+    
+    return data;
+  },
+
+  async create(requestData) {
+    const { v4: uuidv4 } = require('uuid');
+    const requestWithId = {
+      ...requestData,
+      id: requestData.id || uuidv4(),
+    };
+    
+    const { data, error } = await supabase
+      .from('letter_requests')
+      .insert(mapLetterRequestToSupabase(requestWithId))
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return mapLetterRequestFromSupabase(data);
+  },
+
+  async update(id, updates) {
+    const { data, error } = await supabase
+      .from('letter_requests')
+      .update(mapLetterRequestToSupabase(updates))
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return mapLetterRequestFromSupabase(data);
+  },
+
+  async destroy(id) {
+    const { error } = await supabase
+      .from('letter_requests')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return true;
+  },
+};
+
+function mapLetterRequestFromSupabase(row) {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    companyName: row.company_name,
+    companyEmail: row.company_email,
+    companyPhone: row.company_phone,
+    companyAddress: row.company_address,
+    internshipDuration: row.internship_duration,
+    internshipStartDate: row.internship_start_date,
+    internshipEndDate: row.internship_end_date,
+    purpose: row.purpose,
+    category: row.category,
+    additionalNotes: row.additional_notes,
+    status: row.status,
+    adminNotes: row.admin_notes,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    referenceNumber: row.reference_number,
+    verificationCode: row.verification_code,
+    pdfUrl: row.pdf_url,
+    pdfGeneratedAt: row.pdf_generated_at,
+    emailSent: row.email_sent,
+    emailSentAt: row.email_sent_at,
+    downloadCount: row.download_count,
+    lastDownloadedAt: row.last_downloaded_at,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    toJSON() {
+      return { ...this };
+    },
+    async save() {
+      return LetterRequest.update(this.id, this);
+    },
+    async destroy() {
+      return LetterRequest.destroy(this.id);
+    },
+  };
+}
+
+function mapLetterRequestToSupabase(request) {
+  const mapped = {};
+  if (request.studentId !== undefined) mapped.student_id = request.studentId;
+  if (request.companyName !== undefined) mapped.company_name = request.companyName;
+  if (request.companyEmail !== undefined) mapped.company_email = request.companyEmail;
+  if (request.companyPhone !== undefined) mapped.company_phone = request.companyPhone;
+  if (request.companyAddress !== undefined) mapped.company_address = request.companyAddress;
+  if (request.internshipDuration !== undefined) mapped.internship_duration = request.internshipDuration;
+  if (request.internshipStartDate !== undefined) mapped.internship_start_date = request.internshipStartDate;
+  if (request.internshipEndDate !== undefined) mapped.internship_end_date = request.internshipEndDate;
+  if (request.purpose !== undefined) mapped.purpose = request.purpose;
+  if (request.category !== undefined) mapped.category = request.category;
+  if (request.additionalNotes !== undefined) mapped.additional_notes = request.additionalNotes;
+  if (request.status !== undefined) mapped.status = request.status;
+  if (request.adminNotes !== undefined) mapped.admin_notes = request.adminNotes;
+  if (request.reviewedBy !== undefined) mapped.reviewed_by = request.reviewedBy;
+  if (request.reviewedAt !== undefined) mapped.reviewed_at = request.reviewedAt;
+  if (request.referenceNumber !== undefined) mapped.reference_number = request.referenceNumber;
+  if (request.verificationCode !== undefined) mapped.verification_code = request.verificationCode;
+  if (request.pdfUrl !== undefined) mapped.pdf_url = request.pdfUrl;
+  if (request.pdfGeneratedAt !== undefined) mapped.pdf_generated_at = request.pdfGeneratedAt;
+  if (request.emailSent !== undefined) mapped.email_sent = request.emailSent;
+  if (request.emailSentAt !== undefined) mapped.email_sent_at = request.emailSentAt;
+  if (request.downloadCount !== undefined) mapped.download_count = request.downloadCount;
+  if (request.lastDownloadedAt !== undefined) mapped.last_downloaded_at = request.lastDownloadedAt;
+  return mapped;
+}
+
+// Evaluation model helpers
+const Evaluation = {
+  async findOne(where) {
+    let query = supabase.from('evaluations').select('*');
+    if (where.id) query = query.eq('id', where.id);
+    if (where.studentId) query = query.eq('student_id', where.studentId);
+    const { data, error } = await query.single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data ? mapEvaluationFromSupabase(data) : null;
+  },
+  async findAll(options = {}) {
+    let query = supabase.from('evaluations').select('*');
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        query = query.eq(mapKeyToSupabase(key), value);
+      });
+    }
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      query = query.order(mapKeyToSupabase(field), { ascending: direction === 'ASC' });
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return data.map(mapEvaluationFromSupabase);
+  },
+  async create(evalData) {
+    const { v4: uuidv4 } = require('uuid');
+    const { data, error } = await supabase
+      .from('evaluations')
+      .insert({ ...mapEvaluationToSupabase(evalData), id: evalData.id || uuidv4() })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapEvaluationFromSupabase(data);
+  },
+  async update(id, updates) {
+    const { data, error } = await supabase
+      .from('evaluations')
+      .update(mapEvaluationToSupabase(updates))
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapEvaluationFromSupabase(data);
+  },
+};
+
+function mapEvaluationFromSupabase(row) {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    internshipId: row.internship_id,
+    title: row.title,
+    description: row.description,
+    evaluationType: row.evaluation_type,
+    isAvailable: row.is_available,
+    availableFrom: row.available_from,
+    deadline: row.deadline,
+    submissionUrl: row.submission_url,
+    viewedAt: row.viewed_at,
+    viewedBy: row.viewed_by,
+    feedbackAcknowledgedAt: row.feedback_acknowledged_at,
+    feedbackAcknowledgedBy: row.feedback_acknowledged_by,
+    requiresAcknowledgment: row.requires_acknowledgment,
+    acknowledgmentDeadline: row.acknowledgment_deadline,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    toJSON() { return { ...this }; },
+  };
+}
+
+function mapEvaluationToSupabase(eval) {
+  const mapped = {};
+  if (eval.studentId !== undefined) mapped.student_id = eval.studentId;
+  if (eval.internshipId !== undefined) mapped.internship_id = eval.internshipId;
+  if (eval.title !== undefined) mapped.title = eval.title;
+  if (eval.description !== undefined) mapped.description = eval.description;
+  if (eval.evaluationType !== undefined) mapped.evaluation_type = eval.evaluationType;
+  if (eval.isAvailable !== undefined) mapped.is_available = eval.isAvailable;
+  if (eval.availableFrom !== undefined) mapped.available_from = eval.availableFrom;
+  if (eval.deadline !== undefined) mapped.deadline = eval.deadline;
+  if (eval.submissionUrl !== undefined) mapped.submission_url = eval.submissionUrl;
+  if (eval.viewedAt !== undefined) mapped.viewed_at = eval.viewedAt;
+  if (eval.viewedBy !== undefined) mapped.viewed_by = eval.viewedBy;
+  if (eval.feedbackAcknowledgedAt !== undefined) mapped.feedback_acknowledged_at = eval.feedbackAcknowledgedAt;
+  if (eval.feedbackAcknowledgedBy !== undefined) mapped.feedback_acknowledged_by = eval.feedbackAcknowledgedBy;
+  if (eval.requiresAcknowledgment !== undefined) mapped.requires_acknowledgment = eval.requiresAcknowledgment;
+  if (eval.acknowledgmentDeadline !== undefined) mapped.acknowledgment_deadline = eval.acknowledgmentDeadline;
+  if (eval.createdBy !== undefined) mapped.created_by = eval.createdBy;
+  return mapped;
+}
+
+// Logbook model helpers
+const Logbook = {
+  async findOne(where) {
+    let query = supabase.from('logbooks').select('*');
+    if (where.id) query = query.eq('id', where.id);
+    if (where.studentId) query = query.eq('student_id', where.studentId);
+    const { data, error } = await query.single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data ? mapLogbookFromSupabase(data) : null;
+  },
+  async findAll(options = {}) {
+    let query = supabase.from('logbooks').select('*');
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        query = query.eq(mapKeyToSupabase(key), value);
+      });
+    }
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      query = query.order(mapKeyToSupabase(field), { ascending: direction === 'ASC' });
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return data.map(mapLogbookFromSupabase);
+  },
+  async create(logbookData) {
+    const { v4: uuidv4 } = require('uuid');
+    const { data, error } = await supabase
+      .from('logbooks')
+      .insert({ ...mapLogbookToSupabase(logbookData), id: logbookData.id || uuidv4() })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapLogbookFromSupabase(data);
+  },
+  async update(id, updates) {
+    const { data, error } = await supabase
+      .from('logbooks')
+      .update(mapLogbookToSupabase(updates))
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapLogbookFromSupabase(data);
+  },
+};
+
+function mapLogbookFromSupabase(row) {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    internshipId: row.internship_id,
+    title: row.title,
+    description: row.description,
+    submissionDeadline: row.submission_deadline,
+    submittedAt: row.submitted_at,
+    submissionUrl: row.submission_url,
+    status: row.status,
+    feedback: row.feedback,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    feedbackViewedAt: row.feedback_viewed_at,
+    feedbackViewedBy: row.feedback_viewed_by,
+    feedbackAcknowledgedAt: row.feedback_acknowledged_at,
+    feedbackAcknowledgedBy: row.feedback_acknowledged_by,
+    requiresFeedbackAcknowledgment: row.requires_feedback_acknowledgment,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    toJSON() { return { ...this }; },
+  };
+}
+
+function mapLogbookToSupabase(logbook) {
+  const mapped = {};
+  if (logbook.studentId !== undefined) mapped.student_id = logbook.studentId;
+  if (logbook.internshipId !== undefined) mapped.internship_id = logbook.internshipId;
+  if (logbook.title !== undefined) mapped.title = logbook.title;
+  if (logbook.description !== undefined) mapped.description = logbook.description;
+  if (logbook.submissionDeadline !== undefined) mapped.submission_deadline = logbook.submissionDeadline;
+  if (logbook.submittedAt !== undefined) mapped.submitted_at = logbook.submittedAt;
+  if (logbook.submissionUrl !== undefined) mapped.submission_url = logbook.submissionUrl;
+  if (logbook.status !== undefined) mapped.status = logbook.status;
+  if (logbook.feedback !== undefined) mapped.feedback = logbook.feedback;
+  if (logbook.reviewedBy !== undefined) mapped.reviewed_by = logbook.reviewedBy;
+  if (logbook.reviewedAt !== undefined) mapped.reviewed_at = logbook.reviewedAt;
+  if (logbook.feedbackViewedAt !== undefined) mapped.feedback_viewed_at = logbook.feedbackViewedAt;
+  if (logbook.feedbackViewedBy !== undefined) mapped.feedback_viewed_by = logbook.feedbackViewedBy;
+  if (logbook.feedbackAcknowledgedAt !== undefined) mapped.feedback_acknowledged_at = logbook.feedbackAcknowledgedAt;
+  if (logbook.feedbackAcknowledgedBy !== undefined) mapped.feedback_acknowledged_by = logbook.feedbackAcknowledgedBy;
+  if (logbook.requiresFeedbackAcknowledgment !== undefined) mapped.requires_feedback_acknowledgment = logbook.requiresFeedbackAcknowledgment;
+  return mapped;
+}
+
+// Report model helpers
+const Report = {
+  async findOne(where) {
+    let query = supabase.from('reports').select('*');
+    if (where.id) query = query.eq('id', where.id);
+    if (where.studentId) query = query.eq('student_id', where.studentId);
+    const { data, error } = await query.single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data ? mapReportFromSupabase(data) : null;
+  },
+  async findAll(options = {}) {
+    let query = supabase.from('reports').select('*');
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        query = query.eq(mapKeyToSupabase(key), value);
+      });
+    }
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      query = query.order(mapKeyToSupabase(field), { ascending: direction === 'ASC' });
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return data.map(mapReportFromSupabase);
+  },
+  async create(reportData) {
+    const { v4: uuidv4 } = require('uuid');
+    const { data, error } = await supabase
+      .from('reports')
+      .insert({ ...mapReportToSupabase(reportData), id: reportData.id || uuidv4() })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapReportFromSupabase(data);
+  },
+  async update(id, updates) {
+    const { data, error } = await supabase
+      .from('reports')
+      .update(mapReportToSupabase(updates))
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapReportFromSupabase(data);
+  },
+};
+
+function mapReportFromSupabase(row) {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    internshipId: row.internship_id,
+    title: row.title,
+    description: row.description,
+    reportType: row.report_type,
+    submissionDeadline: row.submission_deadline,
+    submittedAt: row.submitted_at,
+    submissionUrl: row.submission_url,
+    status: row.status,
+    feedback: row.feedback,
+    reviewedBy: row.reviewed_by,
+    reviewedAt: row.reviewed_at,
+    feedbackViewedAt: row.feedback_viewed_at,
+    feedbackViewedBy: row.feedback_viewed_by,
+    feedbackAcknowledgedAt: row.feedback_acknowledged_at,
+    feedbackAcknowledgedBy: row.feedback_acknowledged_by,
+    requiresFeedbackAcknowledgment: row.requires_feedback_acknowledgment,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    toJSON() { return { ...this }; },
+  };
+}
+
+function mapReportToSupabase(report) {
+  const mapped = {};
+  if (report.studentId !== undefined) mapped.student_id = report.studentId;
+  if (report.internshipId !== undefined) mapped.internship_id = report.internshipId;
+  if (report.title !== undefined) mapped.title = report.title;
+  if (report.description !== undefined) mapped.description = report.description;
+  if (report.reportType !== undefined) mapped.report_type = report.reportType;
+  if (report.submissionDeadline !== undefined) mapped.submission_deadline = report.submissionDeadline;
+  if (report.submittedAt !== undefined) mapped.submitted_at = report.submittedAt;
+  if (report.submissionUrl !== undefined) mapped.submission_url = report.submissionUrl;
+  if (report.status !== undefined) mapped.status = report.status;
+  if (report.feedback !== undefined) mapped.feedback = report.feedback;
+  if (report.reviewedBy !== undefined) mapped.reviewed_by = report.reviewedBy;
+  if (report.reviewedAt !== undefined) mapped.reviewed_at = report.reviewedAt;
+  if (report.feedbackViewedAt !== undefined) mapped.feedback_viewed_at = report.feedbackViewedAt;
+  if (report.feedbackViewedBy !== undefined) mapped.feedback_viewed_by = report.feedbackViewedBy;
+  if (report.feedbackAcknowledgedAt !== undefined) mapped.feedback_acknowledged_at = report.feedbackAcknowledgedAt;
+  if (report.feedbackAcknowledgedBy !== undefined) mapped.feedback_acknowledged_by = report.feedbackAcknowledgedBy;
+  if (report.requiresFeedbackAcknowledgment !== undefined) mapped.requires_feedback_acknowledgment = report.requiresFeedbackAcknowledgment;
+  return mapped;
+}
+
+// AdministrativeAction model helpers
+const AdministrativeAction = {
+  async findOne(where) {
+    let query = supabase.from('administrative_actions').select('*');
+    if (where.id) query = query.eq('id', where.id);
+    if (where.studentId) query = query.eq('student_id', where.studentId);
+    const { data, error } = await query.single();
+    if (error && error.code !== 'PGRST116') throw error;
+    return data ? mapAdminActionFromSupabase(data) : null;
+  },
+  async findAll(options = {}) {
+    let query = supabase.from('administrative_actions').select('*');
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        query = query.eq(mapKeyToSupabase(key), value);
+      });
+    }
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      query = query.order(mapKeyToSupabase(field), { ascending: direction === 'ASC' });
+    }
+    const { data, error } = await query;
+    if (error) throw error;
+    return data.map(mapAdminActionFromSupabase);
+  },
+  async create(actionData) {
+    const { v4: uuidv4 } = require('uuid');
+    const { data, error } = await supabase
+      .from('administrative_actions')
+      .insert({ ...mapAdminActionToSupabase(actionData), id: actionData.id || uuidv4() })
+      .select()
+      .single();
+    if (error) throw error;
+    return mapAdminActionFromSupabase(data);
+  },
+  async update(id, updates) {
+    const { data, error } = await supabase
+      .from('administrative_actions')
+      .update(mapAdminActionToSupabase(updates))
+      .eq('id', id)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapAdminActionFromSupabase(data);
+  },
+};
+
+function mapAdminActionFromSupabase(row) {
+  return {
+    id: row.id,
+    studentId: row.student_id,
+    actionType: row.action_type,
+    title: row.title,
+    description: row.description,
+    isRequired: row.is_required,
+    isCompleted: row.is_completed,
+    completedAt: row.completed_at,
+    dueDate: row.due_date,
+    actionUrl: row.action_url,
+    createdBy: row.created_by,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    toJSON() { return { ...this }; },
+  };
+}
+
+function mapAdminActionToSupabase(action) {
+  const mapped = {};
+  if (action.studentId !== undefined) mapped.student_id = action.studentId;
+  if (action.actionType !== undefined) mapped.action_type = action.actionType;
+  if (action.title !== undefined) mapped.title = action.title;
+  if (action.description !== undefined) mapped.description = action.description;
+  if (action.isRequired !== undefined) mapped.is_required = action.isRequired;
+  if (action.isCompleted !== undefined) mapped.is_completed = action.isCompleted;
+  if (action.completedAt !== undefined) mapped.completed_at = action.completedAt;
+  if (action.dueDate !== undefined) mapped.due_date = action.dueDate;
+  if (action.actionUrl !== undefined) mapped.action_url = action.actionUrl;
+  if (action.createdBy !== undefined) mapped.created_by = action.createdBy;
+  return mapped;
+}
+
 module.exports = {
   User,
   Internship,
   Application,
   Notice,
   Notification,
+  LetterRequest,
+  Evaluation,
+  Logbook,
+  Report,
+  AdministrativeAction,
   supabase, // Export supabase client for direct queries
   Op, // Export Op for compatibility
 };

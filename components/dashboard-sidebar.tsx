@@ -24,7 +24,8 @@ const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Internships", href: "/dashboard/internships", icon: Briefcase },
   { name: "My Applications", href: "/dashboard/applications", icon: FileText },
-  { name: "Application Letter", href: "/dashboard/letter", icon: FileCheck },
+  { name: "Letter Requests", href: "/dashboard/letter-requests", icon: FileCheck },
+  { name: "Application Letter", href: "/dashboard/letter", icon: FileText },
   { name: "Notifications", href: "/dashboard/notifications", icon: Bell },
   { name: "Profile", href: "/dashboard/profile", icon: User },
 ];

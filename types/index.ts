@@ -223,3 +223,50 @@ export interface ApplicationFilters {
     end: string;
   };
 }
+
+// Letter Request types
+export type LetterRequestStatus = 'pending' | 'approved' | 'rejected';
+
+export interface LetterRequest {
+  id: string;
+  studentId: string;
+  student?: User;
+  companyName: string;
+  companyEmail?: string;
+  companyPhone?: string;
+  companyAddress?: string;
+  internshipDuration: string;
+  internshipStartDate?: string;
+  internshipEndDate?: string;
+  purpose: string;
+  category?: string;
+  additionalNotes?: string;
+  status: LetterRequestStatus;
+  adminNotes?: string;
+  reviewedBy?: string;
+  reviewer?: User;
+  reviewedAt?: string;
+  referenceNumber?: string;
+  verificationCode?: string;
+  pdfUrl?: string;
+  pdfGeneratedAt?: string;
+  emailSent?: boolean;
+  emailSentAt?: string;
+  downloadCount?: number;
+  lastDownloadedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface LetterRequestFormData {
+  companyName: string;
+  companyEmail?: string;
+  companyPhone?: string;
+  companyAddress?: string;
+  internshipDuration: string;
+  internshipStartDate?: string;
+  internshipEndDate?: string;
+  purpose: string;
+  category?: string;
+  additionalNotes?: string;
+}

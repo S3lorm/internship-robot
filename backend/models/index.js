@@ -1,5 +1,17 @@
 // Export Supabase models instead of Sequelize models
-const { User, Internship, Application, Notice, Notification, supabase } = require('./supabase');
+const { 
+  User, 
+  Internship, 
+  Application, 
+  Notice, 
+  Notification, 
+  LetterRequest,
+  Evaluation,
+  Logbook,
+  Report,
+  AdministrativeAction,
+  supabase 
+} = require('./supabase');
 
 // For backward compatibility, export sequelize as null
 // Some code might check for sequelize, but we're using Supabase now
@@ -12,6 +24,11 @@ module.exports = {
   Application,
   Notice,
   Notification,
+  LetterRequest,
+  Evaluation,
+  Logbook,
+  Report,
+  AdministrativeAction,
   supabase,
 };
 

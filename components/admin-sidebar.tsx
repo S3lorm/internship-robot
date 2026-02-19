@@ -13,6 +13,7 @@ import {
   Users,
   Briefcase,
   FileText,
+  FileCheck,
   Bell,
   Settings,
   LogOut,
@@ -25,6 +26,7 @@ const adminNavItems = [
   { href: "/admin/users", label: "User Management", icon: Users },
   { href: "/admin/internships", label: "Internships", icon: Briefcase },
   { href: "/admin/applications", label: "Applications", icon: FileText },
+  { href: "/admin/letter-requests", label: "Letter Requests", icon: FileCheck },
   { href: "/admin/notices", label: "Notices", icon: Bell },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
 ];
