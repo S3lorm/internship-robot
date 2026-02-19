@@ -170,7 +170,7 @@ export default function LoginPage() {
             <p className="mt-1">
               Student: student@st.rmu.edu.gh / password123
             </p>
-            <p>Admin: admin@rmu.edu.gh / password123</p>
+            <p>Admin: admin@rmu.edu.gh / Admin@2024</p>
           </div>
         </CardFooter>
       </Card>

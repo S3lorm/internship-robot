@@ -14,10 +14,10 @@ router.get('/', evaluationController.getEvaluations);
 router.get('/:id', evaluationController.getEvaluationById);
 
 // Mark evaluation as viewed
-router.post('/:id/view', evaluationController.markEvaluationViewed);
+router.patch('/:id/view', evaluationController.markEvaluationViewed);
 
 // Acknowledge evaluation feedback
-router.post('/:id/acknowledge', evaluationController.acknowledgeEvaluationFeedback);
+router.patch('/:id/acknowledge', evaluationController.acknowledgeEvaluationFeedback);
 
 // Create evaluation (Admin only)
 router.post('/', evaluationController.createEvaluation);
@@ -26,4 +26,5 @@ router.post('/', evaluationController.createEvaluation);
 router.patch('/:id', evaluationController.updateEvaluation);
 
 module.exports = router;
+
 

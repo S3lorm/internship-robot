@@ -79,3 +79,4 @@ function getResourceType(path) {
 
 module.exports = activityLogger;
 
+

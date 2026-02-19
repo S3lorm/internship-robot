@@ -28,3 +28,4 @@ router.patch('/security-events/:id/resolve', requireRole('admin'), securityContr
 
 module.exports = router;
 
+

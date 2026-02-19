@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { notificationsApi } from "@/lib/api";
 import {
   LayoutDashboard,
   Briefcase,
@@ -18,14 +19,14 @@ import {
   LogOut,
   Anchor,
   Settings,
+  ClipboardCheck,
 } from "lucide-react";
 
 const navigation = [
   { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
   { name: "Internships", href: "/dashboard/internships", icon: Briefcase },
-  { name: "My Applications", href: "/dashboard/applications", icon: FileText },
+  { name: "Evaluations", href: "/dashboard/evaluations", icon: ClipboardCheck },
   { name: "Letter Requests", href: "/dashboard/letter-requests", icon: FileCheck },
-  { name: "Application Letter", href: "/dashboard/letter", icon: FileText },
   { name: "Notifications", href: "/dashboard/notifications", icon: Bell },
   { name: "Profile", href: "/dashboard/profile", icon: User },
 ];
@@ -38,6 +39,40 @@ interface DashboardSidebarProps {
 export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const result = await notificationsApi.getAll();
+        if (result.data) {
+          // Backend returns { data: notifications[] }, fetchApi wraps it as { data: { data: notifications[] } }
+          // Handle both possible structures
+          let notifications: any[] = [];
+          if (Array.isArray(result.data)) {
+            notifications = result.data;
+          } else if (result.data && typeof result.data === 'object') {
+            // Check if it's { data: notifications[] } structure
+            if (Array.isArray((result.data as any).data)) {
+              notifications = (result.data as any).data;
+            } else if (Array.isArray((result.data as any).notifications)) {
+              notifications = (result.data as any).notifications;
+            }
+          }
+          const unread = notifications.filter((n: any) => !n.isRead).length;
+          setUnreadCount(unread);
+        }
+      } catch (error) {
+        // Silently fail - don't break the sidebar
+      }
+    };
+
+    fetchUnreadCount();
+    // Poll every 30 seconds for real-time updates
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   const handleLogout = () => {
     logout();
@@ -84,9 +119,9 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
                 isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/60"
               )} />
               <span className="truncate">{item.name}</span>
-              {item.name === "Notifications" && (
-                <Badge variant="secondary" className="ml-auto h-5 min-w-5 px-1.5 text-xs">
-                  3
+              {item.name === "Notifications" && unreadCount > 0 && (
+                <Badge variant="secondary" className="ml-auto h-5 min-w-5 px-1.5 text-xs bg-primary text-primary-foreground">
+                  {unreadCount > 99 ? "99+" : unreadCount}
                 </Badge>
               )}
             </Link>

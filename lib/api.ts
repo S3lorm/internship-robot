@@ -137,6 +137,20 @@ export const authApi = {
       body: JSON.stringify(data),
     }),
 
+  changePassword: (currentPassword: string, newPassword: string) =>
+    fetchApi('/profile/password', {
+      method: 'PATCH',
+      body: JSON.stringify({ currentPassword, newPassword }),
+    }),
+
+  getPreferences: () => fetchApi('/profile/preferences'),
+
+  updatePreferences: (preferences: Record<string, unknown>) =>
+    fetchApi('/profile/preferences', {
+      method: 'PATCH',
+      body: JSON.stringify(preferences),
+    }),
+
   uploadAvatar: (file: File) => {
     const formData = new FormData();
     formData.append('avatar', file);
@@ -150,11 +164,18 @@ export const authApi = {
     }).then(async res => {
       const json = await res.json();
       if (!res.ok) {
-        return { error: json.message || 'Failed to upload avatar' };
+        return { error: json.message || json.error || 'Failed to upload avatar' };
       }
       return { data: json };
+    }).catch(error => {
+      return { error: error.message || 'Network error while uploading avatar' };
     });
   },
+
+  removeAvatar: () =>
+    fetchApi('/profile/avatar', {
+      method: 'DELETE',
+    }),
 };
 
 // Internships API
@@ -335,6 +356,12 @@ export const lettersApi = {
 
   getRequestById: (id: string) => fetchApi(`/letters/requests/${id}`),
 
+  updateRequest: (id: string, data: Record<string, unknown>) =>
+    fetchApi(`/letters/requests/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+
   updateRequestStatus: (id: string, status: string, adminNotes?: string, sendEmail?: boolean) =>
     fetchApi(`/letters/requests/${id}/status`, {
       method: 'PATCH',
@@ -403,4 +430,60 @@ export const usersApi = {
     fetchApi(`/users/${id}`, {
       method: 'DELETE',
     }),
+};
+
+// Reminders API
+export const remindersApi = {
+  getUpcomingDeadlines: () => fetchApi('/reminders/upcoming'),
+  getOverdueItems: () => fetchApi('/reminders/overdue'),
+  triggerReminders: () => fetchApi('/reminders/trigger', { method: 'POST' }), // Admin only
+};
+
+// Evaluations API
+export const evaluationsApi = {
+  getAll: () => fetchApi('/evaluations'),
+  getById: (id: string) => fetchApi(`/evaluations/${id}`),
+  markAsViewed: (id: string) => fetchApi(`/evaluations/${id}/view`, { method: 'PATCH' }),
+  acknowledgeFeedback: (id: string) => fetchApi(`/evaluations/${id}/acknowledge`, { method: 'PATCH' }),
+  create: (data: Record<string, unknown>) =>
+    fetchApi('/evaluations', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+  update: (id: string, data: Record<string, unknown>) =>
+    fetchApi(`/evaluations/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    }),
+};
+
+// Logbooks API
+export const logbooksApi = {
+  getAll: () => fetchApi('/logbooks'),
+  getById: (id: string) => fetchApi(`/logbooks/${id}`),
+  submit: (id: string, data: any) => fetchApi(`/logbooks/${id}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  markFeedbackViewed: (id: string) => fetchApi(`/logbooks/${id}/view-feedback`, { method: 'PATCH' }),
+  acknowledgeFeedback: (id: string) => fetchApi(`/logbooks/${id}/acknowledge-feedback`, { method: 'PATCH' }),
+};
+
+// Reports API
+export const reportsApi = {
+  getAll: () => fetchApi('/reports'),
+  getById: (id: string) => fetchApi(`/reports/${id}`),
+  submit: (id: string, data: any) => fetchApi(`/reports/${id}/submit`, {
+    method: 'POST',
+    body: JSON.stringify(data),
+  }),
+  markFeedbackViewed: (id: string) => fetchApi(`/reports/${id}/view-feedback`, { method: 'PATCH' }),
+  acknowledgeFeedback: (id: string) => fetchApi(`/reports/${id}/acknowledge-feedback`, { method: 'PATCH' }),
+};
+
+// Administrative Actions API
+export const administrativeActionsApi = {
+  getAll: () => fetchApi('/administrative-actions'),
+  getById: (id: string) => fetchApi(`/administrative-actions/${id}`),
+  markAsCompleted: (id: string) => fetchApi(`/administrative-actions/${id}/complete`, { method: 'PATCH' }),
 };

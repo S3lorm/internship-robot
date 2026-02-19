@@ -32,7 +32,7 @@ import { lettersApi } from "@/lib/api";
 import { internshipsApi } from "@/lib/api";
 import type { Internship } from "@/types";
 
-export default function LetterPage() {
+export default function AdminLetterPage() {
   const router = useRouter();
   const { user, isAuthenticated, isLoading: authLoading } = useAuth();
   const [internships, setInternships] = useState<Internship[]>([]);
@@ -45,13 +45,13 @@ export default function LetterPage() {
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
       router.push("/login");
-    } else if (!authLoading && isAuthenticated && user?.role !== "student") {
+    } else if (!authLoading && isAuthenticated && user?.role !== "admin") {
       router.push("/dashboard");
     }
   }, [authLoading, isAuthenticated, user, router]);
 
   useEffect(() => {
-    if (isAuthenticated && user?.role === "student") {
+    if (isAuthenticated && user?.role === "admin") {
       loadInternships();
     }
   }, [isAuthenticated, user]);
@@ -123,7 +123,7 @@ export default function LetterPage() {
     );
   }
 
-  if (!user || user.role !== "student") {
+  if (!user || user.role !== "admin") {
     return null;
   }
 
@@ -131,10 +131,10 @@ export default function LetterPage() {
     <div className="space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-foreground md:text-3xl">
-          Internship Application Letter
+          Application Letter Generator
         </h1>
         <p className="text-muted-foreground">
-          Generate and download your official internship application letter
+          Generate and download official internship application letters for students
         </p>
       </div>
 
@@ -210,9 +210,9 @@ export default function LetterPage() {
       {letterHtml && (
         <Card>
           <CardHeader>
-            <CardTitle>Your Letter</CardTitle>
+            <CardTitle>Generated Letter</CardTitle>
             <CardDescription>
-              Review your letter and download or print it
+              Review the letter and download or print it
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -258,7 +258,7 @@ export default function LetterPage() {
           <div className="flex items-start gap-2">
             <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" />
             <p>
-              The letter includes your personal information, program details, and an official recommendation from your department.
+              The letter includes student personal information, program details, and an official recommendation from the department.
             </p>
           </div>
           <div className="flex items-start gap-2">
@@ -276,7 +276,7 @@ export default function LetterPage() {
           <div className="flex items-start gap-2">
             <CheckCircle2 className="h-4 w-4 text-green-600 mt-0.5" />
             <p>
-              The letter includes the official signature of your department head.
+              The letter includes the official signature of the department head.
             </p>
           </div>
         </CardContent>
@@ -284,3 +284,4 @@ export default function LetterPage() {
     </div>
   );
 }
+

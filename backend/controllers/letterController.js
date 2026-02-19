@@ -848,6 +848,68 @@ async function markEmailSent(req, res) {
   }
 }
 
+// Update letter request details (Admin only - before approval)
+async function updateRequest(req, res) {
+  try {
+    const user = req.user;
+    const { LetterRequest } = require('../models');
+    const { id } = req.params;
+    const {
+      companyName,
+      companyEmail,
+      companyPhone,
+      companyAddress,
+      internshipDuration,
+      internshipStartDate,
+      internshipEndDate,
+      purpose,
+      category,
+      additionalNotes,
+    } = req.body;
+
+    if (user.role !== 'admin') {
+      return res.status(403).json({ message: 'Admin access required' });
+    }
+
+    const request = await LetterRequest.findByPk(id);
+    if (!request) {
+      return res.status(404).json({ message: 'Letter request not found' });
+    }
+
+    // Only allow editing if status is pending
+    if (request.status !== 'pending') {
+      return res.status(400).json({ 
+        message: 'Cannot edit request that has already been approved or rejected' 
+      });
+    }
+
+    const updateData = {};
+    if (companyName !== undefined) updateData.companyName = companyName;
+    if (companyEmail !== undefined) updateData.companyEmail = companyEmail;
+    if (companyPhone !== undefined) updateData.companyPhone = companyPhone;
+    if (companyAddress !== undefined) updateData.companyAddress = companyAddress;
+    if (internshipDuration !== undefined) updateData.internshipDuration = internshipDuration;
+    if (internshipStartDate !== undefined) updateData.internshipStartDate = internshipStartDate;
+    if (internshipEndDate !== undefined) updateData.internshipEndDate = internshipEndDate;
+    if (purpose !== undefined) updateData.purpose = purpose;
+    if (category !== undefined) updateData.category = category;
+    if (additionalNotes !== undefined) updateData.additionalNotes = additionalNotes;
+
+    const updated = await LetterRequest.update(id, updateData);
+
+    res.json({ 
+      message: 'Request updated successfully', 
+      request: updated 
+    });
+  } catch (error) {
+    console.error('Error updating letter request:', error);
+    res.status(500).json({ 
+      message: 'Failed to update request', 
+      error: error.message 
+    });
+  }
+}
+
 module.exports = {
   generateLetter,
   downloadLetter,
@@ -855,6 +917,7 @@ module.exports = {
   createRequest,
   getRequests,
   getRequestById,
+  updateRequest,
   updateRequestStatus,
   downloadLetterPDF,
   markEmailSent,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,12 +15,15 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import {
-  mockApplications,
-  mockInternships,
-  mockNotices,
-  mockNotifications,
   mockRegionalCompanies,
 } from "@/lib/mock-data";
+import {
+  applicationsApi,
+  internshipsApi,
+  noticesApi,
+  notificationsApi,
+} from "@/lib/api";
+import type { Application, Internship, Notice, Notification } from "@/types";
 import {
   FileText,
   Clock,
@@ -32,26 +35,80 @@ import {
   Eye,
   MapPin,
   Mail,
+  Loader2,
 } from "lucide-react";
+import { DeadlinesWidget } from "@/components/deadlines-widget";
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [applications, setApplications] = useState<Application[]>([]);
+  const [internships, setInternships] = useState<Internship[]>([]);
+  const [notices, setNotices] = useState<Notice[]>([]);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Get user's applications
-  const myApplications = mockApplications.filter(
-    (app) => app.studentId === user?.id
-  );
+  // Fetch all data on component mount
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError(null);
+
+        // Fetch applications
+        const appsResult = await applicationsApi.getMyApplications();
+        if (appsResult.error) {
+          throw new Error(appsResult.error);
+        }
+        // Backend returns { data: applications[] }
+        setApplications(Array.isArray(appsResult.data?.data) ? appsResult.data.data : (Array.isArray(appsResult.data) ? appsResult.data : []));
+
+        // Fetch internships
+        const internshipsResult = await internshipsApi.getAll();
+        if (internshipsResult.error) {
+          throw new Error(internshipsResult.error);
+        }
+        // Backend returns { data: internships[], meta: {...} }
+        setInternships(Array.isArray(internshipsResult.data?.data) ? internshipsResult.data.data : (Array.isArray(internshipsResult.data) ? internshipsResult.data : []));
+
+        // Fetch notices
+        const noticesResult = await noticesApi.getAll({ isActive: "true" });
+        if (noticesResult.error) {
+          throw new Error(noticesResult.error);
+        }
+        // Backend returns { data: notices[], meta: {...} }
+        setNotices(Array.isArray(noticesResult.data?.data) ? noticesResult.data.data : (Array.isArray(noticesResult.data) ? noticesResult.data : []));
+
+        // Fetch notifications
+        const notificationsResult = await notificationsApi.getAll();
+        if (notificationsResult.error) {
+          throw new Error(notificationsResult.error);
+        }
+        // Backend returns { data: notifications[] }
+        setNotifications(Array.isArray(notificationsResult.data?.data) ? notificationsResult.data.data : (Array.isArray(notificationsResult.data) ? notificationsResult.data : []));
+      } catch (err) {
+        console.error("Error fetching dashboard data:", err);
+        setError(err instanceof Error ? err.message : "Failed to load dashboard data");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    if (user) {
+      fetchData();
+    }
+  }, [user]);
 
   const stats = {
-    total: myApplications.length,
-    pending: myApplications.filter((a) => a.status === "pending").length,
-    underReview: myApplications.filter((a) => a.status === "under_review").length,
-    approved: myApplications.filter((a) => a.status === "approved").length,
-    rejected: myApplications.filter((a) => a.status === "rejected").length,
+    total: applications.length,
+    pending: applications.filter((a) => a.status === "pending").length,
+    underReview: applications.filter((a) => a.status === "under_review").length,
+    approved: applications.filter((a) => a.status === "approved").length,
+    rejected: applications.filter((a) => a.status === "rejected").length,
   };
 
-  const unreadNotifications = mockNotifications.filter((n) => !n.isRead);
-  const activeNotices = mockNotices.filter((n) => n.isActive && n.isPinned);
+  const unreadNotifications = notifications.filter((n) => !n.isRead);
+  const activeNotices = notices.filter((n) => n.isActive);
 
   const [selectedRegion, setSelectedRegion] = useState<string>("all");
   const regions = useMemo(() => {
@@ -117,7 +174,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Important Notice */}
-      {activeNotices.length > 0 && (
+      {!loading && activeNotices.length > 0 && (
         <Card className="border-primary/30 bg-primary/5">
           <CardContent className="flex items-start gap-3 p-4">
             <Bell className="mt-0.5 h-5 w-5 text-primary" />
@@ -139,8 +196,14 @@ export default function DashboardPage() {
               <FileText className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-sm text-muted-foreground">Total Applications</p>
+              {loading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{stats.total}</p>
+                  <p className="text-sm text-muted-foreground">Total Applications</p>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -151,8 +214,14 @@ export default function DashboardPage() {
               <Clock className="h-6 w-6 text-yellow-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{stats.pending + stats.underReview}</p>
-              <p className="text-sm text-muted-foreground">In Progress</p>
+              {loading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{stats.pending + stats.underReview}</p>
+                  <p className="text-sm text-muted-foreground">In Progress</p>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -163,8 +232,14 @@ export default function DashboardPage() {
               <CheckCircle2 className="h-6 w-6 text-green-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{stats.approved}</p>
-              <p className="text-sm text-muted-foreground">Approved</p>
+              {loading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{stats.approved}</p>
+                  <p className="text-sm text-muted-foreground">Approved</p>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -175,15 +250,21 @@ export default function DashboardPage() {
               <TrendingUp className="h-6 w-6 text-blue-600" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{mockInternships.length}</p>
-              <p className="text-sm text-muted-foreground">Open Positions</p>
+              {loading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{internships.length}</p>
+                  <p className="text-sm text-muted-foreground">Open Positions</p>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Application Progress */}
-      {stats.total > 0 && (
+      {!loading && stats.total > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-lg">Application Progress</CardTitle>
@@ -200,7 +281,7 @@ export default function DashboardPage() {
                 </span>
               </div>
               <Progress
-                value={((stats.approved + stats.rejected) / stats.total) * 100}
+                value={stats.total > 0 ? ((stats.approved + stats.rejected) / stats.total) * 100 : 0}
                 className="h-2"
               />
               <div className="flex flex-wrap gap-4 text-sm">
@@ -239,7 +320,16 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {myApplications.length === 0 ? (
+            {loading ? (
+              <div className="py-8 text-center">
+                <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-muted-foreground">Loading applications...</p>
+              </div>
+            ) : error ? (
+              <div className="py-8 text-center">
+                <p className="text-destructive">{error}</p>
+              </div>
+            ) : applications.length === 0 ? (
               <div className="py-8 text-center">
                 <FileText className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
                 <p className="text-muted-foreground">No applications yet</p>
@@ -249,33 +339,36 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {myApplications.slice(0, 3).map((application) => (
-                  <div
-                    key={application.id}
-                    className="flex items-start justify-between rounded-lg border border-border p-4"
-                  >
-                    <div className="flex items-start gap-3">
-                      {getStatusIcon(application.status)}
-                      <div>
-                        <p className="font-medium">
-                          {application.internship?.title}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {application.internship?.company}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Applied{" "}
-                          {new Date(application.createdAt).toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </p>
+                {applications.slice(0, 3).map((application) => {
+                  const internship = internships.find((i) => i.id === application.internshipId);
+                  return (
+                    <div
+                      key={application.id}
+                      className="flex items-start justify-between rounded-lg border border-border p-4"
+                    >
+                      <div className="flex items-start gap-3">
+                        {getStatusIcon(application.status)}
+                        <div>
+                          <p className="font-medium">
+                            {internship?.title || "Unknown Internship"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            {internship?.company || "Unknown Company"}
+                          </p>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            Applied{" "}
+                            {new Date(application.appliedAt || application.createdAt).toLocaleDateString("en-GB", {
+                              day: "numeric",
+                              month: "short",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
                       </div>
+                      {getStatusBadge(application.status)}
                     </div>
-                    {getStatusBadge(application.status)}
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </CardContent>
@@ -295,7 +388,16 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent>
-            {unreadNotifications.length === 0 ? (
+            {loading ? (
+              <div className="py-8 text-center">
+                <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-muted-foreground">Loading notifications...</p>
+              </div>
+            ) : error ? (
+              <div className="py-8 text-center">
+                <p className="text-destructive">{error}</p>
+              </div>
+            ) : unreadNotifications.length === 0 ? (
               <div className="py-8 text-center">
                 <Bell className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
                 <p className="text-muted-foreground">No new notifications</p>

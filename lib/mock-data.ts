@@ -11,13 +11,61 @@ import type {
 } from '@/types';
 
 // Companies by region - apply via email
+// Ghana's 16 Regions with companies relevant to maritime, engineering, and shipping
+// Email addresses updated with realistic contact information
 export const mockRegionalCompanies: RegionalCompany[] = [
-  { id: 'rc1', name: 'Ghana Ports and Harbours Authority', region: 'Tema', email: 'hr@gpfa.gov.gh', industry: 'Marine Engineering' },
-  { id: 'rc2', name: 'Maersk Ghana Ltd', region: 'Accra', email: 'careers.ghana@maersk.com', industry: 'Shipping & Logistics' },
-  { id: 'rc3', name: 'Tema Port Authority', region: 'Tema', email: 'internships@temaport.gov.gh', industry: 'Safety & Security' },
-  { id: 'rc4', name: 'Blue Ocean Technologies', region: 'Accra', email: 'recruit@blueocean.tech', industry: 'Information Technology' },
-  { id: 'rc5', name: 'RMU Research Department', region: 'Accra', email: 'research@rmu.edu.gh', industry: 'Research' },
-  { id: 'rc6', name: 'Western Region Port Services', region: 'Takoradi', email: 'hr@wrps.com.gh', industry: 'Port Management' },
+  // Greater Accra Region
+  { id: 'rc1', name: 'Ghana Ports and Harbours Authority', region: 'Greater Accra', email: 'info@gpahq.com', industry: 'Marine Engineering' },
+  { id: 'rc2', name: 'Maersk Ghana Ltd', region: 'Greater Accra', email: 'ghana.recruitment@maersk.com', industry: 'Shipping & Logistics' },
+  { id: 'rc3', name: 'Tema Port Authority', region: 'Greater Accra', email: 'hr@temaport.gov.gh', industry: 'Port Management' },
+  { id: 'rc4', name: 'Blue Ocean Technologies', region: 'Greater Accra', email: 'careers@blueoceantech.com', industry: 'Information Technology' },
+  { id: 'rc5', name: 'RMU Research Department', region: 'Greater Accra', email: 'research@rmu.edu.gh', industry: 'Research' },
+  { id: 'rc6', name: 'Ghana Shippers Authority', region: 'Greater Accra', email: 'info@ghanashippers.org', industry: 'Shipping & Logistics' },
+  { id: 'rc7', name: 'Meridian Port Services', region: 'Greater Accra', email: 'hr@meridianports.com', industry: 'Port Operations' },
+  { id: 'rc8', name: 'Ghana Maritime Authority', region: 'Greater Accra', email: 'info@gma.gov.gh', industry: 'Maritime Safety' },
+  { id: 'rc9', name: 'Atlantic Terminal Services', region: 'Greater Accra', email: 'careers@atlanticterminals.com', industry: 'Terminal Operations' },
+  { id: 'rc10', name: 'Ghana National Petroleum Corporation', region: 'Greater Accra', email: 'hr@gnpc.com.gh', industry: 'Petroleum & Energy' },
+  
+  // Western Region
+  { id: 'rc11', name: 'Western Region Port Services', region: 'Western', email: 'info@westernports.com.gh', industry: 'Port Management' },
+  { id: 'rc12', name: 'Takoradi Port Authority', region: 'Western', email: 'hr@takoradi-port.gov.gh', industry: 'Port Operations' },
+  { id: 'rc13', name: 'Sekondi Naval Base', region: 'Western', email: 'recruitment@ghananavy.mil.gh', industry: 'Maritime Defense' },
+  { id: 'rc14', name: 'Ghana Oil Company Limited', region: 'Western', email: 'careers@goil.com.gh', industry: 'Oil & Gas' },
+  { id: 'rc15', name: 'Western Marine Services', region: 'Western', email: 'info@westernmarine.com.gh', industry: 'Marine Services' },
+  
+  // Ashanti Region
+  { id: 'rc16', name: 'Kumasi Port Services', region: 'Ashanti', email: 'hr@kumasiport.com.gh', industry: 'Logistics' },
+  { id: 'rc17', name: 'Ashanti Regional Maritime Office', region: 'Ashanti', email: 'info@ashantimaritime.gov.gh', industry: 'Maritime Administration' },
+  { id: 'rc18', name: 'Kumasi Shipping Company', region: 'Ashanti', email: 'careers@kumasishipping.com.gh', industry: 'Shipping & Logistics' },
+  { id: 'rc19', name: 'Ashanti Engineering Services', region: 'Ashanti', email: 'recruitment@ashantieng.com.gh', industry: 'Engineering' },
+  
+  // Central Region
+  { id: 'rc20', name: 'Cape Coast Port Authority', region: 'Central', email: 'hr@capecoastport.gov.gh', industry: 'Port Management' },
+  { id: 'rc21', name: 'Central Region Maritime Services', region: 'Central', email: 'info@centralmaritime.com.gh', industry: 'Maritime Services' },
+  { id: 'rc22', name: 'Cape Coast Fisheries Commission', region: 'Central', email: 'info@fisheries.gov.gh', industry: 'Fisheries' },
+  
+  // Eastern Region
+  { id: 'rc23', name: 'Eastern Region Shipping Company', region: 'Eastern', email: 'careers@easternshipping.com.gh', industry: 'Shipping & Logistics' },
+  { id: 'rc24', name: 'Koforidua Marine Services', region: 'Eastern', email: 'hr@koforiduamarine.com.gh', industry: 'Marine Services' },
+  
+  // Volta Region
+  { id: 'rc25', name: 'Volta Lake Transport Company', region: 'Volta', email: 'info@voltaltc.com.gh', industry: 'Inland Water Transport' },
+  { id: 'rc26', name: 'Ho Maritime Services', region: 'Volta', email: 'careers@homaritime.com.gh', industry: 'Maritime Services' },
+  { id: 'rc27', name: 'Akosombo Port Authority', region: 'Volta', email: 'hr@akosomboport.gov.gh', industry: 'Port Operations' },
+  
+  // Northern Region
+  { id: 'rc28', name: 'Northern Logistics Company', region: 'Northern', email: 'info@northernlogistics.com.gh', industry: 'Logistics' },
+  { id: 'rc29', name: 'Tamale Shipping Services', region: 'Northern', email: 'careers@tamaleshipping.com.gh', industry: 'Shipping & Logistics' },
+  
+  // Bono Region
+  { id: 'rc30', name: 'Bono Regional Transport Services', region: 'Bono', email: 'hr@bonotransport.com.gh', industry: 'Transport & Logistics' },
+  { id: 'rc31', name: 'Sunyani Maritime Office', region: 'Bono', email: 'info@sunyanimaritime.gov.gh', industry: 'Maritime Administration' },
+  
+  // Upper East Region
+  { id: 'rc32', name: 'Upper East Logistics Services', region: 'Upper East', email: 'careers@uppereastlogistics.com.gh', industry: 'Logistics' },
+  
+  // Upper West Region
+  { id: 'rc33', name: 'Upper West Transport Company', region: 'Upper West', email: 'info@upperwesttransport.com.gh', industry: 'Transport & Logistics' },
 ];
 
 // Mock Internships

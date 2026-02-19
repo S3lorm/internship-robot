@@ -48,6 +48,7 @@ export default function ProfilePage() {
   const { user, updateUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
@@ -109,54 +110,136 @@ export default function ProfilePage() {
           <Card>
             <CardContent className="flex flex-col items-center gap-6 p-6 sm:flex-row">
               <div className="relative">
-                <Avatar className="h-24 w-24">
-                  <AvatarImage src={user.avatar || "/placeholder.svg"} alt={user.firstName} />
-                  <AvatarFallback className="bg-primary/10 text-2xl text-primary">
-                    {user.firstName[0]}
-                    {user.lastName[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <label
-                  className="absolute bottom-0 right-0 flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-transform hover:scale-105 cursor-pointer"
-                  aria-label="Change profile picture"
-                >
-                  <Camera className="h-4 w-4" />
-                  <input
-                    type="file"
-                    accept="image/*"
-                    className="hidden"
-                    onChange={async (e) => {
-                      const file = e.target.files?.[0];
-                      if (!file) return;
-                      
-                      // Validate file size (max 5MB)
-                      if (file.size > 5 * 1024 * 1024) {
-                        toast.error("Image size must be less than 5MB");
-                        return;
-                      }
-                      
-                      // Validate file type
-                      if (!file.type.startsWith('image/')) {
-                        toast.error("Please select an image file");
-                        return;
-                      }
-                      
-                      setIsUploadingAvatar(true);
-                      const result = await authApi.uploadAvatar(file);
-                      setIsUploadingAvatar(false);
-                      
-                      if (result.error) {
-                        toast.error(result.error);
-                      } else {
-                        toast.success("Avatar updated successfully!");
-                        if (result.data?.user) {
-                          updateUser(result.data.user);
+                <div className="relative">
+                  <Avatar className="h-32 w-32 border-4 border-background shadow-lg">
+                    {isUploadingAvatar ? (
+                      <div className="flex h-full w-full items-center justify-center bg-muted">
+                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                      </div>
+                    ) : (
+                      <>
+                        <AvatarImage 
+                          src={
+                            avatarPreview 
+                              ? avatarPreview 
+                              : user.avatar 
+                                ? user.avatar.startsWith('http') || user.avatar.startsWith('/uploads')
+                                  ? user.avatar.startsWith('http')
+                                    ? user.avatar
+                                    : `${typeof window !== 'undefined' ? window.location.origin : ''}${user.avatar}`
+                                  : user.avatar
+                                : "/placeholder.svg"
+                          } 
+                          alt={`${user.firstName} ${user.lastName}`}
+                          className="object-cover"
+                        />
+                        <AvatarFallback className="bg-primary/10 text-3xl font-semibold text-primary">
+                          {user.firstName?.[0] || ""}
+                          {user.lastName?.[0] || ""}
+                        </AvatarFallback>
+                      </>
+                    )}
+                  </Avatar>
+                  <label
+                    className={`absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:scale-110 hover:bg-primary/90 cursor-pointer ${
+                      isUploadingAvatar ? "opacity-50 cursor-not-allowed" : ""
+                    }`}
+                    aria-label="Change profile picture"
+                  >
+                    {isUploadingAvatar ? (
+                      <Loader2 className="h-5 w-5 animate-spin" />
+                    ) : (
+                      <Camera className="h-5 w-5" />
+                    )}
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/jpg"
+                      className="hidden"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (!file) return;
+                        
+                        // Validate file size (max 5MB)
+                        if (file.size > 5 * 1024 * 1024) {
+                          toast.error("Image size must be less than 5MB");
+                          return;
                         }
+                        
+                        // Validate file type
+                        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
+                        if (!allowedTypes.includes(file.type)) {
+                          toast.error("Please select a JPG, PNG, or WEBP image file");
+                          return;
+                        }
+                        
+                        // Show preview immediately
+                        const reader = new FileReader();
+                        reader.onloadend = () => {
+                          setAvatarPreview(reader.result as string);
+                        };
+                        reader.readAsDataURL(file);
+                        
+                        setIsUploadingAvatar(true);
+                        try {
+                          const result = await authApi.uploadAvatar(file);
+                          
+                          if (result.error) {
+                            toast.error(result.error);
+                            setAvatarPreview(null); // Clear preview on error
+                          } else {
+                            toast.success("Profile photo updated successfully!");
+                            // Update user with new avatar URL
+                            if (result.data?.user) {
+                              updateUser(result.data.user);
+                            } else if (result.data?.avatarUrl) {
+                              updateUser({ ...user, avatar: result.data.avatarUrl });
+                            } else if (result.data?.avatar) {
+                              updateUser({ ...user, avatar: result.data.avatar });
+                            }
+                            // Clear preview after successful upload - the actual image will load
+                            setTimeout(() => setAvatarPreview(null), 500);
+                          }
+                        } catch (error: any) {
+                          toast.error(error.message || "Failed to upload photo");
+                          setAvatarPreview(null);
+                        } finally {
+                          setIsUploadingAvatar(false);
+                        }
+                      }}
+                      disabled={isUploadingAvatar}
+                    />
+                  </label>
+                </div>
+                {user.avatar && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="mt-2 text-xs text-muted-foreground hover:text-destructive"
+                    onClick={async () => {
+                      if (!confirm("Are you sure you want to remove your profile photo?")) {
+                        return;
+                      }
+                      try {
+                        const result = await authApi.removeAvatar();
+                        if (result.error) {
+                          toast.error(result.error);
+                        } else {
+                          toast.success("Profile photo removed");
+                          if (result.data?.user) {
+                            updateUser(result.data.user);
+                          } else {
+                            updateUser({ ...user, avatar: null });
+                          }
+                          setAvatarPreview(null);
+                        }
+                      } catch (error: any) {
+                        toast.error(error.message || "Failed to remove photo");
                       }
                     }}
-                    disabled={isUploadingAvatar}
-                  />
-                </label>
+                  >
+                    Remove Photo
+                  </Button>
+                )}
               </div>
               <div className="text-center sm:text-left">
                 <h2 className="text-xl font-semibold">

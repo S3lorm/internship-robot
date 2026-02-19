@@ -29,9 +29,11 @@ import {
   ChevronRight,
 } from "lucide-react"
 import { Notice } from "@/types"
-import { mockNotices } from "@/lib/mock-data"
+import { noticesApi } from "@/lib/api"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
+import { Loader2, AlertCircle } from "lucide-react"
+import { Button } from "@/components/ui/button"
 
 const priorityConfig = {
   low: { label: "General", color: "bg-slate-100 text-slate-800 border-slate-200", icon: Info },
@@ -48,24 +50,47 @@ export default function NoticesPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [priorityFilter, setPriorityFilter] = useState<string>("all")
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
   const [selectedNotice, setSelectedNotice] = useState<Notice | null>(null)
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    const timer = setTimeout(() => {
+    fetchNotices();
+  }, []);
+
+  const fetchNotices = async () => {
+    try {
+      setIsLoading(true);
+      const result = await noticesApi.getAll({ isActive: "true" });
+      if (result.error) {
+        throw new Error(result.error);
+      }
+      const noticesData = Array.isArray(result.data?.data)
+        ? result.data.data
+        : Array.isArray(result.data?.notices)
+        ? result.data.notices
+        : Array.isArray(result.data)
+        ? result.data
+        : [];
+      
       // Filter notices for students (all or students-targeted) and active
-      const studentNotices = mockNotices.filter(
-        (n) =>
+      const studentNotices = noticesData.filter(
+        (n: Notice) =>
           n.isActive &&
           (n.targetAudience === "all" || n.targetAudience === "students") &&
           (!n.expiresAt || new Date(n.expiresAt) > new Date())
-      )
-      setNotices(studentNotices)
-      setFilteredNotices(studentNotices)
-      setIsLoading(false)
-    }, 500)
-    return () => clearTimeout(timer)
-  }, [])
+      );
+      setNotices(studentNotices);
+      setFilteredNotices(studentNotices);
+    } catch (err) {
+      console.error("Error fetching notices:", err);
+      setError(err instanceof Error ? err.message : "Failed to load notices");
+      setNotices([]);
+      setFilteredNotices([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     let filtered = notices
@@ -99,13 +124,14 @@ export default function NoticesPage() {
   return (
     <Suspense fallback={<Loading />}>
       {isLoading ? (
-        <div className="space-y-6">
-          <div className="h-8 w-48 bg-muted animate-pulse rounded" />
-          <div className="grid gap-4">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-32 bg-muted animate-pulse rounded-lg" />
-            ))}
-          </div>
+        <div className="flex items-center justify-center min-h-[400px]">
+          <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+        </div>
+      ) : error ? (
+        <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+          <AlertCircle className="h-12 w-12 text-destructive" />
+          <p className="text-destructive">{error}</p>
+          <Button onClick={fetchNotices}>Try Again</Button>
         </div>
       ) : (
         <div className="space-y-6">

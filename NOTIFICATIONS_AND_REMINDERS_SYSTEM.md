@@ -193,3 +193,4 @@ You can also trigger reminders manually via API endpoint (to be created):
 4. Add email notifications (optional enhancement)
 5. Add notification preferences (user settings)
 
+

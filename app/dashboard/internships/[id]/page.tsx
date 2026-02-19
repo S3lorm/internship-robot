@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, use } from "react";
+import { useState, use, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
@@ -23,7 +23,8 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { mockInternships, mockApplications } from "@/lib/mock-data";
+import { internshipsApi, applicationsApi } from "@/lib/api";
+import type { Internship, Application } from "@/types";
 import {
   ArrowLeft,
   MapPin,
@@ -52,15 +53,60 @@ export default function InternshipDetailPage({
   const [dialogOpen, setDialogOpen] = useState(false);
   const [coverLetter, setCoverLetter] = useState("");
   const [cvFile, setCvFile] = useState<File | null>(null);
+  const [internship, setInternship] = useState<Internship | null>(null);
+  const [existingApplication, setExistingApplication] = useState<Application | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  const internship = mockInternships.find((i) => i.id === id);
+  useEffect(() => {
+    fetchData();
+  }, [id, user?.id]);
 
-  // Check if user has already applied
-  const existingApplication = mockApplications.find(
-    (a) => a.internshipId === id && a.studentId === user?.id
-  );
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      setError(null);
 
-  if (!internship) {
+      // Fetch internship
+      const internshipResult = await internshipsApi.getById(id);
+      if (internshipResult.error) {
+        throw new Error(internshipResult.error);
+      }
+      const int = internshipResult.data?.internship || internshipResult.data;
+      setInternship(int);
+
+      // Fetch user's applications to check if already applied
+      if (user?.id) {
+        const appsResult = await applicationsApi.getMyApplications();
+        if (!appsResult.error && appsResult.data) {
+          const apps = Array.isArray(appsResult.data?.data)
+            ? appsResult.data.data
+            : Array.isArray(appsResult.data?.applications)
+            ? appsResult.data.applications
+            : Array.isArray(appsResult.data)
+            ? appsResult.data
+            : [];
+          const existing = apps.find((a: Application) => a.internshipId === id);
+          setExistingApplication(existing || null);
+        }
+      }
+    } catch (err) {
+      console.error("Error fetching data:", err);
+      setError(err instanceof Error ? err.message : "Failed to load internship");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error || !internship) {
     return (
       <div className="space-y-6">
         <Button variant="ghost" onClick={() => router.back()}>
@@ -72,7 +118,7 @@ export default function InternshipDetailPage({
             <AlertCircle className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
             <h3 className="mb-2 text-lg font-medium">Internship not found</h3>
             <p className="text-muted-foreground">
-              The internship you&apos;re looking for doesn&apos;t exist or has been removed.
+              {error || "The internship you're looking for doesn't exist or has been removed."}
             </p>
             <Button variant="link" asChild className="mt-2">
               <Link href="/dashboard/internships">Browse all internships</Link>
@@ -83,10 +129,10 @@ export default function InternshipDetailPage({
     );
   }
 
-  const deadline = new Date(internship.applicationDeadline);
-  const startDate = new Date(internship.startDate);
-  const isDeadlinePassed = deadline < new Date();
-  const slotsRemaining = Math.max(0, internship.slots - internship.applicationsCount);
+  const deadline = internship.applicationDeadline ? new Date(internship.applicationDeadline) : null;
+  const startDate = internship.startDate ? new Date(internship.startDate) : null;
+  const isDeadlinePassed = deadline ? deadline < new Date() : false;
+  const slotsRemaining = Math.max(0, (internship.slots || 0) - (internship.applicationsCount || 0));
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -115,13 +161,25 @@ export default function InternshipDetailPage({
 
     setIsApplying(true);
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      const formData = new FormData();
+      formData.append("internshipId", id);
+      formData.append("coverLetter", coverLetter);
+      formData.append("cv", cvFile);
 
-    setIsApplying(false);
-    setDialogOpen(false);
-    toast.success("Application submitted successfully!");
-    router.push("/dashboard/applications");
+      const result = await applicationsApi.create(formData);
+      if (result.error) {
+        throw new Error(result.error);
+      }
+
+      toast.success("Application submitted successfully!");
+      setDialogOpen(false);
+      router.push("/dashboard/applications");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Failed to submit application");
+    } finally {
+      setIsApplying(false);
+    }
   };
 
   return (
@@ -191,38 +249,42 @@ export default function InternshipDetailPage({
           </Card>
 
           {/* Requirements */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Requirements</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {internship.requirements.map((req, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span className="text-muted-foreground">{req}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+          {internship.requirements && internship.requirements.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Requirements</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {internship.requirements.map((req, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span className="text-muted-foreground">{req}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Responsibilities */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Responsibilities</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ul className="space-y-2">
-                {internship.responsibilities.map((resp, index) => (
-                  <li key={index} className="flex items-start gap-2">
-                    <Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span className="text-muted-foreground">{resp}</span>
-                  </li>
-                ))}
-              </ul>
-            </CardContent>
-          </Card>
+          {internship.responsibilities && internship.responsibilities.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Responsibilities</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {internship.responsibilities.map((resp, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <Briefcase className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span className="text-muted-foreground">{resp}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
         {/* Sidebar */}
@@ -234,27 +296,36 @@ export default function InternshipDetailPage({
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Deadline</span>
-                  <span className="font-medium">
-                    {deadline.toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Start Date</span>
-                  <span className="font-medium">
-                    {startDate.toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                  </span>
-                </div>
+                {deadline && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Deadline</span>
+                      <span className="font-medium">
+                        {deadline.toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <Separator />
+                  </>
+                )}
+                {startDate && (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-muted-foreground">Start Date</span>
+                      <span className="font-medium">
+                        {startDate.toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        })}
+                      </span>
+                    </div>
+                    <Separator />
+                  </>
+                )}
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Duration</span>
@@ -263,7 +334,7 @@ export default function InternshipDetailPage({
                 <Separator />
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-muted-foreground">Applications</span>
-                  <span className="font-medium">{internship.applicationsCount}</span>
+                  <span className="font-medium">{internship.applicationsCount || 0}</span>
                 </div>
               </div>
 

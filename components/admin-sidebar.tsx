@@ -19,6 +19,7 @@ import {
   LogOut,
   Anchor,
   BarChart3,
+  ClipboardCheck,
 } from "lucide-react";
 
 const adminNavItems = [
@@ -26,7 +27,9 @@ const adminNavItems = [
   { href: "/admin/users", label: "User Management", icon: Users },
   { href: "/admin/internships", label: "Internships", icon: Briefcase },
   { href: "/admin/applications", label: "Applications", icon: FileText },
+  { href: "/admin/evaluations", label: "Evaluations", icon: ClipboardCheck },
   { href: "/admin/letter-requests", label: "Letter Requests", icon: FileCheck },
+  { href: "/admin/letter", label: "Application Letter", icon: FileText },
   { href: "/admin/notices", label: "Notices", icon: Bell },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
 ];

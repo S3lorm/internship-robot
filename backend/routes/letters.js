@@ -25,6 +25,7 @@ router.get('/signatures', (req, res) => {
 router.post('/requests', letterController.createRequest);
 router.get('/requests', letterController.getRequests);
 router.get('/requests/:id', letterController.getRequestById);
+router.patch('/requests/:id', letterController.updateRequest); // Update request details (Admin only)
 router.patch('/requests/:id/status', letterController.updateRequestStatus);
 router.get('/requests/:id/download', letterController.downloadLetterPDF);
 router.patch('/requests/:id/mark-email-sent', letterController.markEmailSent);

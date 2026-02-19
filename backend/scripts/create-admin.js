@@ -1,16 +1,17 @@
 const bcrypt = require('bcryptjs');
 const dotenv = require('dotenv');
-const { sequelize, User } = require('../models');
+const { User } = require('../models/supabase');
 
 dotenv.config();
 
 async function createAdmin() {
   try {
-    await sequelize.authenticate();
-    console.log('Database connected');
+    console.log('🔧 Creating admin user...');
+    console.log('');
 
+    // Fixed admin credentials - you can change these if needed
     const email = process.env.ADMIN_EMAIL || 'admin@rmu.edu.gh';
-    const password = process.env.ADMIN_PASSWORD || 'admin123';
+    const password = process.env.ADMIN_PASSWORD || 'Admin@2024';
     const firstName = process.env.ADMIN_FIRST_NAME || 'Admin';
     const lastName = process.env.ADMIN_LAST_NAME || 'User';
 
@@ -18,18 +19,37 @@ async function createAdmin() {
     const existing = await User.findOne({ email });
     if (existing) {
       if (existing.role === 'admin') {
-        console.log(`✅ Admin user already exists: ${email}`);
+        // Update password to ensure it matches
+        const hashed = await bcrypt.hash(password, 10);
+        await User.update(existing.id, {
+          password: hashed,
+          isEmailVerified: true,
+          isActive: true,
+        });
+        console.log(`✅ Admin user already exists - password updated`);
+        console.log('');
+        console.log('📋 Login Credentials:');
+        console.log(`   Email: ${email}`);
         console.log(`   Password: ${password}`);
+        console.log('');
+        console.log('🌐 Login at: http://localhost:3000/login');
         return;
       } else {
         // Update existing user to admin
-        existing.role = 'admin';
-        existing.isEmailVerified = true;
         const hashed = await bcrypt.hash(password, 10);
-        existing.password = hashed;
-        await existing.save();
+        await User.update(existing.id, {
+          role: 'admin',
+          password: hashed,
+          isEmailVerified: true,
+          isActive: true,
+        });
         console.log(`✅ Updated user to admin: ${email}`);
+        console.log('');
+        console.log('📋 Login Credentials:');
+        console.log(`   Email: ${email}`);
         console.log(`   Password: ${password}`);
+        console.log('');
+        console.log('🌐 Login at: http://localhost:3000/login');
         return;
       }
     }
@@ -48,16 +68,18 @@ async function createAdmin() {
 
     console.log('✅ Admin user created successfully!');
     console.log('');
-    console.log('Login credentials:');
+    console.log('📋 Login Credentials:');
     console.log(`   Email: ${email}`);
     console.log(`   Password: ${password}`);
     console.log('');
-    console.log('You can now login at http://localhost:3000/login');
+    console.log('🌐 Login at: http://localhost:3000/login');
+    console.log('');
+    console.log('⚠️  IMPORTANT: Save these credentials securely!');
+    console.log('   You can change the password after logging in.');
   } catch (error) {
-    console.error('Error creating admin:', error);
+    console.error('❌ Error creating admin:', error);
+    console.error('   Details:', error.message);
     process.exit(1);
-  } finally {
-    await sequelize.close();
   }
 }
 

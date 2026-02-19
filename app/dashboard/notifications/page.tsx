@@ -1,12 +1,13 @@
 "use client";
 
 import React from "react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { mockNotifications } from "@/lib/mock-data";
+import { notificationsApi } from "@/lib/api";
+import type { Notification } from "@/types";
 import {
   Bell,
   CheckCircle2,
@@ -16,11 +17,18 @@ import {
   CheckCheck,
   Trash2,
   Filter,
+  Loader2,
+  RefreshCw,
+  FileText,
+  Calendar,
+  Clock,
 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 
 export default function NotificationsPage() {
-  const [notifications, setNotifications] = useState(mockNotifications);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
@@ -33,21 +41,71 @@ export default function NotificationsPage() {
         ? notifications.filter((n) => !n.isRead)
         : notifications.filter((n) => n.isRead);
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-    );
-    toast.success("Notification marked as read");
+  // Load notifications
+  const loadNotifications = async () => {
+    try {
+      const result = await notificationsApi.getAll();
+      if (result.error) {
+        toast.error(result.error);
+      } else if (result.data) {
+        // Handle both possible response structures
+        let notificationsData: Notification[] = [];
+        if (Array.isArray(result.data)) {
+          notificationsData = result.data;
+        } else if (result.data.data && Array.isArray(result.data.data)) {
+          notificationsData = result.data.data;
+        } else if (result.data.notifications && Array.isArray(result.data.notifications)) {
+          notificationsData = result.data.notifications;
+        }
+        setNotifications(notificationsData);
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to load notifications");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    toast.success("All notifications marked as read");
+  // Real-time polling every 30 seconds
+  useEffect(() => {
+    loadNotifications();
+    const interval = setInterval(loadNotifications, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+  }, []);
+
+  const markAsRead = async (id: string) => {
+    try {
+      const result = await notificationsApi.markAsRead(id);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+        );
+        toast.success("Notification marked as read");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to mark as read");
+    }
+  };
+
+  const markAllAsRead = async () => {
+    try {
+      const result = await notificationsApi.markAllAsRead();
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+        toast.success("All notifications marked as read");
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to mark all as read");
+    }
   };
 
   const deleteNotification = (id: string) => {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-    toast.success("Notification deleted");
+    toast.success("Notification removed");
   };
 
   const clearAll = () => {
@@ -58,12 +116,34 @@ export default function NotificationsPage() {
   const getNotificationIcon = (type: string) => {
     switch (type) {
       case "success":
+      case "letter_request":
         return <CheckCircle2 className="h-5 w-5 text-green-600" />;
       case "error":
         return <AlertCircle className="h-5 w-5 text-red-600" />;
+      case "evaluation_available":
+        return <FileText className="h-5 w-5 text-blue-600" />;
+      case "deadline_reminder":
+      case "logbook_deadline":
+      case "report_deadline":
+        return <AlertCircle className="h-5 w-5 text-amber-600" />;
+      case "admin_action_required":
+        return <CheckCircle2 className="h-5 w-5 text-purple-600" />;
       default:
         return <Info className="h-5 w-5 text-blue-600" />;
     }
+  };
+
+  const getNotificationBadge = (notification: Notification) => {
+    if (notification.priority === "urgent") {
+      return <Badge variant="destructive" className="text-xs">Urgent</Badge>;
+    }
+    if (notification.priority === "high") {
+      return <Badge variant="default" className="text-xs bg-orange-500">High</Badge>;
+    }
+    if (notification.actionRequired) {
+      return <Badge variant="secondary" className="text-xs">Action Required</Badge>;
+    }
+    return null;
   };
 
   return (
@@ -79,6 +159,15 @@ export default function NotificationsPage() {
           </p>
         </div>
         <div className="flex gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadNotifications}
+            disabled={isLoading}
+          >
+            <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
+            Refresh
+          </Button>
           {unreadCount > 0 && (
             <Button variant="outline" size="sm" onClick={markAllAsRead}>
               <CheckCheck className="mr-2 h-4 w-4" />
@@ -164,7 +253,11 @@ export default function NotificationsPage() {
           </div>
         </CardHeader>
         <CardContent>
-          {filteredNotifications.length === 0 ? (
+          {isLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ) : filteredNotifications.length === 0 ? (
             <div className="py-12 text-center">
               <Bell className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
               <h3 className="mb-2 text-lg font-medium">No notifications</h3>
@@ -194,27 +287,39 @@ export default function NotificationsPage() {
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex-1">
-                          <h3
-                            className={`font-semibold ${
-                              notification.isRead
-                                ? "text-foreground"
-                                : "text-foreground"
-                            }`}
-                          >
-                            {notification.title}
-                          </h3>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h3
+                              className={`font-semibold ${
+                                notification.isRead
+                                  ? "text-foreground"
+                                  : "text-foreground"
+                              }`}
+                            >
+                              {notification.title}
+                            </h3>
+                            {getNotificationBadge(notification)}
+                          </div>
                           <p className="mt-1 text-sm text-muted-foreground">
                             {notification.message}
                           </p>
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            {new Date(notification.createdAt).toLocaleDateString("en-GB", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </p>
+                          <div className="flex items-center gap-3 mt-2">
+                            <p className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="h-3 w-3" />
+                              {new Date(notification.createdAt).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </p>
+                            {notification.expiresAt && (
+                              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                Expires: {new Date(notification.expiresAt).toLocaleDateString()}
+                              </p>
+                            )}
+                          </div>
                         </div>
                         {!notification.isRead && (
                           <Badge variant="secondary" className="shrink-0">
@@ -229,7 +334,7 @@ export default function NotificationsPage() {
                           className="mt-2 h-auto p-0"
                           asChild
                         >
-                          <a href={notification.link}>View details →</a>
+                          <Link href={notification.link}>View details →</Link>
                         </Button>
                       )}
                     </div>

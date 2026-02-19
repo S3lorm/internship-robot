@@ -37,6 +37,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         const { data, error } = await authApi.getProfile();
         if (error || !data) {
+          // Check if it's a network error (backend not available)
+          if (error && error.includes('Failed to connect to backend')) {
+            // Backend is not available - try to use cached user if available
+            const cachedUser = localStorage.getItem('rmu_user');
+            if (cachedUser) {
+              try {
+                const user = JSON.parse(cachedUser) as User;
+                setState({
+                  user,
+                  isLoading: false,
+                  isAuthenticated: true,
+                });
+                console.warn('Using cached user data - backend unavailable');
+                return;
+              } catch (parseError) {
+                // Invalid cached data, clear it
+                localStorage.removeItem('rmu_user');
+              }
+            }
+          }
           // Token might be invalid or expired, clear it
           localStorage.removeItem('rmu_token');
           localStorage.removeItem('rmu_user');
@@ -52,8 +72,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           isAuthenticated: true,
         });
       } catch (err) {
-        // If API call fails completely (network error, etc.), just clear and continue
+        // If API call fails completely (network error, etc.), try to use cached user
         console.warn('Failed to restore session:', err);
+        const cachedUser = localStorage.getItem('rmu_user');
+        if (cachedUser) {
+          try {
+            const user = JSON.parse(cachedUser) as User;
+            setState({
+              user,
+              isLoading: false,
+              isAuthenticated: true,
+            });
+            console.warn('Using cached user data - backend unavailable');
+            return;
+          } catch (parseError) {
+            // Invalid cached data, clear it
+            localStorage.removeItem('rmu_user');
+          }
+        }
         localStorage.removeItem('rmu_token');
         localStorage.removeItem('rmu_user');
         setState(prev => ({ ...prev, isLoading: false, isAuthenticated: false, user: null }));

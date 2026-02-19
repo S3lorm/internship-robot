@@ -20,10 +20,11 @@ import {
   CheckCircle2,
   XCircle,
   AlertCircle,
-  ChevronRight
+  ChevronRight,
+  Loader2
 } from "lucide-react"
 import { Application, Internship } from "@/types"
-import { mockApplications, mockInternships } from "@/lib/mock-data"
+import { applicationsApi, internshipsApi } from "@/lib/api"
 import { useSearchParams } from "next/navigation"
 import Loading from "./loading"
 
@@ -39,26 +40,64 @@ export default function ApplicationsPage() {
   const searchParams = useSearchParams()
   const [applications, setApplications] = useState<(Application & { internship?: Internship })[]>([])
   const [filteredApplications, setFilteredApplications] = useState<(Application & { internship?: Internship })[]>([])
+  const [internships, setInternships] = useState<Internship[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    // Simulate API call
-    const timer = setTimeout(() => {
-      const userApplications = mockApplications
-        .filter(app => app.studentId === user?.id)
-        .map(app => ({
-          ...app,
-          internship: mockInternships.find(i => i.id === app.internshipId)
-        }))
-      setApplications(userApplications)
-      setFilteredApplications(userApplications)
-      setIsLoading(false)
-    }, 500)
-
-    return () => clearTimeout(timer)
+    fetchData();
   }, [user?.id])
+
+  const fetchData = async () => {
+    try {
+      setIsLoading(true);
+      setError(null);
+
+      // Fetch applications
+      const appsResult = await applicationsApi.getMyApplications();
+      if (appsResult.error) {
+        throw new Error(appsResult.error);
+      }
+      const apps = Array.isArray(appsResult.data?.data)
+        ? appsResult.data.data
+        : Array.isArray(appsResult.data?.applications)
+        ? appsResult.data.applications
+        : Array.isArray(appsResult.data)
+        ? appsResult.data
+        : [];
+
+      // Fetch internships to match with applications
+      const internshipsResult = await internshipsApi.getAll();
+      if (!internshipsResult.error && internshipsResult.data) {
+        const ints = Array.isArray(internshipsResult.data?.data)
+          ? internshipsResult.data.data
+          : Array.isArray(internshipsResult.data?.internships)
+          ? internshipsResult.data.internships
+          : Array.isArray(internshipsResult.data)
+          ? internshipsResult.data
+          : [];
+        setInternships(ints);
+      }
+
+      // Match applications with internships
+      const appsWithInternships = apps.map((app: Application) => ({
+        ...app,
+        internship: internships.find((i: Internship) => i.id === app.internshipId),
+      }));
+
+      setApplications(appsWithInternships);
+      setFilteredApplications(appsWithInternships);
+    } catch (err) {
+      console.error("Error fetching applications:", err);
+      setError(err instanceof Error ? err.message : "Failed to load applications");
+      setApplications([]);
+      setFilteredApplications([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
     let filtered = applications
@@ -90,7 +129,21 @@ export default function ApplicationsPage() {
   const counts = getStatusCounts()
 
   if (isLoading) {
-    return <Loading />
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <AlertCircle className="h-12 w-12 text-destructive" />
+        <p className="text-destructive">{error}</p>
+        <Button onClick={fetchData}>Try Again</Button>
+      </div>
+    );
   }
 
   return (

@@ -31,6 +31,9 @@ import {
   Eye,
   Search,
   Filter,
+  Edit,
+  Save,
+  X,
 } from "lucide-react";
 import {
   Dialog,
@@ -56,6 +59,9 @@ export default function AdminLetterRequestsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedData, setEditedData] = useState<Partial<LetterRequest>>({});
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     loadRequests();
@@ -112,12 +118,61 @@ export default function AdminLetterRequestsPage() {
         toast.success(`Request ${status} successfully${status === "approved" ? " - PDF generated" : ""}`);
         setSelectedRequest(null);
         setAdminNotes("");
+        setIsEditing(false);
+        setEditedData({});
         loadRequests();
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to update request");
     } finally {
       setIsUpdating(false);
+    }
+  };
+
+  const handleEdit = () => {
+    if (!selectedRequest) return;
+    setIsEditing(true);
+    setEditedData({
+      companyName: selectedRequest.companyName,
+      companyEmail: selectedRequest.companyEmail || "",
+      companyPhone: selectedRequest.companyPhone || "",
+      companyAddress: selectedRequest.companyAddress || "",
+      internshipDuration: selectedRequest.internshipDuration,
+      internshipStartDate: selectedRequest.internshipStartDate || "",
+      internshipEndDate: selectedRequest.internshipEndDate || "",
+      purpose: selectedRequest.purpose,
+      category: selectedRequest.category || "",
+      additionalNotes: selectedRequest.additionalNotes || "",
+    });
+  };
+
+  const handleCancelEdit = () => {
+    setIsEditing(false);
+    setEditedData({});
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedRequest) return;
+
+    setIsSaving(true);
+    try {
+      const result = await lettersApi.updateRequest(selectedRequest.id, editedData);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Request updated successfully");
+        setIsEditing(false);
+        setEditedData({});
+        loadRequests();
+        // Update selected request with new data
+        if (result.data?.request) {
+          setSelectedRequest(result.data.request);
+        }
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to update request");
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -300,16 +355,38 @@ export default function AdminLetterRequestsPage() {
       )}
 
       {/* Review Dialog */}
-      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+      <Dialog 
+        open={!!selectedRequest} 
+        onOpenChange={() => {
+          setSelectedRequest(null);
+          setIsEditing(false);
+          setEditedData({});
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           {selectedRequest && (
             <>
               <DialogHeader>
                 <div className="flex items-center justify-between">
-                  <DialogTitle>Review Letter Request</DialogTitle>
-                  <Badge variant="outline" className={statusConfig[selectedRequest.status].color}>
-                    {statusConfig[selectedRequest.status].label}
-                  </Badge>
+                  <DialogTitle>
+                    {isEditing ? "Edit Letter Request" : "Review Letter Request"}
+                  </DialogTitle>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={statusConfig[selectedRequest.status].color}>
+                      {statusConfig[selectedRequest.status].label}
+                    </Badge>
+                    {selectedRequest.status === "pending" && !isEditing && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleEdit}
+                        className="h-8"
+                      >
+                        <Edit className="h-3 w-3 mr-1" />
+                        Edit
+                      </Button>
+                    )}
+                  </div>
                 </div>
                 <DialogDescription>
                   Request from {selectedRequest.student?.firstName}{" "}
@@ -354,18 +431,63 @@ export default function AdminLetterRequestsPage() {
                     <Building2 className="h-4 w-4" />
                     Company Information
                   </h3>
-                  <div className="space-y-2 text-sm">
-                    <p><span className="font-medium">Name:</span> {selectedRequest.companyName}</p>
-                    {selectedRequest.companyEmail && (
-                      <p><span className="font-medium">Email:</span> {selectedRequest.companyEmail}</p>
-                    )}
-                    {selectedRequest.companyPhone && (
-                      <p><span className="font-medium">Phone:</span> {selectedRequest.companyPhone}</p>
-                    )}
-                    {selectedRequest.companyAddress && (
-                      <p><span className="font-medium">Address:</span> {selectedRequest.companyAddress}</p>
-                    )}
-                  </div>
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="companyName">Company Name *</Label>
+                        <Input
+                          id="companyName"
+                          value={editedData.companyName || ""}
+                          onChange={(e) => setEditedData({ ...editedData, companyName: e.target.value })}
+                          className="mt-1"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="companyEmail">Company Email</Label>
+                        <Input
+                          id="companyEmail"
+                          type="email"
+                          value={editedData.companyEmail || ""}
+                          onChange={(e) => setEditedData({ ...editedData, companyEmail: e.target.value })}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="companyPhone">Company Phone</Label>
+                        <Input
+                          id="companyPhone"
+                          type="tel"
+                          value={editedData.companyPhone || ""}
+                          onChange={(e) => setEditedData({ ...editedData, companyPhone: e.target.value })}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="companyAddress">Company Address</Label>
+                        <Textarea
+                          id="companyAddress"
+                          value={editedData.companyAddress || ""}
+                          onChange={(e) => setEditedData({ ...editedData, companyAddress: e.target.value })}
+                          className="mt-1"
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 text-sm">
+                      <p><span className="font-medium">Name:</span> {selectedRequest.companyName}</p>
+                      {selectedRequest.companyEmail && (
+                        <p><span className="font-medium">Email:</span> {selectedRequest.companyEmail}</p>
+                      )}
+                      {selectedRequest.companyPhone && (
+                        <p><span className="font-medium">Phone:</span> {selectedRequest.companyPhone}</p>
+                      )}
+                      {selectedRequest.companyAddress && (
+                        <p><span className="font-medium">Address:</span> {selectedRequest.companyAddress}</p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Internship Details */}
@@ -374,46 +496,120 @@ export default function AdminLetterRequestsPage() {
                     <Calendar className="h-4 w-4" />
                     Internship Details
                   </h3>
-                  <div className="space-y-2 text-sm">
-                    <p><span className="font-medium">Duration:</span> {selectedRequest.internshipDuration}</p>
-                    {selectedRequest.internshipStartDate && (
-                      <p>
-                        <span className="font-medium">Start Date:</span>{" "}
-                        {new Date(selectedRequest.internshipStartDate).toLocaleDateString()}
-                      </p>
-                    )}
-                    {selectedRequest.internshipEndDate && (
-                      <p>
-                        <span className="font-medium">End Date:</span>{" "}
-                        {new Date(selectedRequest.internshipEndDate).toLocaleDateString()}
-                      </p>
-                    )}
-                  </div>
+                  {isEditing ? (
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="internshipDuration">Internship Duration *</Label>
+                        <Input
+                          id="internshipDuration"
+                          value={editedData.internshipDuration || ""}
+                          onChange={(e) => setEditedData({ ...editedData, internshipDuration: e.target.value })}
+                          className="mt-1"
+                          placeholder="e.g., 3 months, 6 months"
+                          required
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="internshipStartDate">Start Date</Label>
+                        <Input
+                          id="internshipStartDate"
+                          type="date"
+                          value={editedData.internshipStartDate ? editedData.internshipStartDate.split('T')[0] : ""}
+                          onChange={(e) => setEditedData({ ...editedData, internshipStartDate: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="internshipEndDate">End Date</Label>
+                        <Input
+                          id="internshipEndDate"
+                          type="date"
+                          value={editedData.internshipEndDate ? editedData.internshipEndDate.split('T')[0] : ""}
+                          onChange={(e) => setEditedData({ ...editedData, internshipEndDate: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 text-sm">
+                      <p><span className="font-medium">Duration:</span> {selectedRequest.internshipDuration}</p>
+                      {selectedRequest.internshipStartDate && (
+                        <p>
+                          <span className="font-medium">Start Date:</span>{" "}
+                          {new Date(selectedRequest.internshipStartDate).toLocaleDateString()}
+                        </p>
+                      )}
+                      {selectedRequest.internshipEndDate && (
+                        <p>
+                          <span className="font-medium">End Date:</span>{" "}
+                          {new Date(selectedRequest.internshipEndDate).toLocaleDateString()}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 {/* Purpose */}
                 <div>
                   <h3 className="font-semibold mb-3">Purpose</h3>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                    {selectedRequest.purpose}
-                  </p>
+                  {isEditing ? (
+                    <Textarea
+                      value={editedData.purpose || ""}
+                      onChange={(e) => setEditedData({ ...editedData, purpose: e.target.value })}
+                      className="min-h-[100px]"
+                      placeholder="Enter the purpose of the internship..."
+                      required
+                    />
+                  ) : (
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                      {selectedRequest.purpose}
+                    </p>
+                  )}
                 </div>
 
-                {selectedRequest.category && (
-                  <div>
-                    <h3 className="font-semibold mb-3">Category</h3>
+                {/* Category */}
+                <div>
+                  <h3 className="font-semibold mb-3">Category</h3>
+                  {isEditing ? (
+                    <Select
+                      value={editedData.category || ""}
+                      onValueChange={(value) => setEditedData({ ...editedData, category: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="academic">Academic</SelectItem>
+                        <SelectItem value="professional">Professional</SelectItem>
+                        <SelectItem value="research">Research</SelectItem>
+                        <SelectItem value="other">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  ) : selectedRequest.category ? (
                     <Badge variant="secondary">{selectedRequest.category}</Badge>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No category specified</p>
+                  )}
+                </div>
 
-                {selectedRequest.additionalNotes && (
-                  <div>
-                    <h3 className="font-semibold mb-3">Additional Notes</h3>
+                {/* Additional Notes */}
+                <div>
+                  <h3 className="font-semibold mb-3">Additional Notes</h3>
+                  {isEditing ? (
+                    <Textarea
+                      value={editedData.additionalNotes || ""}
+                      onChange={(e) => setEditedData({ ...editedData, additionalNotes: e.target.value })}
+                      className="min-h-[80px]"
+                      placeholder="Any additional notes or information..."
+                    />
+                  ) : selectedRequest.additionalNotes ? (
                     <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                       {selectedRequest.additionalNotes}
                     </p>
-                  </div>
-                )}
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No additional notes</p>
+                  )}
+                </div>
 
                 {selectedRequest.adminNotes && (
                   <div>
@@ -525,13 +721,42 @@ export default function AdminLetterRequestsPage() {
               </div>
 
               <DialogFooter>
-                {selectedRequest.status === "pending" && (
+                {isEditing ? (
+                  <>
+                    <Button
+                      variant="outline"
+                      onClick={handleCancelEdit}
+                      disabled={isSaving}
+                    >
+                      <X className="mr-2 h-4 w-4" />
+                      Cancel
+                    </Button>
+                    <Button
+                      onClick={handleSaveEdit}
+                      disabled={isSaving}
+                    >
+                      {isSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>
+                          <Save className="mr-2 h-4 w-4" />
+                          Save Changes
+                        </>
+                      )}
+                    </Button>
+                  </>
+                ) : selectedRequest.status === "pending" ? (
                   <>
                     <Button
                       variant="outline"
                       onClick={() => {
                         setSelectedRequest(null);
                         setAdminNotes("");
+                        setIsEditing(false);
+                        setEditedData({});
                       }}
                     >
                       Cancel
@@ -576,9 +801,12 @@ export default function AdminLetterRequestsPage() {
                       )}
                     </Button>
                   </>
-                )}
-                {selectedRequest.status !== "pending" && (
-                  <Button onClick={() => setSelectedRequest(null)}>Close</Button>
+                ) : (
+                  <Button onClick={() => {
+                    setSelectedRequest(null);
+                    setIsEditing(false);
+                    setEditedData({});
+                  }}>Close</Button>
                 )}
               </DialogFooter>
             </>
