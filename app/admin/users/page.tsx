@@ -51,7 +51,7 @@ import {
   Shield,
 } from "lucide-react"
 import { User } from "@/types"
-import { mockUsers } from "@/lib/mock-data"
+import { usersApi } from "@/lib/api"
 import { toast } from "sonner"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
@@ -71,13 +71,22 @@ export default function UserManagementPage() {
   })
   const searchParams = useSearchParams()
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setUsers(mockUsers)
-      setFilteredUsers(mockUsers)
+  const fetchUsers = async () => {
+    try {
+      setIsLoading(true)
+      const res = await usersApi.getAll()
+      const fetchedUsers = (res as any).data?.data || (res as any).data?.users || (res as any).users || []
+      setUsers(fetchedUsers)
+    } catch (error) {
+      toast.error("Failed to fetch users")
+      console.error(error)
+    } finally {
       setIsLoading(false)
-    }, 500)
-    return () => clearTimeout(timer)
+    }
+  }
+
+  useEffect(() => {
+    fetchUsers()
   }, [])
 
   useEffect(() => {
@@ -104,52 +113,69 @@ export default function UserManagementPage() {
     setFilteredUsers(filtered)
   }, [searchQuery, roleFilter, statusFilter, users])
 
-  const handleToggleStatus = (userId: string) => {
-    setUsers((prev) =>
-      prev.map((user) =>
-        user.id === userId ? { ...user, isActive: !user.isActive } : user
+  const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
+    try {
+      // Optimistic update
+      setUsers((prev) =>
+        prev.map((user) =>
+          user.id === userId ? { ...user, isActive: !currentStatus } : user
+        )
       )
-    )
-    toast.success("User status updated successfully")
-  }
 
-  const handleDeleteUser = () => {
-    if (deleteDialog.user) {
-      setUsers((prev) => prev.filter((user) => user.id !== deleteDialog.user?.id))
-      toast.success("User deleted successfully")
-      setDeleteDialog({ open: false, user: null })
+      await usersApi.updateStatus(userId, !currentStatus)
+      toast.success("User status updated successfully")
+    } catch (e) {
+      toast.error("Failed to update status")
+      fetchUsers() // revert
     }
   }
 
-  const handleBulkAction = (action: string) => {
+  const handleDeleteUser = async () => {
+    if (deleteDialog.user) {
+      try {
+        await usersApi.delete(deleteDialog.user.id)
+        setUsers((prev) => prev.filter((user) => user.id !== deleteDialog.user?.id))
+        toast.success("User deleted successfully")
+        setDeleteDialog({ open: false, user: null })
+      } catch (error) {
+        toast.error("Failed to delete user")
+      }
+    }
+  }
+
+  const handleBulkAction = async (action: string) => {
     if (selectedUsers.length === 0) {
       toast.error("Please select users first")
       return
     }
 
-    switch (action) {
-      case "activate":
-        setUsers((prev) =>
-          prev.map((user) =>
-            selectedUsers.includes(user.id) ? { ...user, isActive: true } : user
-          )
-        )
-        toast.success(`${selectedUsers.length} users activated`)
-        break
-      case "deactivate":
-        setUsers((prev) =>
-          prev.map((user) =>
-            selectedUsers.includes(user.id) ? { ...user, isActive: false } : user
-          )
-        )
-        toast.success(`${selectedUsers.length} users deactivated`)
-        break
-      case "delete":
-        setUsers((prev) => prev.filter((user) => !selectedUsers.includes(user.id)))
-        toast.success(`${selectedUsers.length} users deleted`)
-        break
+    // Fallback: Currently APIs don't easily support bulk operations
+    try {
+      for (const id of selectedUsers) {
+        if (action === "activate" || action === "deactivate") {
+          await usersApi.updateStatus(id, action === "activate")
+        } else if (action === "delete") {
+          await usersApi.delete(id)
+        }
+      }
+
+      switch (action) {
+        case "activate":
+          toast.success(`${selectedUsers.length} users activated`)
+          break
+        case "deactivate":
+          toast.success(`${selectedUsers.length} users deactivated`)
+          break
+        case "delete":
+          toast.success(`${selectedUsers.length} users deleted`)
+          break
+      }
+      fetchUsers()
+      setSelectedUsers([])
+    } catch (error) {
+      toast.error("Bulk action failed")
+      fetchUsers()
     }
-    setSelectedUsers([])
   }
 
   const handleExport = () => {
@@ -163,7 +189,7 @@ export default function UserManagementPage() {
           user.studentId || "N/A",
           user.role,
           user.isActive ? "Active" : "Inactive",
-          new Date(user.createdAt).toLocaleDateString(),
+          new Date((user as any).createdAt || new Date()).toLocaleDateString(),
         ].join(",")
       ),
     ].join("\n")
@@ -396,7 +422,7 @@ export default function UserManagementPage() {
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground">
-                          {new Date(user.createdAt).toLocaleDateString()}
+                          {new Date((user as any).createdAt || new Date()).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
                           <DropdownMenu>
@@ -412,7 +438,7 @@ export default function UserManagementPage() {
                                 <Mail className="mr-2 h-4 w-4" />
                                 Send Email
                               </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleToggleStatus(user.id)}>
+                              <DropdownMenuItem onClick={() => handleToggleStatus(user.id, user.isActive || false)}>
                                 {user.isActive ? (
                                   <>
                                     <UserX className="mr-2 h-4 w-4" />
@@ -451,7 +477,7 @@ export default function UserManagementPage() {
             <DialogHeader>
               <DialogTitle>Delete User</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete {deleteDialog.user?.firstName} {deleteDialog.user?.lastName}? 
+                Are you sure you want to delete {deleteDialog.user?.firstName} {deleteDialog.user?.lastName}?
                 This action cannot be undone.
               </DialogDescription>
             </DialogHeader>

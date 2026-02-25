@@ -53,7 +53,7 @@ import {
   GraduationCap,
 } from "lucide-react"
 import { Application, Internship, User } from "@/types"
-import { mockApplications, mockInternships, mockUsers } from "@/lib/mock-data"
+import { applicationsApi, internshipsApi, usersApi } from "@/lib/api"
 import { toast } from "sonner"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
@@ -64,6 +64,7 @@ const statusConfig = {
   under_review: { label: "Under Review", color: "bg-blue-100 text-blue-800 border-blue-200", icon: AlertCircle },
   approved: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
   rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
+  withdrawn: { label: "Withdrawn", color: "bg-gray-100 text-gray-800 border-gray-200", icon: XCircle },
 }
 
 type ApplicationWithDetails = Application & {
@@ -95,17 +96,36 @@ export default function ApplicationsManagementPage() {
   const [feedback, setFeedback] = useState("")
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      const appsWithDetails = mockApplications.map((app) => ({
-        ...app,
-        student: mockUsers.find((u) => u.id === app.studentId),
-        internship: mockInternships.find((i) => i.id === app.internshipId),
-      }))
-      setApplications(appsWithDetails)
-      setFilteredApplications(appsWithDetails)
-      setIsLoading(false)
-    }, 500)
-    return () => clearTimeout(timer)
+    async function fetchApplications() {
+      try {
+        setIsLoading(true)
+        const [appsRes, intsRes, usersRes] = await Promise.all([
+          applicationsApi.getAll(),
+          internshipsApi.getAll(),
+          usersApi.getAll({ role: "student" }),
+        ])
+
+        const applicationsList = (appsRes as any).data?.data || (appsRes as any).data?.applications || (appsRes as any).applications || []
+        const internshipsList = (intsRes as any).data?.data || (intsRes as any).data?.internships || (intsRes as any).internships || []
+        const usersList = (usersRes as any).data?.data || (usersRes as any).data?.users || (usersRes as any).users || []
+
+        const appsWithDetails = applicationsList.map((app: any) => ({
+          ...app,
+          student: usersList.find((u: any) => u.id === app.studentId) || app.Student || app.student,
+          internship: internshipsList.find((i: any) => i.id === app.internshipId) || app.Internship || app.internship,
+        }))
+
+        setApplications(appsWithDetails)
+        setFilteredApplications(appsWithDetails)
+      } catch (error) {
+        console.error("Failed to fetch applications:", error)
+        toast.error("Failed to fetch applications")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchApplications()
   }, [])
 
   useEffect(() => {
@@ -128,17 +148,25 @@ export default function ApplicationsManagementPage() {
     setFilteredApplications(filtered)
   }, [searchQuery, statusFilter, applications])
 
-  const handleStatusUpdate = (applicationId: string, newStatus: Application["status"], feedbackText?: string) => {
-    setApplications((prev) =>
-      prev.map((app) =>
-        app.id === applicationId
-          ? { ...app, status: newStatus, feedback: feedbackText, reviewedAt: new Date().toISOString() }
-          : app
+  const handleStatusUpdate = async (applicationId: string, newStatus: Application["status"], feedbackText?: string) => {
+    try {
+      // First update optimistically in UI
+      setApplications((prev) =>
+        prev.map((app) =>
+          app.id === applicationId
+            ? { ...app, status: newStatus, adminNotes: feedbackText, reviewedAt: new Date().toISOString() }
+            : app
+        )
       )
-    )
-    toast.success(`Application ${newStatus === "approved" ? "approved" : "rejected"} successfully`)
-    setFeedbackDialog({ open: false, application: null, action: null })
-    setFeedback("")
+      toast.success(`Application ${newStatus === "approved" ? "approved" : "rejected"} successfully`)
+      setFeedbackDialog({ open: false, application: null, action: null })
+      setFeedback("")
+
+      // Then trigger backend update (assuming specific admin routes)
+      await applicationsApi.updateStatus(applicationId, newStatus)
+    } catch (e: any) {
+      toast.error("Failed to update status on server.")
+    }
   }
 
   const handleBulkAction = (action: "approve" | "reject") => {
@@ -169,7 +197,7 @@ export default function ApplicationsManagementPage() {
           app.internship?.title,
           app.internship?.company,
           app.status,
-          new Date(app.appliedAt).toLocaleDateString(),
+          new Date((app as any).createdAt || (app as any).appliedAt || new Date()).toLocaleDateString(),
           app.reviewedAt ? new Date(app.reviewedAt).toLocaleDateString() : "N/A",
         ].join(",")
       ),
@@ -327,7 +355,7 @@ export default function ApplicationsManagementPage() {
                     </TableRow>
                   ) : (
                     filteredApplications.map((application) => {
-                      const status = statusConfig[application.status]
+                      const status = statusConfig[application.status] || { color: "bg-gray-100 text-gray-800 border-gray-200", label: "Unknown", icon: AlertCircle }
                       const StatusIcon = status.icon
 
                       return (
@@ -369,7 +397,7 @@ export default function ApplicationsManagementPage() {
                             </div>
                           </TableCell>
                           <TableCell className="text-muted-foreground">
-                            {new Date(application.appliedAt).toLocaleDateString()}
+                            {new Date((application as any).createdAt || (application as any).appliedAt || new Date()).toLocaleDateString()}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline" className={status.color}>
@@ -481,7 +509,7 @@ export default function ApplicationsManagementPage() {
                     </p>
                     <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
                       <Calendar className="h-4 w-4" />
-                      <span>Deadline: {new Date(reviewSheet.application.internship?.deadline || "").toLocaleDateString()}</span>
+                      <span>Deadline: {new Date((reviewSheet.application.internship as any)?.deadline || reviewSheet.application.internship?.applicationDeadline || "").toLocaleDateString()}</span>
                     </div>
                   </div>
                 </div>
@@ -516,18 +544,18 @@ export default function ApplicationsManagementPage() {
                   <div className="flex items-center gap-3">
                     <Badge
                       variant="outline"
-                      className={statusConfig[reviewSheet.application.status].color}
+                      className={(statusConfig[reviewSheet.application.status] || { color: "" }).color}
                     >
-                      {statusConfig[reviewSheet.application.status].label}
+                      {(statusConfig[reviewSheet.application.status] || { label: "Unknown" }).label}
                     </Badge>
                     <span className="text-sm text-muted-foreground">
-                      Applied on {new Date(reviewSheet.application.appliedAt).toLocaleDateString()}
+                      Applied on {new Date((reviewSheet.application as any).createdAt || (reviewSheet.application as any).appliedAt || new Date()).toLocaleDateString()}
                     </span>
                   </div>
-                  {reviewSheet.application.feedback && (
+                  {(reviewSheet.application.adminNotes || (reviewSheet.application as any).feedback) && (
                     <div className="p-3 bg-muted/50 rounded-lg">
-                      <p className="text-sm font-medium text-foreground mb-1">Feedback:</p>
-                      <p className="text-sm text-muted-foreground">{reviewSheet.application.feedback}</p>
+                      <p className="text-sm font-medium text-foreground mb-1">Feedback/Notes:</p>
+                      <p className="text-sm text-muted-foreground">{reviewSheet.application.adminNotes || (reviewSheet.application as any).feedback}</p>
                     </div>
                   )}
                 </div>
@@ -535,30 +563,30 @@ export default function ApplicationsManagementPage() {
                 {/* Actions */}
                 {(reviewSheet.application.status === "pending" ||
                   reviewSheet.application.status === "under_review") && (
-                  <div className="flex gap-3 pt-4 border-t border-border">
-                    <Button
-                      className="flex-1 bg-green-600 hover:bg-green-700"
-                      onClick={() => {
-                        setReviewSheet({ open: false, application: null })
-                        setFeedbackDialog({ open: true, application: reviewSheet.application, action: "approve" })
-                      }}
-                    >
-                      <CheckCircle2 className="h-4 w-4 mr-2" />
-                      Approve
-                    </Button>
-                    <Button
-                      variant="destructive"
-                      className="flex-1"
-                      onClick={() => {
-                        setReviewSheet({ open: false, application: null })
-                        setFeedbackDialog({ open: true, application: reviewSheet.application, action: "reject" })
-                      }}
-                    >
-                      <XCircle className="h-4 w-4 mr-2" />
-                      Reject
-                    </Button>
-                  </div>
-                )}
+                    <div className="flex gap-3 pt-4 border-t border-border">
+                      <Button
+                        className="flex-1 bg-green-600 hover:bg-green-700"
+                        onClick={() => {
+                          setReviewSheet({ open: false, application: null })
+                          setFeedbackDialog({ open: true, application: reviewSheet.application, action: "approve" })
+                        }}
+                      >
+                        <CheckCircle2 className="h-4 w-4 mr-2" />
+                        Approve
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        className="flex-1"
+                        onClick={() => {
+                          setReviewSheet({ open: false, application: null })
+                          setFeedbackDialog({ open: true, application: reviewSheet.application, action: "reject" })
+                        }}
+                      >
+                        <XCircle className="h-4 w-4 mr-2" />
+                        Reject
+                      </Button>
+                    </div>
+                  )}
               </div>
             )}
           </SheetContent>

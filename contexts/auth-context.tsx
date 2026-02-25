@@ -5,8 +5,8 @@ import type { User, AuthState, LoginFormData, RegisterFormData } from '@/types';
 import { authApi } from '@/lib/api';
 
 interface AuthContextType extends AuthState {
-  login: (data: LoginFormData) => Promise<{ success: boolean; error?: string }>;
-  register: (data: RegisterFormData) => Promise<{ success: boolean; error?: string }>;
+  login: (data: LoginFormData) => Promise<{ success: boolean; error?: string; requiresVerification?: boolean }>;
+  register: (data: RegisterFormData) => Promise<{ success: boolean; error?: string; requiresVerification?: boolean }>;
   logout: () => void;
   updateUser: (user: Partial<User>) => void;
   verifyEmail: (token: string) => Promise<{ success: boolean; error?: string }>;
@@ -100,9 +100,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const login = useCallback(
-    async (data: LoginFormData): Promise<{ success: boolean; error?: string }> => {
+    async (data: LoginFormData): Promise<{ success: boolean; error?: string; requiresVerification?: boolean }> => {
       setState(prev => ({ ...prev, isLoading: true }));
-      
+
       const result = await authApi.login(data.email, data.password);
       if (result.error || !result.data) {
         setState(prev => ({ ...prev, isLoading: false }));
@@ -112,38 +112,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         return { success: false, error: result.error || 'Invalid email or password' };
       }
-    
+
       const { token, user } = result.data as any;
-      
+
       if (typeof window !== 'undefined') {
         localStorage.setItem('rmu_token', token);
         localStorage.setItem('rmu_user', JSON.stringify(user));
       }
-    
+
       setState({
         user,
         isLoading: false,
         isAuthenticated: true,
       });
-    
+
       return { success: true };
     },
     []
   );
 
   const register = useCallback(
-    async (data: RegisterFormData): Promise<{ success: boolean; error?: string }> => {
-    setState(prev => ({ ...prev, isLoading: true }));
-    
+    async (data: RegisterFormData): Promise<{ success: boolean; error?: string; requiresVerification?: boolean }> => {
+      setState(prev => ({ ...prev, isLoading: true }));
+
       const payload = {
         email: data.email,
         password: data.password,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      studentId: data.studentId,
-      department: data.department,
-      program: data.program,
-      yearOfStudy: data.yearOfStudy,
+        firstName: data.firstName,
+        lastName: data.lastName,
+        studentId: data.studentId,
+        department: data.department,
+        program: data.program,
+        yearOfStudy: data.yearOfStudy,
         phone: data.phone,
       };
 
@@ -195,7 +195,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!state.user) {
       return { success: false, error: 'No user logged in' };
     }
-    
+
     const result = await authApi.resendVerification(state.user.email);
     if (result.error) {
       return { success: false, error: result.error };

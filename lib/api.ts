@@ -18,7 +18,7 @@ async function fetchApi<T>(
 ): Promise<{ data?: T; error?: string }> {
   try {
     const token = typeof window !== 'undefined' ? localStorage.getItem('rmu_token') : null;
-    
+
     const headers: HeadersInit = {
       'Content-Type': 'application/json',
       ...(token && { Authorization: `Bearer ${token}` }),
@@ -26,14 +26,14 @@ async function fetchApi<T>(
     };
 
     const fullUrl = `${API_BASE_URL}${endpoint}`;
-    
+
     // Debug logging - always log in browser to help troubleshoot
     if (typeof window !== 'undefined') {
-      console.log(`[API] ${options.method || 'GET'} ${fullUrl}`, { 
-        API_BASE_URL, 
+      console.log(`[API] ${options.method || 'GET'} ${fullUrl}`, {
+        API_BASE_URL,
         endpoint,
         envVar: process.env.NEXT_PUBLIC_API_URL,
-        fullUrl 
+        fullUrl
       });
     }
 
@@ -57,7 +57,7 @@ async function fetchApi<T>(
     // Check if response is JSON before parsing
     const contentType = response.headers.get('content-type');
     const isJson = contentType && contentType.includes('application/json');
-    
+
     let data;
     if (isJson) {
       data = await response.json();
@@ -65,10 +65,10 @@ async function fetchApi<T>(
       // If we get HTML (like a 404 page), return a helpful error
       const text = await response.text();
       console.error('Non-JSON response:', text.substring(0, 200));
-      return { 
-        error: response.status === 404 
-          ? 'API endpoint not found. Please check your backend is running.' 
-          : `Server returned ${response.status}: ${response.statusText}` 
+      return {
+        error: response.status === 404
+          ? 'API endpoint not found. Please check your backend is running.'
+          : `Server returned ${response.status}: ${response.statusText}`
       };
     }
 
@@ -81,8 +81,8 @@ async function fetchApi<T>(
     console.error('API Error:', error);
     if (error instanceof TypeError) {
       if (error.message.includes('fetch') || error.message.includes('Failed to fetch')) {
-        return { 
-          error: `Cannot connect to backend at ${API_BASE_URL}. Please ensure the backend server is running on port 5000.` 
+        return {
+          error: `Cannot connect to backend at ${API_BASE_URL}. Please ensure the backend server is running on port 5000.`
         };
       }
     }
@@ -296,7 +296,7 @@ export const notificationsApi = {
 // Letters API
 export const lettersApi = {
   generate: (internshipId?: string) => {
-    const url = internshipId 
+    const url = internshipId
       ? `/letters/generate?internshipId=${internshipId}`
       : '/letters/generate';
     return fetch(`${API_BASE_URL}${url}`, {
@@ -315,7 +315,7 @@ export const lettersApi = {
   },
 
   download: (internshipId?: string, format: string = 'html') => {
-    const url = internshipId 
+    const url = internshipId
       ? `/letters/download?internshipId=${internshipId}&format=${format}`
       : `/letters/download?format=${format}`;
     return fetch(`${API_BASE_URL}${url}`, {

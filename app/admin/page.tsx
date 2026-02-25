@@ -20,7 +20,8 @@ import {
   Building2,
   Calendar,
 } from "lucide-react"
-import { mockApplications, mockInternships, mockUsers } from "@/lib/mock-data"
+import { applicationsApi, internshipsApi, usersApi } from "@/lib/api"
+import type { Application, Internship, User } from "@/types"
 
 export default function AdminDashboard() {
   const [stats, setStats] = useState({
@@ -32,30 +33,55 @@ export default function AdminDashboard() {
     rejectedApplications: 0,
     activeInternships: 0,
   })
-  const [recentApplications, setRecentApplications] = useState<typeof mockApplications>([])
+  const [recentApplications, setRecentApplications] = useState<Application[]>([])
+  const [activeInternshipsList, setActiveInternshipsList] = useState<Internship[]>([])
+  const [usersList, setUsersList] = useState<User[]>([])
+  const [applicationsList, setApplicationsList] = useState<Application[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
-    // Simulate API call
-    const timer = setTimeout(() => {
-      const students = mockUsers.filter(u => u.role === "student")
-      const activeInternships = mockInternships.filter(i => i.status === "open")
-      
-      setStats({
-        totalStudents: students.length,
-        totalInternships: mockInternships.length,
-        totalApplications: mockApplications.length,
-        pendingApplications: mockApplications.filter(a => a.status === "pending").length,
-        approvedApplications: mockApplications.filter(a => a.status === "approved").length,
-        rejectedApplications: mockApplications.filter(a => a.status === "rejected").length,
-        activeInternships: activeInternships.length,
-      })
-      
-      setRecentApplications(mockApplications.slice(0, 5))
-      setIsLoading(false)
-    }, 500)
+    async function fetchDashboardData() {
+      try {
+        setIsLoading(true)
+        const [appsRes, intsRes, usersRes] = await Promise.all([
+          applicationsApi.getAll(),
+          internshipsApi.getAll(),
+          usersApi.getAll({ role: "student" }),
+        ])
 
-    return () => clearTimeout(timer)
+        const applications = (appsRes as any).data?.data || (appsRes as any).data?.applications || (appsRes as any).applications || []
+        const internships = (intsRes as any).data?.data || (intsRes as any).data?.internships || (intsRes as any).internships || []
+        const users = (usersRes as any).data?.data || (usersRes as any).data?.users || (usersRes as any).users || []
+
+        setApplicationsList(applications)
+        setUsersList(users)
+
+        const activeInterns = internships.filter((i: Internship) => i.status === "published" || (i as any).status === "open")
+        setActiveInternshipsList(activeInterns)
+
+        setStats({
+          totalStudents: users.length,
+          totalInternships: internships.length,
+          totalApplications: applications.length,
+          pendingApplications: applications.filter((a: Application) => a.status === "pending").length,
+          approvedApplications: applications.filter((a: Application) => a.status === "approved").length,
+          rejectedApplications: applications.filter((a: Application) => a.status === "rejected").length,
+          activeInternships: activeInterns.length,
+        })
+
+        // Sort applications to get the most recent ones
+        const sortedApps = [...applications].sort(
+          (a: any, b: any) => new Date(b.createdAt || b.appliedAt || 0).getTime() - new Date(a.createdAt || a.appliedAt || 0).getTime()
+        )
+        setRecentApplications(sortedApps.slice(0, 5))
+      } catch (error) {
+        console.error("Failed to fetch dashboard data:", error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchDashboardData()
   }, [])
 
   const statCards = [
@@ -138,10 +164,9 @@ export default function AdminDashboard() {
                 <div className={`w-12 h-12 rounded-lg ${stat.color} flex items-center justify-center`}>
                   <stat.icon className="h-6 w-6 text-white" />
                 </div>
-                <div className={`flex items-center gap-1 text-sm ${
-                  stat.changeType === "positive" ? "text-green-600" : "text-red-600"
-                }`}>
-                  {stat.changeType === "positive" 
+                <div className={`flex items-center gap-1 text-sm ${stat.changeType === "positive" ? "text-green-600" : "text-red-600"
+                  }`}>
+                  {stat.changeType === "positive"
                     ? <ArrowUpRight className="h-4 w-4" />
                     : <ArrowDownRight className="h-4 w-4" />
                   }
@@ -169,13 +194,13 @@ export default function AdminDashboard() {
               {[
                 { label: "Approved", count: stats.approvedApplications, color: "bg-green-500", icon: CheckCircle2 },
                 { label: "Pending", count: stats.pendingApplications, color: "bg-amber-500", icon: Clock },
-                { label: "Under Review", count: mockApplications.filter(a => a.status === "under_review").length, color: "bg-blue-500", icon: AlertCircle },
+                { label: "Under Review", count: applicationsList.filter(a => a.status === "under_review").length, color: "bg-blue-500", icon: AlertCircle },
                 { label: "Rejected", count: stats.rejectedApplications, color: "bg-red-500", icon: XCircle },
               ].map((item) => {
-                const percentage = stats.totalApplications > 0 
-                  ? Math.round((item.count / stats.totalApplications) * 100) 
+                const percentage = stats.totalApplications > 0
+                  ? Math.round((item.count / stats.totalApplications) * 100)
                   : 0
-                
+
                 return (
                   <div key={item.label} className="flex items-center gap-4">
                     <div className={`w-10 h-10 rounded-lg ${item.color}/10 flex items-center justify-center`}>
@@ -187,7 +212,7 @@ export default function AdminDashboard() {
                         <span className="text-sm text-muted-foreground">{item.count} ({percentage}%)</span>
                       </div>
                       <div className="h-2 bg-muted rounded-full overflow-hidden">
-                        <div 
+                        <div
                           className={`h-full ${item.color} rounded-full transition-all duration-500`}
                           style={{ width: `${percentage}%` }}
                         />
@@ -214,18 +239,19 @@ export default function AdminDashboard() {
           <CardContent>
             <div className="space-y-4">
               {recentApplications.map((application) => {
-                const student = mockUsers.find(u => u.id === application.studentId)
-                const internship = mockInternships.find(i => i.id === application.internshipId)
-                
-                const statusConfig = {
+                const student = usersList.find((u) => u.id === application.studentId)
+                const internship = activeInternshipsList.find((i) => i.id === application.internshipId) || (application as any).Internship
+
+                const statusConfig: Record<string, { color: string; label: string }> = {
                   pending: { color: "bg-amber-100 text-amber-800", label: "Pending" },
                   under_review: { color: "bg-blue-100 text-blue-800", label: "Reviewing" },
                   approved: { color: "bg-green-100 text-green-800", label: "Approved" },
                   rejected: { color: "bg-red-100 text-red-800", label: "Rejected" },
+                  withdrawn: { color: "bg-gray-100 text-gray-800", label: "Withdrawn" },
                 }
-                
-                const status = statusConfig[application.status]
-                
+
+                const status = statusConfig[application.status] || { color: "bg-gray-100 text-gray-800", label: "Unknown" }
+
                 return (
                   <div key={application.id} className="flex items-center gap-4 p-3 rounded-lg hover:bg-muted/50 transition-colors">
                     <Avatar className="h-10 w-10">
@@ -265,9 +291,9 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {mockInternships.filter(i => i.status === "open").slice(0, 3).map((internship) => {
-              const applicationCount = mockApplications.filter(a => a.internshipId === internship.id).length
-              
+            {activeInternshipsList.slice(0, 3).map((internship) => {
+              const applicationCount = applicationsList.filter(a => a.internshipId === internship.id).length
+
               return (
                 <div key={internship.id} className="p-4 rounded-lg border border-border hover:border-primary/50 transition-colors">
                   <div className="flex items-start gap-3">
@@ -286,7 +312,7 @@ export default function AdminDashboard() {
                     </span>
                     <span className="text-muted-foreground flex items-center gap-1">
                       <Calendar className="h-4 w-4" />
-                      {new Date(internship.deadline).toLocaleDateString()}
+                      {new Date((internship as any).deadline || internship.applicationDeadline || new Date()).toLocaleDateString()}
                     </span>
                   </div>
                 </div>

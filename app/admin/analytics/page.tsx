@@ -35,7 +35,7 @@ import {
   Download,
   Calendar,
 } from "lucide-react"
-import { mockApplications, mockInternships, mockUsers } from "@/lib/mock-data"
+import { analyticsApi, internshipsApi, applicationsApi, usersApi } from "@/lib/api"
 import { toast } from "sonner"
 
 const COLORS = ["#1e3a5f", "#2563eb", "#16a34a", "#dc2626", "#f59e0b"]
@@ -44,28 +44,74 @@ export default function AnalyticsPage() {
   const [isLoading, setIsLoading] = useState(true)
   const [dateRange, setDateRange] = useState("all")
 
+  const [totalStudents, setTotalStudents] = useState<number>(0)
+  const [totalInternships, setTotalInternships] = useState<number>(0)
+  const [totalApplications, setTotalApplications] = useState<number>(0)
+  const [approvalRate, setApprovalRate] = useState<number>(0)
+
+  const [statusData, setStatusData] = useState<any[]>([])
+  const [topInternships, setTopInternships] = useState<any[]>([])
+  const [typeData, setTypeData] = useState<any[]>([])
+
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setIsLoading(false)
-    }, 500)
-    return () => clearTimeout(timer)
+    async function fetchAnalytics() {
+      try {
+        setIsLoading(true)
+
+        // The dashboard expects some counts and objects.
+        // Easiest is to just fetch the root objects and map them manually
+        // just like the mock data did since the backend endpoints don't match 1:1 format.
+        const [usersRes, internshipsRes, applicationsRes] = await Promise.all([
+          usersApi.getAll({ role: "student" }),
+          internshipsApi.getAll(),
+          applicationsApi.getAll()
+        ]);
+
+        const usersList = (usersRes as any).data?.data || (usersRes as any).data?.users || (usersRes as any).users || []
+        const internshipsList = (internshipsRes as any).data?.data || (internshipsRes as any).data?.internships || (internshipsRes as any).internships || []
+        const applicationsList = (applicationsRes as any).data?.data || (applicationsRes as any).data?.applications || (applicationsRes as any).applications || []
+
+        setTotalStudents(usersList.length)
+        setTotalInternships(internshipsList.length)
+        setTotalApplications(applicationsList.length)
+
+        const approvedCount = applicationsList.filter((a: any) => a.status === "approved").length
+        setApprovalRate(applicationsList.length > 0 ? Math.round((approvedCount / applicationsList.length) * 100) : 0)
+
+        setStatusData([
+          { name: "Approved", value: applicationsList.filter((a: any) => a.status === "approved").length },
+          { name: "Pending", value: applicationsList.filter((a: any) => a.status === "pending").length },
+          { name: "Under Review", value: applicationsList.filter((a: any) => a.status === "under_review").length },
+          { name: "Rejected", value: applicationsList.filter((a: any) => a.status === "rejected").length },
+        ])
+
+        const top = internshipsList
+          .map((i: any) => ({
+            name: i.title.length > 20 ? i.title.substring(0, 20) + "..." : i.title,
+            applications: applicationsList.filter((a: any) => a.internshipId === i.id).length,
+            company: i.company,
+          }))
+          .sort((a: any, b: any) => b.applications - a.applications)
+          .slice(0, 5)
+        setTopInternships(top)
+
+        setTypeData([
+          { type: "Full-time", count: internshipsList.filter((i: any) => i.type === "full-time").length },
+          { type: "Part-time", count: internshipsList.filter((i: any) => i.type === "part-time").length },
+          { type: "Remote", count: internshipsList.filter((i: any) => i.type === "remote").length },
+        ])
+
+      } catch (error) {
+        console.error(error)
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchAnalytics()
   }, [])
 
-  // Calculate analytics data
-  const totalStudents = mockUsers.filter((u) => u.role === "student").length
-  const totalInternships = mockInternships.length
-  const totalApplications = mockApplications.length
-  const approvalRate = Math.round(
-    (mockApplications.filter((a) => a.status === "approved").length / totalApplications) * 100
-  )
 
-  // Application status distribution
-  const statusData = [
-    { name: "Approved", value: mockApplications.filter((a) => a.status === "approved").length },
-    { name: "Pending", value: mockApplications.filter((a) => a.status === "pending").length },
-    { name: "Under Review", value: mockApplications.filter((a) => a.status === "under_review").length },
-    { name: "Rejected", value: mockApplications.filter((a) => a.status === "rejected").length },
-  ]
 
   // Applications by month (simulated data)
   const monthlyData = [
@@ -77,31 +123,7 @@ export default function AnalyticsPage() {
     { month: "Jun", applications: 45, approved: 35 },
   ]
 
-  // Top internships by applications
-  const topInternships = mockInternships
-    .map((i) => ({
-      name: i.title.length > 20 ? i.title.substring(0, 20) + "..." : i.title,
-      applications: mockApplications.filter((a) => a.internshipId === i.id).length,
-      company: i.company,
-    }))
-    .sort((a, b) => b.applications - a.applications)
-    .slice(0, 5)
 
-  // Applications by type
-  const typeData = [
-    {
-      type: "Full-time",
-      count: mockInternships.filter((i) => i.type === "full-time").length,
-    },
-    {
-      type: "Part-time",
-      count: mockInternships.filter((i) => i.type === "part-time").length,
-    },
-    {
-      type: "Remote",
-      count: mockInternships.filter((i) => i.type === "remote").length,
-    },
-  ]
 
   const handleExport = () => {
     toast.success("Analytics report exported successfully")
@@ -165,7 +187,7 @@ export default function AnalyticsPage() {
           },
           {
             title: "Active Internships",
-            value: mockInternships.filter((i) => i.status === "open").length,
+            value: totalInternships, // or filter active based on db
             change: "+5",
             trend: "up",
             icon: Briefcase,
@@ -195,9 +217,8 @@ export default function AnalyticsPage() {
                   <metric.icon className="h-6 w-6 text-white" />
                 </div>
                 <div
-                  className={`flex items-center gap-1 text-sm ${
-                    metric.trend === "up" ? "text-green-600" : "text-red-600"
-                  }`}
+                  className={`flex items-center gap-1 text-sm ${metric.trend === "up" ? "text-green-600" : "text-red-600"
+                    }`}
                 >
                   {metric.trend === "up" ? (
                     <TrendingUp className="h-4 w-4" />

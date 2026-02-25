@@ -45,7 +45,7 @@ import {
   Megaphone,
 } from "lucide-react"
 import { Notice } from "@/types"
-import { mockNotices } from "@/lib/mock-data"
+import { noticesApi } from "@/lib/api"
 import { toast } from "sonner"
 
 const priorityConfig = {
@@ -78,56 +78,96 @@ export default function NoticesManagementPage() {
   })
   const [formData, setFormData] = useState(emptyNotice)
 
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setNotices(mockNotices)
+  const fetchNotices = async () => {
+    try {
+      setIsLoading(true)
+      const res = await noticesApi.getAll()
+      const fetchedNotices = (res as any).data?.data || (res as any).data?.notices || (res as any).notices || []
+      setNotices(fetchedNotices)
+    } catch (error) {
+      toast.error("Failed to load notices")
+      console.error(error)
+    } finally {
       setIsLoading(false)
-    }, 500)
-    return () => clearTimeout(timer)
+    }
+  }
+
+  useEffect(() => {
+    fetchNotices()
   }, [])
 
-  const handleCreate = () => {
-    const newNotice: Notice = {
-      id: `notice-${Date.now()}`,
-      ...formData,
-      expiresAt: formData.expiresAt || undefined,
-      createdAt: new Date().toISOString(),
-      createdBy: "admin-1",
-    }
-    setNotices([newNotice, ...notices])
-    setCreateDialog(false)
-    setFormData(emptyNotice)
-    toast.success("Notice created successfully")
-  }
-
-  const handleEdit = () => {
-    if (editDialog.notice) {
-      setNotices((prev) =>
-        prev.map((n) =>
-          n.id === editDialog.notice?.id
-            ? { ...n, ...formData, expiresAt: formData.expiresAt || undefined }
-            : n
-        )
-      )
-      setEditDialog({ open: false, notice: null })
+  const handleCreate = async () => {
+    try {
+      const newNoticePayload = {
+        ...formData,
+        expiresAt: formData.expiresAt || undefined,
+      }
+      await noticesApi.create(newNoticePayload)
+      setCreateDialog(false)
       setFormData(emptyNotice)
-      toast.success("Notice updated successfully")
+      toast.success("Notice created successfully")
+      fetchNotices()
+    } catch (error) {
+      toast.error("Failed to create notice")
     }
   }
 
-  const handleDelete = () => {
+  const handleEdit = async () => {
+    if (editDialog.notice) {
+      try {
+        const payload = {
+          ...formData,
+          expiresAt: formData.expiresAt || undefined,
+        }
+        await noticesApi.update(editDialog.notice.id, payload)
+        setEditDialog({ open: false, notice: null })
+        setFormData(emptyNotice)
+        toast.success("Notice updated successfully")
+        fetchNotices()
+      } catch (error) {
+        toast.error("Failed to update notice")
+      }
+    }
+  }
+
+  const handleDelete = async () => {
     if (deleteDialog.notice) {
-      setNotices((prev) => prev.filter((n) => n.id !== deleteDialog.notice?.id))
-      setDeleteDialog({ open: false, notice: null })
-      toast.success("Notice deleted successfully")
+      try {
+        await noticesApi.delete(deleteDialog.notice.id)
+        setDeleteDialog({ open: false, notice: null })
+        toast.success("Notice deleted successfully")
+        fetchNotices()
+      } catch (error) {
+        toast.error("Failed to delete notice")
+      }
     }
   }
 
-  const handleToggleActive = (noticeId: string) => {
-    setNotices((prev) =>
-      prev.map((n) => (n.id === noticeId ? { ...n, isActive: !n.isActive } : n))
-    )
-    toast.success("Notice status updated")
+  const handleToggleActive = async (noticeId: string, currentStatus: boolean) => {
+    try {
+      // Optimistic upate
+      setNotices((prev) =>
+        prev.map((n) => (n.id === noticeId ? { ...n, isActive: !currentStatus } : n))
+      )
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/notices/${noticeId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('rmu_token')}`,
+        },
+        body: JSON.stringify({ isActive: !currentStatus })
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed");
+      }
+
+      toast.success("Notice status updated")
+    } catch (e: any) {
+      toast.error("Failed to update notice status")
+      fetchNotices() // revert
+    }
   }
 
   const openEditDialog = (notice: Notice) => {
@@ -136,7 +176,7 @@ export default function NoticesManagementPage() {
       content: notice.content,
       priority: notice.priority,
       targetAudience: notice.targetAudience,
-      expiresAt: notice.expiresAt ? notice.expiresAt.split("T")[0] : "",
+      expiresAt: (notice as any).expiresAt ? (notice as any).expiresAt.split("T")[0] : "",
       isActive: notice.isActive,
     })
     setEditDialog({ open: true, notice })
@@ -337,7 +377,7 @@ export default function NoticesManagementPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">
-                  {notices.filter((n) => n.priority === "urgent" && n.isActive).length}
+                  {(notices.filter((n) => (n.priority as any) === "urgent" && n.isActive) || []).length}
                 </p>
                 <p className="text-sm text-muted-foreground">Urgent</p>
               </div>
@@ -364,9 +404,9 @@ export default function NoticesManagementPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
           {notices.map((notice) => {
-            const priority = priorityConfig[notice.priority]
+            const priority = priorityConfig[(notice.priority as keyof typeof priorityConfig)] || priorityConfig["medium"]
             const PriorityIcon = priority.icon
-            const isExpired = notice.expiresAt && new Date(notice.expiresAt) < new Date()
+            const isExpired = (notice as any).expiresAt && new Date((notice as any).expiresAt) < new Date()
 
             return (
               <Card
@@ -391,8 +431,8 @@ export default function NoticesManagementPage() {
                             {notice.targetAudience === "all"
                               ? "All Users"
                               : notice.targetAudience === "students"
-                              ? "Students"
-                              : "Admins"}
+                                ? "Students"
+                                : "Admins"}
                           </Badge>
                           {!notice.isActive && (
                             <Badge variant="outline" className="bg-gray-100 text-gray-800">
@@ -418,7 +458,7 @@ export default function NoticesManagementPage() {
                           <Edit className="mr-2 h-4 w-4" />
                           Edit
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleToggleActive(notice.id)}>
+                        <DropdownMenuItem onClick={() => handleToggleActive(notice.id, notice.isActive)}>
                           {notice.isActive ? (
                             <>
                               <EyeOff className="mr-2 h-4 w-4" />
@@ -447,12 +487,12 @@ export default function NoticesManagementPage() {
                   <div className="flex items-center gap-4 mt-4 pt-4 border-t border-border text-xs text-muted-foreground">
                     <span className="flex items-center gap-1">
                       <Calendar className="h-3 w-3" />
-                      Created: {new Date(notice.createdAt).toLocaleDateString()}
+                      Created: {new Date((notice as any).createdAt || notice.createdAt || new Date()).toLocaleDateString()}
                     </span>
-                    {notice.expiresAt && (
+                    {(notice as any).expiresAt && (
                       <span className="flex items-center gap-1">
                         <Calendar className="h-3 w-3" />
-                        Expires: {new Date(notice.expiresAt).toLocaleDateString()}
+                        Expires: {new Date((notice as any).expiresAt).toLocaleDateString()}
                       </span>
                     )}
                   </div>

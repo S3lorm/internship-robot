@@ -32,8 +32,7 @@ import { Notice } from "@/types"
 import { noticesApi } from "@/lib/api"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
-import { Loader2, AlertCircle } from "lucide-react"
-import { Button } from "@/components/ui/button"
+import { Loader2 } from "lucide-react"
 
 const priorityConfig = {
   low: { label: "General", color: "bg-slate-100 text-slate-800 border-slate-200", icon: Info },
@@ -65,20 +64,20 @@ export default function NoticesPage() {
       if (result.error) {
         throw new Error(result.error);
       }
-      const noticesData = Array.isArray(result.data?.data)
-        ? result.data.data
-        : Array.isArray(result.data?.notices)
-        ? result.data.notices
-        : Array.isArray(result.data)
-        ? result.data
-        : [];
-      
+      const noticesData = Array.isArray((result as any).data?.data)
+        ? (result as any).data.data
+        : Array.isArray((result as any).data?.notices)
+          ? (result as any).data.notices
+          : Array.isArray((result as any).data)
+            ? (result as any).data
+            : [];
+
       // Filter notices for students (all or students-targeted) and active
       const studentNotices = noticesData.filter(
         (n: Notice) =>
           n.isActive &&
           (n.targetAudience === "all" || n.targetAudience === "students") &&
-          (!n.expiresAt || new Date(n.expiresAt) > new Date())
+          (!(n as any).expiresAt || new Date((n as any).expiresAt) > new Date())
       );
       setNotices(studentNotices);
       setFilteredNotices(studentNotices);
@@ -119,7 +118,7 @@ export default function NoticesPage() {
     return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   })
 
-  const urgentNotices = sortedNotices.filter((n) => n.priority === "urgent")
+  const urgentNotices = sortedNotices.filter((n) => (n.priority as any) === "urgent")
 
   return (
     <Suspense fallback={<Loading />}>
@@ -209,7 +208,7 @@ export default function NoticesPage() {
           ) : (
             <div className="space-y-4">
               {sortedNotices.map((notice) => {
-                const priority = priorityConfig[notice.priority]
+                const priority = priorityConfig[(notice.priority as keyof typeof priorityConfig)] || priorityConfig["medium"]
                 const PriorityIcon = priority.icon
 
                 return (
@@ -244,9 +243,9 @@ export default function NoticesPage() {
                                 day: "numeric",
                               })}
                             </span>
-                            {notice.expiresAt && (
+                            {(notice as any).expiresAt && (
                               <span className="flex items-center gap-1">
-                                Expires: {new Date(notice.expiresAt).toLocaleDateString()}
+                                Expires: {new Date((notice as any).expiresAt).toLocaleDateString()}
                               </span>
                             )}
                           </div>
@@ -269,9 +268,9 @@ export default function NoticesPage() {
                     <div className="flex items-center gap-2 mb-2">
                       <Badge
                         variant="outline"
-                        className={priorityConfig[selectedNotice.priority].color}
+                        className={priorityConfig[(selectedNotice.priority as keyof typeof priorityConfig)].color}
                       >
-                        {priorityConfig[selectedNotice.priority].label}
+                        {priorityConfig[(selectedNotice.priority as keyof typeof priorityConfig)].label}
                       </Badge>
                     </div>
                     <DialogTitle>{selectedNotice.title}</DialogTitle>
@@ -289,11 +288,11 @@ export default function NoticesPage() {
                     <div className="prose prose-sm max-w-none">
                       <p className="text-foreground whitespace-pre-wrap">{selectedNotice.content}</p>
                     </div>
-                    {selectedNotice.expiresAt && (
+                    {(selectedNotice as any).expiresAt && (
                       <div className="p-3 bg-muted/50 rounded-lg">
                         <p className="text-sm text-muted-foreground">
                           <span className="font-medium">Note:</span> This notice expires on{" "}
-                          {new Date(selectedNotice.expiresAt).toLocaleDateString("en-US", {
+                          {new Date((selectedNotice as any).expiresAt).toLocaleDateString("en-US", {
                             weekday: "long",
                             year: "numeric",
                             month: "long",

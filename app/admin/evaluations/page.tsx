@@ -118,25 +118,25 @@ export default function EvaluationsManagementPage() {
       if (studentsResult.error) throw new Error(studentsResult.error);
       if (internshipsResult.error) throw new Error(internshipsResult.error);
 
-      const evals = Array.isArray(evalsResult.data?.evaluations)
-        ? evalsResult.data.evaluations
-        : Array.isArray(evalsResult.data)
-        ? evalsResult.data
-        : [];
+      const evals = Array.isArray((evalsResult as any).data?.evaluations)
+        ? (evalsResult as any).data.evaluations
+        : Array.isArray((evalsResult as any).data)
+          ? (evalsResult as any).data
+          : [];
       setEvaluations(evals);
 
-      const studs = Array.isArray(studentsResult.data?.data)
-        ? studentsResult.data.data
-        : Array.isArray(studentsResult.data)
-        ? studentsResult.data
-        : [];
+      const studs = Array.isArray((studentsResult as any).data?.data)
+        ? (studentsResult as any).data.data
+        : Array.isArray((studentsResult as any).data)
+          ? (studentsResult as any).data
+          : [];
       setStudents(studs);
 
-      const ints = Array.isArray(internshipsResult.data?.data)
-        ? internshipsResult.data.data
-        : Array.isArray(internshipsResult.data)
-        ? internshipsResult.data
-        : [];
+      const ints = Array.isArray((internshipsResult as any).data?.data)
+        ? (internshipsResult as any).data.data
+        : Array.isArray((internshipsResult as any).data)
+          ? (internshipsResult as any).data
+          : [];
       setInternships(ints);
     } catch (err) {
       console.error("Error fetching data:", err);
@@ -146,12 +146,12 @@ export default function EvaluationsManagementPage() {
     }
   };
 
-  const filteredEvaluations = evaluations.filter((eval) => {
+  const filteredEvaluations = evaluations.filter((evaluation) => {
     const matchesSearch =
       !searchQuery ||
-      eval.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      eval.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesType = typeFilter === "all" || eval.evaluationType === typeFilter;
+      evaluation.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      evaluation.description?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesType = typeFilter === "all" || evaluation.evaluationType === typeFilter;
     return matchesSearch && matchesType;
   });
 

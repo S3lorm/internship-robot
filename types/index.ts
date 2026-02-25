@@ -14,6 +14,7 @@ export interface User {
   yearOfStudy?: number;
   avatar?: string;
   isEmailVerified: boolean;
+  isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }

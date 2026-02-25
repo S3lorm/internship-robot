@@ -47,7 +47,7 @@ import {
   Briefcase,
 } from "lucide-react"
 import { Internship } from "@/types"
-import { mockInternships, mockApplications } from "@/lib/mock-data"
+import { applicationsApi, internshipsApi } from "@/lib/api"
 import { toast } from "sonner"
 import { useSearchParams } from "next/navigation"
 import Loading from "./loading"
@@ -79,6 +79,7 @@ export default function InternshipsManagementPage() {
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [isLoading, setIsLoading] = useState(true)
+  const [applications, setApplications] = useState<any[]>([])
   const [createDialog, setCreateDialog] = useState(false)
   const [editDialog, setEditDialog] = useState<{ open: boolean; internship: Internship | null }>({
     open: false,
@@ -93,12 +94,28 @@ export default function InternshipsManagementPage() {
   const [responsibilitiesInput, setResponsibilitiesInput] = useState("")
 
   useEffect(() => {
-    const timer = setTimeout(() => {
-      setInternships(mockInternships)
-      setFilteredInternships(mockInternships)
-      setIsLoading(false)
-    }, 500)
-    return () => clearTimeout(timer)
+    async function fetchInternships() {
+      try {
+        setIsLoading(true)
+        const [intsRes, appsRes] = await Promise.all([
+          internshipsApi.getAll(),
+          applicationsApi.getAll()
+        ])
+
+        const internshipsList = (intsRes as any).data?.data || (intsRes as any).data?.internships || (intsRes as any).internships || []
+        const applicationsList = (appsRes as any).data?.data || (appsRes as any).data?.applications || (appsRes as any).applications || []
+
+        setInternships(internshipsList)
+        setFilteredInternships(internshipsList)
+        setApplications(applicationsList)
+      } catch (error) {
+        toast.error("Failed to load internships")
+      } finally {
+        setIsLoading(false)
+      }
+    }
+
+    fetchInternships()
   }, [])
 
   useEffect(() => {
@@ -144,11 +161,11 @@ export default function InternshipsManagementPage() {
         prev.map((i) =>
           i.id === editDialog.internship?.id
             ? {
-                ...i,
-                ...formData,
-                requirements: requirementsInput.split("\n").filter((r) => r.trim()),
-                responsibilities: responsibilitiesInput.split("\n").filter((r) => r.trim()),
-              }
+              ...i,
+              ...formData,
+              requirements: requirementsInput.split("\n").filter((r) => r.trim()),
+              responsibilities: responsibilitiesInput.split("\n").filter((r) => r.trim()),
+            }
             : i
         )
       )
@@ -184,13 +201,13 @@ export default function InternshipsManagementPage() {
       duration: internship.duration,
       description: internship.description,
       requirements: internship.requirements,
-      responsibilities: internship.responsibilities,
-      deadline: internship.deadline.split("T")[0],
-      slots: internship.slots,
+      responsibilities: internship.responsibilities || [],
+      deadline: ((internship as any).deadline || internship.applicationDeadline || new Date().toISOString()).split("T")[0],
+      slots: internship.slots || 1,
       stipend: internship.stipend || "",
     })
-    setRequirementsInput(internship.requirements.join("\n"))
-    setResponsibilitiesInput(internship.responsibilities.join("\n"))
+    setRequirementsInput((internship.requirements || []).join("\n"))
+    setResponsibilitiesInput((internship.responsibilities || []).join("\n"))
     setEditDialog({ open: true, internship })
   }
 
@@ -447,8 +464,8 @@ export default function InternshipsManagementPage() {
           </Card>
         ) : (
           filteredInternships.map((internship) => {
-            const applicationCount = mockApplications.filter(
-              (a) => a.internshipId === internship.id
+            const applicationCount = applications.filter(
+              (a: any) => a.internshipId === internship.id
             ).length
 
             return (
@@ -510,10 +527,10 @@ export default function InternshipsManagementPage() {
                 <CardContent>
                   <div className="space-y-3">
                     <div className="flex flex-wrap gap-2">
-                      <Badge variant="outline" className={statusColors[internship.status]}>
+                      <Badge variant="outline" className={(statusColors as any)[internship.status] || "bg-gray-100"}>
                         {internship.status.charAt(0).toUpperCase() + internship.status.slice(1)}
                       </Badge>
-                      <Badge variant="outline">{internship.type}</Badge>
+                      <Badge variant="outline">{internship.type || "Internship"}</Badge>
                     </div>
 
                     <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
@@ -527,7 +544,7 @@ export default function InternshipsManagementPage() {
                       </div>
                       <div className="flex items-center gap-1">
                         <Calendar className="h-4 w-4" />
-                        <span>{new Date(internship.deadline).toLocaleDateString()}</span>
+                        <span>{new Date((internship as any).deadline || internship.applicationDeadline || new Date()).toLocaleDateString()}</span>
                       </div>
                       <div className="flex items-center gap-1">
                         <Users className="h-4 w-4" />
