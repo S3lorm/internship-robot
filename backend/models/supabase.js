@@ -7,7 +7,7 @@ const supabase = require('../config/supabase');
 const User = {
   async findOne(where) {
     let query = supabase.from('user_profiles').select('*');
-    
+
     if (where.email) {
       query = query.eq('email', where.email);
     }
@@ -25,48 +25,80 @@ const User = {
     }
 
     const { data, error } = await query.single();
-    
+
     if (error && error.code !== 'PGRST116') { // PGRST116 = not found
       throw error;
     }
-    
+
     return data ? mapUserFromSupabase(data) : null;
   },
 
   async findAll(options = {}) {
     let query = supabase.from('user_profiles').select('*');
-    
+
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
         const mappedKey = mapKeyToSupabase(key);
         query = query.eq(mappedKey, value);
       });
     }
-    
+
     if (options.order) {
       const [field, direction] = options.order[0];
       const mappedField = mapKeyToSupabase(field);
       query = query.order(mappedField, { ascending: direction === 'ASC' });
     }
-    
+
     if (options.limit) {
       query = query.limit(options.limit);
     }
-    
+
     if (options.offset) {
       query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
     }
 
     const { data, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return data.map(mapUserFromSupabase);
+  },
+
+  async findAndCountAll(options = {}) {
+    let query = supabase.from('user_profiles').select('*', { count: 'exact' });
+
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        const mappedKey = mapKeyToSupabase(key);
+        query = query.eq(mappedKey, value);
+      });
+    }
+
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      const mappedField = mapKeyToSupabase(field);
+      query = query.order(mappedField, { ascending: direction === 'ASC' });
+    }
+
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+
+    if (options.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    const rows = data.map(mapUserFromSupabase);
+    return { rows, count: count || rows.length };
   },
 
   async count(options = {}) {
     let query = supabase.from('user_profiles').select('*', { count: 'exact', head: true });
-    
+
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
         const mappedKey = mapKeyToSupabase(key);
@@ -75,9 +107,9 @@ const User = {
     }
 
     const { count, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return count || 0;
   },
 
@@ -88,15 +120,15 @@ const User = {
       ...userData,
       id: userData.id || uuidv4(),
     };
-    
+
     const { data, error } = await supabase
       .from('user_profiles')
       .insert(mapUserToSupabase(userWithId))
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapUserFromSupabase(data);
   },
 
@@ -107,9 +139,9 @@ const User = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapUserFromSupabase(data);
   },
 };
@@ -180,7 +212,7 @@ const Internship = {
   async findByPk(id, options = {}) {
     const data = await this.findOne({ id });
     if (!data) return null;
-    
+
     // Handle includes (joins) if needed
     if (options.include) {
       for (const include of options.include) {
@@ -192,13 +224,13 @@ const Internship = {
         }
       }
     }
-    
+
     return data;
   },
 
   async findOne(where) {
     let query = supabase.from('internships').select('*');
-    
+
     if (where.id) {
       query = query.eq('id', where.id);
     }
@@ -210,18 +242,18 @@ const Internship = {
     }
 
     const { data, error } = await query.single();
-    
+
     if (error && error.code !== 'PGRST116') {
       throw error;
     }
-    
+
     return data ? mapInternshipFromSupabase(data) : null;
   },
 
   async findAndCountAll(options = {}) {
     const where = options.where || {};
     let query = supabase.from('internships').select('*', { count: 'exact' });
-    
+
     // Apply where conditions
     Object.entries(where).forEach(([key, value]) => {
       const mappedKey = mapKeyToSupabase(key);
@@ -232,14 +264,14 @@ const Internship = {
         query = query.eq(mappedKey, value);
       }
     });
-    
+
     // Apply order
     if (options.order) {
       const [field, direction] = options.order[0];
       const mappedField = mapKeyToSupabase(field);
       query = query.order(mappedField, { ascending: direction === 'ASC' });
     }
-    
+
     // Apply pagination
     if (options.limit) {
       query = query.limit(options.limit);
@@ -249,11 +281,11 @@ const Internship = {
     }
 
     const { data, error, count } = await query;
-    
+
     if (error) throw error;
-    
+
     let rows = data.map(mapInternshipFromSupabase);
-    
+
     // Handle includes
     if (options.include) {
       for (const include of options.include) {
@@ -267,13 +299,13 @@ const Internship = {
         }
       }
     }
-    
+
     return { rows, count: count || rows.length };
   },
 
   async count(options = {}) {
     let query = supabase.from('internships').select('*', { count: 'exact', head: true });
-    
+
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
         const mappedKey = mapKeyToSupabase(key);
@@ -286,40 +318,40 @@ const Internship = {
     }
 
     const { count, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return count || 0;
   },
 
   async findAll(options = {}) {
     let query = supabase.from('internships').select('*');
-    
+
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
         const mappedKey = mapKeyToSupabase(key);
         query = query.eq(mappedKey, value);
       });
     }
-    
+
     if (options.order) {
       const [field, direction] = options.order[0];
       const mappedField = mapKeyToSupabase(field);
       query = query.order(mappedField, { ascending: direction === 'ASC' });
     }
-    
+
     if (options.limit) {
       query = query.limit(options.limit);
     }
-    
+
     if (options.offset) {
       query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
     }
 
     const { data, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return data.map(mapInternshipFromSupabase);
   },
 
@@ -329,9 +361,9 @@ const Internship = {
       .insert(mapInternshipToSupabase(internshipData))
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapInternshipFromSupabase(data);
   },
 
@@ -342,26 +374,26 @@ const Internship = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapInternshipFromSupabase(data);
   },
 
   async destroy(where) {
     let query = supabase.from('internships').delete();
-    
+
     if (where.id) {
       query = query.eq('id', where.id);
     }
 
     const { error } = await query;
-    
+
     if (error) throw error;
-    
+
     return true;
   },
-  
+
   // Sequelize compatibility method
   async destroy() {
     if (!this.id) throw new Error('Cannot destroy without id');
@@ -379,7 +411,7 @@ const Application = {
   async findByPk(id, options = {}) {
     const data = await this.findOne({ id });
     if (!data) return null;
-    
+
     // Handle includes
     if (options.include) {
       for (const include of options.include) {
@@ -399,13 +431,13 @@ const Application = {
         }
       }
     }
-    
+
     return data;
   },
 
   async findOne(where) {
     let query = supabase.from('applications').select('*');
-    
+
     if (where.id) {
       query = query.eq('id', where.id);
     }
@@ -417,31 +449,31 @@ const Application = {
     }
 
     const { data, error } = await query.single();
-    
+
     if (error && error.code !== 'PGRST116') {
       throw error;
     }
-    
+
     return data ? mapApplicationFromSupabase(data) : null;
   },
 
   async findAndCountAll(options = {}) {
     const where = options.where || {};
     let query = supabase.from('applications').select('*', { count: 'exact' });
-    
+
     // Apply where conditions
     Object.entries(where).forEach(([key, value]) => {
       const mappedKey = mapKeyToSupabase(key);
       query = query.eq(mappedKey, value);
     });
-    
+
     // Apply order
     if (options.order) {
       const [field, direction] = options.order[0];
       const mappedField = mapKeyToSupabase(field);
       query = query.order(mappedField, { ascending: direction === 'ASC' });
     }
-    
+
     // Apply pagination
     if (options.limit) {
       query = query.limit(options.limit);
@@ -451,11 +483,11 @@ const Application = {
     }
 
     const { data, error, count } = await query;
-    
+
     if (error) throw error;
-    
+
     let rows = data.map(mapApplicationFromSupabase);
-    
+
     // Handle includes
     if (options.include) {
       for (const include of options.include) {
@@ -483,44 +515,44 @@ const Application = {
         }
       }
     }
-    
+
     return { rows, count: count || rows.length };
   },
 
   async findAll(options = {}) {
     let query = supabase.from('applications').select('*');
-    
+
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
         const mappedKey = mapKeyToSupabase(key);
         query = query.eq(mappedKey, value);
       });
     }
-    
+
     if (options.order) {
       const [field, direction] = options.order[0];
       const mappedField = mapKeyToSupabase(field);
       query = query.order(mappedField, { ascending: direction === 'ASC' });
     }
-    
+
     if (options.limit) {
       query = query.limit(options.limit);
     }
-    
+
     if (options.offset) {
       query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
     }
 
     const { data, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return data.map(mapApplicationFromSupabase);
   },
 
   async count(options = {}) {
     let query = supabase.from('applications').select('*', { count: 'exact', head: true });
-    
+
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
         const mappedKey = mapKeyToSupabase(key);
@@ -529,9 +561,9 @@ const Application = {
     }
 
     const { count, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return count || 0;
   },
 
@@ -541,9 +573,9 @@ const Application = {
       .insert(mapApplicationToSupabase(applicationData))
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapApplicationFromSupabase(data);
   },
 
@@ -554,9 +586,9 @@ const Application = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapApplicationFromSupabase(data);
   },
 };
@@ -566,7 +598,7 @@ const Notice = {
   async findByPk(id, options = {}) {
     const data = await this.findOne({ id });
     if (!data) return null;
-    
+
     // Handle includes
     if (options.include) {
       for (const include of options.include) {
@@ -578,13 +610,13 @@ const Notice = {
         }
       }
     }
-    
+
     return data;
   },
 
   async findOne(where) {
     let query = supabase.from('notices').select('*');
-    
+
     if (where.id) {
       query = query.eq('id', where.id);
     }
@@ -593,18 +625,18 @@ const Notice = {
     }
 
     const { data, error } = await query.single();
-    
+
     if (error && error.code !== 'PGRST116') {
       throw error;
     }
-    
+
     return data ? mapNoticeFromSupabase(data) : null;
   },
 
   async findAndCountAll(options = {}) {
     const where = options.where || {};
     let query = supabase.from('notices').select('*', { count: 'exact' });
-    
+
     // Apply where conditions
     Object.entries(where).forEach(([key, value]) => {
       const mappedKey = mapKeyToSupabase(key);
@@ -615,14 +647,14 @@ const Notice = {
         query = query.eq(mappedKey, value);
       }
     });
-    
+
     // Apply order
     if (options.order) {
       const [field, direction] = options.order[0];
       const mappedField = mapKeyToSupabase(field);
       query = query.order(mappedField, { ascending: direction === 'ASC' });
     }
-    
+
     // Apply pagination
     if (options.limit) {
       query = query.limit(options.limit);
@@ -632,11 +664,11 @@ const Notice = {
     }
 
     const { data, error, count } = await query;
-    
+
     if (error) throw error;
-    
+
     let rows = data.map(mapNoticeFromSupabase);
-    
+
     // Handle includes
     if (options.include) {
       for (const include of options.include) {
@@ -650,44 +682,44 @@ const Notice = {
         }
       }
     }
-    
+
     return { rows, count: count || rows.length };
   },
 
   async findAll(options = {}) {
     let query = supabase.from('notices').select('*');
-    
+
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
         const mappedKey = mapKeyToSupabase(key);
         query = query.eq(mappedKey, value);
       });
     }
-    
+
     if (options.order) {
       const [field, direction] = options.order[0];
       const mappedField = mapKeyToSupabase(field);
       query = query.order(mappedField, { ascending: direction === 'ASC' });
     }
-    
+
     if (options.limit) {
       query = query.limit(options.limit);
     }
-    
+
     if (options.offset) {
       query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
     }
 
     const { data, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return data.map(mapNoticeFromSupabase);
   },
 
   async count(options = {}) {
     let query = supabase.from('notices').select('*', { count: 'exact', head: true });
-    
+
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
         const mappedKey = mapKeyToSupabase(key);
@@ -696,9 +728,9 @@ const Notice = {
     }
 
     const { count, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return count || 0;
   },
 
@@ -708,9 +740,9 @@ const Notice = {
       .insert(mapNoticeToSupabase(noticeData))
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapNoticeFromSupabase(data);
   },
 
@@ -721,23 +753,23 @@ const Notice = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapNoticeFromSupabase(data);
   },
 
   async destroy(where) {
     let query = supabase.from('notices').delete();
-    
+
     if (where.id) {
       query = query.eq('id', where.id);
     }
 
     const { error } = await query;
-    
+
     if (error) throw error;
-    
+
     return true;
   },
 };
@@ -746,7 +778,7 @@ const Notice = {
 const Notification = {
   async findOne(where) {
     let query = supabase.from('notifications').select('*');
-    
+
     if (where.id) {
       query = query.eq('id', where.id);
     }
@@ -755,42 +787,42 @@ const Notification = {
     }
 
     const { data, error } = await query.single();
-    
+
     if (error && error.code !== 'PGRST116') {
       throw error;
     }
-    
+
     return data ? mapNotificationFromSupabase(data) : null;
   },
 
   async findAll(options = {}) {
     let query = supabase.from('notifications').select('*');
-    
+
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
         const mappedKey = mapKeyToSupabase(key);
         query = query.eq(mappedKey, value);
       });
     }
-    
+
     if (options.order) {
       const [field, direction] = options.order[0];
       const mappedField = mapKeyToSupabase(field);
       query = query.order(mappedField, { ascending: direction === 'ASC' });
     }
-    
+
     if (options.limit) {
       query = query.limit(options.limit);
     }
-    
+
     if (options.offset) {
       query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
     }
 
     const { data, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return data.map(mapNotificationFromSupabase);
   },
 
@@ -800,9 +832,9 @@ const Notification = {
       .insert(mapNotificationToSupabase(notificationData))
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapNotificationFromSupabase(data);
   },
 
@@ -813,9 +845,9 @@ const Notification = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapNotificationFromSupabase(data);
   },
 };
@@ -1053,7 +1085,7 @@ const Op = {
 const LetterRequest = {
   async findOne(where) {
     let query = supabase.from('letter_requests').select('*');
-    
+
     if (where.id) {
       query = query.eq('id', where.id);
     }
@@ -1065,24 +1097,24 @@ const LetterRequest = {
     }
 
     const { data, error } = await query.single();
-    
+
     if (error && error.code !== 'PGRST116') {
       throw error;
     }
-    
+
     return data ? mapLetterRequestFromSupabase(data) : null;
   },
 
   async findAll(options = {}) {
     let query = supabase.from('letter_requests').select('*');
-    
+
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
         const mappedKey = mapKeyToSupabase(key);
         query = query.eq(mappedKey, value);
       });
     }
-    
+
     if (options.order) {
       const [field, direction] = options.order[0];
       const mappedField = mapKeyToSupabase(field);
@@ -1090,26 +1122,26 @@ const LetterRequest = {
     } else {
       query = query.order('created_at', { ascending: false });
     }
-    
+
     if (options.limit) {
       query = query.limit(options.limit);
     }
-    
+
     if (options.offset) {
       query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
     }
 
     const { data, error } = await query;
-    
+
     if (error) throw error;
-    
+
     return data.map(mapLetterRequestFromSupabase);
   },
 
   async findByPk(id, options = {}) {
     const data = await this.findOne({ id });
     if (!data) return null;
-    
+
     // Handle includes
     if (options.include) {
       for (const include of options.include) {
@@ -1125,7 +1157,7 @@ const LetterRequest = {
         }
       }
     }
-    
+
     return data;
   },
 
@@ -1135,15 +1167,15 @@ const LetterRequest = {
       ...requestData,
       id: requestData.id || uuidv4(),
     };
-    
+
     const { data, error } = await supabase
       .from('letter_requests')
       .insert(mapLetterRequestToSupabase(requestWithId))
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapLetterRequestFromSupabase(data);
   },
 
@@ -1154,9 +1186,9 @@ const LetterRequest = {
       .eq('id', id)
       .select()
       .single();
-    
+
     if (error) throw error;
-    
+
     return mapLetterRequestFromSupabase(data);
   },
 
@@ -1165,7 +1197,7 @@ const LetterRequest = {
       .from('letter_requests')
       .delete()
       .eq('id', id);
-    
+
     if (error) throw error;
     return true;
   },
