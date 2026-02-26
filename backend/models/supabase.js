@@ -1163,14 +1163,59 @@ const LetterRequest = {
 
   async create(requestData) {
     const { v4: uuidv4 } = require('uuid');
+
+    // Pre-generate reference_number and verification_code in JS
+    // to bypass the broken Supabase trigger that references non-existent 'my_date'
+    const now = new Date();
+    const datePart = now.getFullYear().toString() +
+      String(now.getMonth() + 1).padStart(2, '0') +
+      String(now.getDate()).padStart(2, '0');
+    const pattern = `LR-${datePart}-%`;
+
+    // Get the next sequence number for today
+    const { data: existingRefs } = await supabase
+      .from('letter_requests')
+      .select('reference_number')
+      .like('reference_number', pattern);
+
+    let seqNum = 1;
+    if (existingRefs && existingRefs.length > 0) {
+      const nums = existingRefs
+        .map(r => {
+          const match = r.reference_number?.match(/(\d+)$/);
+          return match ? parseInt(match[1], 10) : 0;
+        })
+        .filter(n => !isNaN(n));
+      seqNum = (nums.length > 0 ? Math.max(...nums) : 0) + 1;
+    }
+
+    const referenceNumber = `LR-${datePart}-${String(seqNum).padStart(5, '0')}`;
+
+    // Generate a unique 6-digit verification code
+    let verificationCode;
+    let isUnique = false;
+    while (!isUnique) {
+      verificationCode = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+      const { data: existing } = await supabase
+        .from('letter_requests')
+        .select('id')
+        .eq('verification_code', verificationCode)
+        .maybeSingle();
+      isUnique = !existing;
+    }
+
     const requestWithId = {
       ...requestData,
       id: requestData.id || uuidv4(),
+      referenceNumber,
+      verificationCode,
     };
+
+    const mappedData = mapLetterRequestToSupabase(requestWithId);
 
     const { data, error } = await supabase
       .from('letter_requests')
-      .insert(mapLetterRequestToSupabase(requestWithId))
+      .insert(mappedData)
       .select()
       .single();
 
