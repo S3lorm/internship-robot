@@ -12,5 +12,8 @@ router.post('/', auth, checkRole('admin'), noticeController.create);
 router.patch('/:id', auth, checkRole('admin'), noticeController.update);
 router.delete('/:id', auth, checkRole('admin'), noticeController.remove);
 
+// Endpoint for any logged in user to mark a notice as read
+router.patch('/:id/read', auth, noticeController.markAsRead);
+
 module.exports = router;
 

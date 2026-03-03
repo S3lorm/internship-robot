@@ -9,11 +9,11 @@ import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { 
-  FileText, 
-  Building2, 
-  Calendar, 
-  Clock, 
+import {
+  FileText,
+  Building2,
+  Calendar,
+  Clock,
   Search,
   Eye,
   Download,
@@ -33,6 +33,7 @@ const statusConfig = {
   under_review: { label: "Under Review", color: "bg-blue-100 text-blue-800 border-blue-200", icon: AlertCircle },
   approved: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
   rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
+  withdrawn: { label: "Withdrawn", color: "bg-gray-100 text-gray-800 border-gray-200", icon: AlertCircle },
 }
 
 export default function ApplicationsPage() {
@@ -63,10 +64,10 @@ export default function ApplicationsPage() {
       const apps = Array.isArray(appsResult.data?.data)
         ? appsResult.data.data
         : Array.isArray(appsResult.data?.applications)
-        ? appsResult.data.applications
-        : Array.isArray(appsResult.data)
-        ? appsResult.data
-        : [];
+          ? appsResult.data.applications
+          : Array.isArray(appsResult.data)
+            ? appsResult.data
+            : [];
 
       // Fetch internships to match with applications
       const internshipsResult = await internshipsApi.getAll();
@@ -74,10 +75,10 @@ export default function ApplicationsPage() {
         const ints = Array.isArray(internshipsResult.data?.data)
           ? internshipsResult.data.data
           : Array.isArray(internshipsResult.data?.internships)
-          ? internshipsResult.data.internships
-          : Array.isArray(internshipsResult.data)
-          ? internshipsResult.data
-          : [];
+            ? internshipsResult.data.internships
+            : Array.isArray(internshipsResult.data)
+              ? internshipsResult.data
+              : [];
         setInternships(ints);
       }
 
@@ -103,7 +104,7 @@ export default function ApplicationsPage() {
     let filtered = applications
 
     if (searchQuery) {
-      filtered = filtered.filter(app => 
+      filtered = filtered.filter(app =>
         app.internship?.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         app.internship?.company.toLowerCase().includes(searchQuery.toLowerCase())
       )
@@ -211,7 +212,7 @@ export default function ApplicationsPage() {
             <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-semibold text-foreground mb-2">No Applications Found</h3>
             <p className="text-muted-foreground mb-4">
-              {applications.length === 0 
+              {applications.length === 0
                 ? "You haven't applied to any internships yet."
                 : "No applications match your current filters."}
             </p>
@@ -256,7 +257,7 @@ export default function ApplicationsPage() {
                       <div className="flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                         <span className="flex items-center gap-1">
                           <Calendar className="h-3 w-3" />
-                          Applied: {new Date(application.appliedAt).toLocaleDateString()}
+                          Applied: {new Date(application.appliedAt || application.createdAt).toLocaleDateString()}
                         </span>
                         {application.reviewedAt && (
                           <span className="flex items-center gap-1">
@@ -307,7 +308,7 @@ export default function ApplicationsPage() {
             <div className="relative">
               {/* Timeline */}
               <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-border" />
-              
+
               {[
                 { label: "Application Submitted", date: filteredApplications[0]?.appliedAt, completed: true },
                 { label: "Under Review", date: filteredApplications[0]?.status !== "pending" ? filteredApplications[0]?.reviewedAt : null, completed: filteredApplications[0]?.status !== "pending" },
@@ -323,7 +324,7 @@ export default function ApplicationsPage() {
                     </p>
                     {step.date && (
                       <p className="text-sm text-muted-foreground">
-                        {new Date(step.date).toLocaleDateString("en-US", { 
+                        {new Date(step.date).toLocaleDateString("en-US", {
                           weekday: "long",
                           year: "numeric",
                           month: "long",

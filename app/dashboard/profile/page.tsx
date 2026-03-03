@@ -118,18 +118,18 @@ export default function ProfilePage() {
                       </div>
                     ) : (
                       <>
-                        <AvatarImage 
+                        <AvatarImage
                           src={
-                            avatarPreview 
-                              ? avatarPreview 
-                              : user.avatar 
+                            avatarPreview
+                              ? avatarPreview
+                              : user.avatar
                                 ? user.avatar.startsWith('http') || user.avatar.startsWith('/uploads')
                                   ? user.avatar.startsWith('http')
                                     ? user.avatar
                                     : `${typeof window !== 'undefined' ? window.location.origin : ''}${user.avatar}`
                                   : user.avatar
                                 : "/placeholder.svg"
-                          } 
+                          }
                           alt={`${user.firstName} ${user.lastName}`}
                           className="object-cover"
                         />
@@ -141,9 +141,8 @@ export default function ProfilePage() {
                     )}
                   </Avatar>
                   <label
-                    className={`absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:scale-110 hover:bg-primary/90 cursor-pointer ${
-                      isUploadingAvatar ? "opacity-50 cursor-not-allowed" : ""
-                    }`}
+                    className={`absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:scale-110 hover:bg-primary/90 cursor-pointer ${isUploadingAvatar ? "opacity-50 cursor-not-allowed" : ""
+                      }`}
                     aria-label="Change profile picture"
                   >
                     {isUploadingAvatar ? (
@@ -158,43 +157,44 @@ export default function ProfilePage() {
                       onChange={async (e) => {
                         const file = e.target.files?.[0];
                         if (!file) return;
-                        
+
                         // Validate file size (max 5MB)
                         if (file.size > 5 * 1024 * 1024) {
                           toast.error("Image size must be less than 5MB");
                           return;
                         }
-                        
+
                         // Validate file type
                         const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
                         if (!allowedTypes.includes(file.type)) {
                           toast.error("Please select a JPG, PNG, or WEBP image file");
                           return;
                         }
-                        
+
                         // Show preview immediately
                         const reader = new FileReader();
                         reader.onloadend = () => {
                           setAvatarPreview(reader.result as string);
                         };
                         reader.readAsDataURL(file);
-                        
+
                         setIsUploadingAvatar(true);
                         try {
                           const result = await authApi.uploadAvatar(file);
-                          
+
                           if (result.error) {
                             toast.error(result.error);
                             setAvatarPreview(null); // Clear preview on error
                           } else {
                             toast.success("Profile photo updated successfully!");
                             // Update user with new avatar URL
-                            if (result.data?.user) {
-                              updateUser(result.data.user);
-                            } else if (result.data?.avatarUrl) {
-                              updateUser({ ...user, avatar: result.data.avatarUrl });
-                            } else if (result.data?.avatar) {
-                              updateUser({ ...user, avatar: result.data.avatar });
+                            const resData = (result as any).data;
+                            if (resData?.user) {
+                              updateUser(resData.user);
+                            } else if (resData?.avatarUrl) {
+                              updateUser({ ...user, avatar: resData.avatarUrl });
+                            } else if (resData?.avatar) {
+                              updateUser({ ...user, avatar: resData.avatar });
                             }
                             // Clear preview after successful upload - the actual image will load
                             setTimeout(() => setAvatarPreview(null), 500);
@@ -226,9 +226,9 @@ export default function ProfilePage() {
                         } else {
                           toast.success("Profile photo removed");
                           if (result.data?.user) {
-                            updateUser(result.data.user);
+                            updateUser((result as any).data.user);
                           } else {
-                            updateUser({ ...user, avatar: null });
+                            updateUser({ ...user, avatar: undefined });
                           }
                           setAvatarPreview(null);
                         }

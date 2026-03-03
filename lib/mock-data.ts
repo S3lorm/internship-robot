@@ -77,6 +77,7 @@ export const mockTrendingNews = [
     summary: 'The authority has unveiled a $1.5 billion master plan to expand the Tema Port, creating over 5,000 new jobs in the maritime sector.',
     date: '2026-03-03T08:00:00Z',
     readTime: '4 min read',
+    url: '#',
   },
   {
     id: 'tn2',
@@ -85,6 +86,7 @@ export const mockTrendingNews = [
     summary: 'In an effort to digitize supply chains across West Africa, Maersk has opened a new technology center in Accra focusing on blockchain and AI solutions.',
     date: '2026-03-02T10:30:00Z',
     readTime: '3 min read',
+    url: '#',
   },
   {
     id: 'tn3',
@@ -93,6 +95,7 @@ export const mockTrendingNews = [
     summary: 'The company announced better-than-expected results from its latest appraisal well, signaling potential growth in Ghana\'s upstream petroleum sector.',
     date: '2026-03-01T14:15:00Z',
     readTime: '5 min read',
+    url: '#',
   },
   {
     id: 'tn4',
@@ -101,6 +104,7 @@ export const mockTrendingNews = [
     summary: 'The telecom giant has signed an MoU with the Regional Maritime University to develop specialized communication infrastructure training for maritime operations.',
     date: '2026-02-28T09:45:00Z',
     readTime: '2 min read',
+    url: '#',
   },
 ];
 

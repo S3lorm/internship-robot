@@ -12,7 +12,7 @@ const getApiBaseUrl = () => {
 const API_BASE_URL = getApiBaseUrl();
 
 // Helper function to make API requests
-async function fetchApi<T>(
+async function fetchApi<T = any>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<{ data?: T; error?: string }> {
@@ -275,6 +275,11 @@ export const noticesApi = {
   delete: (id: string) =>
     fetchApi(`/notices/${id}`, {
       method: 'DELETE',
+    }),
+
+  markAsRead: (id: string) =>
+    fetchApi(`/notices/${id}/read`, {
+      method: 'PATCH',
     }),
 };
 

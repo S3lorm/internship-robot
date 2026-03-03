@@ -366,7 +366,7 @@ async function createRequest(req, res) {
   try {
     const user = req.user;
     const { LetterRequest } = require('../models');
-    
+
     if (!user || user.role !== 'student') {
       return res.status(403).json({ message: 'Only students can create letter requests' });
     }
@@ -382,12 +382,13 @@ async function createRequest(req, res) {
       purpose,
       category,
       additionalNotes,
+      requestType, // Accept requestType
     } = req.body;
 
     // Validation
     if (!companyName || !internshipDuration || !purpose) {
-      return res.status(400).json({ 
-        message: 'Company name, internship duration, and purpose are required' 
+      return res.status(400).json({
+        message: 'Company name, internship duration, and purpose are required'
       });
     }
 
@@ -403,14 +404,120 @@ async function createRequest(req, res) {
       purpose,
       category,
       additionalNotes,
-      status: 'pending',
+      requestType: requestType || 'admin', // Default to admin if not provided
+      status: requestType === 'company' ? 'approved' : 'pending',
     });
+
+    // If company request, send directly to company email
+    if (requestType === 'company') {
+      try {
+        // Generate PDF
+        const pdfData = await generateLetterPDF(request);
+        const { LetterRequest } = require('../models');
+        const updated = await LetterRequest.update(request.id, {
+          pdfUrl: pdfData.url,
+          pdfGeneratedAt: new Date().toISOString(),
+          reviewedBy: user.id, // Auto-reviewed by the system/student sending it
+          reviewedAt: new Date().toISOString()
+        });
+
+        // Send email to company
+        const transporter = require('../config/email');
+        const emailFrom = process.env.EMAIL_FROM || process.env.SMTP_USER || 'noreply@rmu.edu.gh';
+        const mailOptions = {
+          from: `"RMU Internship Portal" <${emailFrom}>`,
+          to: companyEmail,
+          subject: `Internship Application - ${user.firstName} ${user.lastName}`,
+          html: `
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <style>
+                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                .header { background: #1e3a5f; color: white; padding: 20px; text-align: center; }
+                .content { padding: 20px; background: #f9f9f9; }
+                .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+              </style>
+            </head>
+            <body>
+              <div class="container">
+                <div class="header">
+                  <h1>Internship Application</h1>
+                </div>
+                <div class="content">
+                  <p>Dear Human Resources Manager,</p>
+                  
+                  <p>Please find attached the official internship recommendation letter for <strong>${user.firstName} ${user.lastName}</strong> from the Regional Maritime University.</p>
+                  
+                  <p>This student is highly recommended for an internship position at your reputable organization.</p>
+                  <p>The letter can be verified using the reference number and verification code provided within the document.</p>
+                  
+                  <p>Best regards,<br>Regional Maritime University</p>
+                </div>
+                <div class="footer">
+                  <p>This is an automated message. Please do not reply directly to this email.</p>
+                </div>
+              </div>
+            </body>
+            </html>
+          `,
+          text: `
+            Dear Human Resources Manager,
+
+            Please find attached the official internship recommendation letter for ${user.firstName} ${user.lastName} from the Regional Maritime University.
+
+            This student is highly recommended for an internship position at your organization.
+
+            Best regards,
+            Regional Maritime University
+          `,
+          attachments: [
+            {
+              filename: pdfData.filename,
+              // Since generateLetterPDF just returns a URL to the API download endpoint currently (since there's no real PDF renderer)
+              // we can attach the HTML directly or simply provide the link. Let's provide the verification link.
+              content: `Please view the letter at ${process.env.FRONTEND_URL || 'http://localhost:3000'}${pdfData.url}`,
+              contentType: 'text/plain'
+            }
+          ]
+        };
+
+        await transporter.sendMail(mailOptions);
+
+        await LetterRequest.update(request.id, {
+          emailSent: true,
+          emailSentAt: new Date().toISOString(),
+        });
+
+        // Notify student of successful send
+        const { createNotification } = require('../services/notificationService');
+        await createNotification({
+          userId: user.id,
+          type: 'letter_request',
+          title: 'Letter Sent Successfully',
+          message: `Your internship letter has been generated and successfully sent to ${companyName} (${companyEmail}).`,
+          relatedId: request.id,
+        });
+
+        return res.status(201).json({
+          message: 'Letter successfully generated and sent to company',
+          request: updated
+        });
+      } catch (err) {
+        console.error('Error auto-sending letter to company:', err);
+        return res.status(500).json({
+          message: 'Failed to send letter to company',
+          error: err.message
+        });
+      }
+    }
 
     // Create notification for admin
     const { createNotification } = require('../services/notificationService');
     const { User } = require('../models');
     const admins = await User.findAll({ where: { role: 'admin' } });
-    
+
     for (const admin of admins) {
       await createNotification({
         userId: admin.id,
@@ -421,15 +528,15 @@ async function createRequest(req, res) {
       });
     }
 
-    res.status(201).json({ 
-      message: 'Letter request submitted successfully', 
-      request 
+    res.status(201).json({
+      message: 'Letter request submitted successfully',
+      request
     });
   } catch (error) {
     console.error('Error creating letter request:', error);
-    res.status(500).json({ 
-      message: 'Failed to create letter request', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to create letter request',
+      error: error.message
     });
   }
 }
@@ -441,12 +548,12 @@ async function getRequests(req, res) {
     const { status } = req.query;
 
     let where = {};
-    
+
     // Students can only see their own requests
     if (user.role === 'student') {
       where.studentId = user.id;
     }
-    
+
     // Admins can filter by status
     if (status && user.role === 'admin') {
       where.status = status;
@@ -473,9 +580,9 @@ async function getRequests(req, res) {
     res.json({ requests });
   } catch (error) {
     console.error('Error fetching letter requests:', error);
-    res.status(500).json({ 
-      message: 'Failed to fetch letter requests', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to fetch letter requests',
+      error: error.message
     });
   }
 }
@@ -513,9 +620,9 @@ async function getRequestById(req, res) {
     res.json({ request });
   } catch (error) {
     console.error('Error fetching letter request:', error);
-    res.status(500).json({ 
-      message: 'Failed to fetch letter request', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to fetch letter request',
+      error: error.message
     });
   }
 }
@@ -563,8 +670,8 @@ async function updateRequestStatus(req, res) {
 
     // Create notification for student
     const { createNotification } = require('../services/notificationService');
-    const notificationTitle = status === 'approved' 
-      ? 'Letter Request Approved - PDF Ready' 
+    const notificationTitle = status === 'approved'
+      ? 'Letter Request Approved - PDF Ready'
       : 'Letter Request Rejected';
     const notificationMessage = status === 'approved'
       ? `Your internship letter request for ${request.companyName} has been approved. Your PDF letter is now available for download. Reference: ${request.referenceNumber || 'N/A'}`
@@ -593,15 +700,15 @@ async function updateRequestStatus(req, res) {
       }
     }
 
-    res.json({ 
-      message: 'Request status updated successfully', 
-      request: updated 
+    res.json({
+      message: 'Request status updated successfully',
+      request: updated
     });
   } catch (error) {
     console.error('Error updating letter request status:', error);
-    res.status(500).json({ 
-      message: 'Failed to update request status', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to update request status',
+      error: error.message
     });
   }
 }
@@ -610,7 +717,7 @@ async function updateRequestStatus(req, res) {
 async function generateLetterPDF(request) {
   const { User } = require('../models');
   const student = await User.findOne({ id: request.studentId });
-  
+
   if (!student) {
     throw new Error('Student not found');
   }
@@ -635,10 +742,10 @@ async function generateLetterPDF(request) {
       },
     });
   }
-  
+
   const { v4: uuidv4 } = require('uuid');
   const filename = `letter_${request.referenceNumber || request.id}_${Date.now()}.html`;
-  
+
   return {
     url: `/api/letters/requests/${request.id}/download`,
     filename: filename,
@@ -656,7 +763,7 @@ async function sendLetterEmailNotification(request, updatedRequest) {
   }
 
   const emailFrom = process.env.EMAIL_FROM || process.env.SMTP_USER || 'noreply@rmu.edu.gh';
-  
+
   const mailOptions = {
     from: `"RMU Internship Portal" <${emailFrom}>`,
     to: student.email,
@@ -763,7 +870,7 @@ async function downloadLetterPDF(req, res) {
     // Log document download
     const { logActivity } = require('../services/activityLogService');
     const { recordDocumentTransmission } = require('../services/documentTransmissionService');
-    
+
     await logActivity({
       userId: user.id,
       actionType: 'document_download',
@@ -805,9 +912,9 @@ async function downloadLetterPDF(req, res) {
     res.send(html);
   } catch (error) {
     console.error('Error downloading letter PDF:', error);
-    res.status(500).json({ 
-      message: 'Failed to download letter', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to download letter',
+      error: error.message
     });
   }
 }
@@ -835,15 +942,15 @@ async function markEmailSent(req, res) {
       emailSentAt: new Date().toISOString(),
     });
 
-    res.json({ 
-      message: 'Email status updated successfully', 
-      request: updated 
+    res.json({
+      message: 'Email status updated successfully',
+      request: updated
     });
   } catch (error) {
     console.error('Error marking email as sent:', error);
-    res.status(500).json({ 
-      message: 'Failed to update email status', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to update email status',
+      error: error.message
     });
   }
 }
@@ -878,8 +985,8 @@ async function updateRequest(req, res) {
 
     // Only allow editing if status is pending
     if (request.status !== 'pending') {
-      return res.status(400).json({ 
-        message: 'Cannot edit request that has already been approved or rejected' 
+      return res.status(400).json({
+        message: 'Cannot edit request that has already been approved or rejected'
       });
     }
 
@@ -897,15 +1004,15 @@ async function updateRequest(req, res) {
 
     const updated = await LetterRequest.update(id, updateData);
 
-    res.json({ 
-      message: 'Request updated successfully', 
-      request: updated 
+    res.json({
+      message: 'Request updated successfully',
+      request: updated
     });
   } catch (error) {
     console.error('Error updating letter request:', error);
-    res.status(500).json({ 
-      message: 'Failed to update request', 
-      error: error.message 
+    res.status(500).json({
+      message: 'Failed to update request',
+      error: error.message
     });
   }
 }

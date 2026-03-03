@@ -8,7 +8,7 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { notificationsApi } from "@/lib/api";
+import { notificationsApi, noticesApi } from "@/lib/api";
 import {
   LayoutDashboard,
   Briefcase,
@@ -60,7 +60,17 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
               notifications = (result.data as any).notifications;
             }
           }
-          const unread = notifications.filter((n: any) => !n.isRead).length;
+          let unread = notifications.filter((n: any) => !n.isRead).length;
+
+          try {
+            const noticesResult = await noticesApi.getAll({ isActive: "true" });
+            const noticesData = Array.isArray(noticesResult.data?.data) ? noticesResult.data.data : (Array.isArray(noticesResult.data) ? noticesResult.data : []);
+            const unreadNotices = noticesData.filter((n: any) => n.isActive && !n.isRead).length;
+            unread += unreadNotices;
+          } catch {
+            // Ignore notices error
+          }
+
           setUnreadCount(unread);
         }
       } catch (error) {
@@ -99,9 +109,9 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
       {/* Navigation */}
       <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
         {navigation.map((item) => {
-          const isActive = pathname === item.href || 
+          const isActive = pathname === item.href ||
             (item.href !== "/dashboard" && pathname.startsWith(item.href));
-          
+
           return (
             <Link
               key={item.name}
@@ -150,7 +160,7 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
             </Badge>
           </div>
         </div>
-        
+
         <div className="space-y-1">
           <Button
             variant="ghost"
@@ -177,4 +187,3 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
     </div>
   );
 }
-

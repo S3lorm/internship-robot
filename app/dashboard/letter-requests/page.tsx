@@ -113,7 +113,7 @@ export default function LetterRequestsPage() {
     setIsSubmitting(true);
 
     try {
-      const result = await lettersApi.createRequest(formData);
+      const result = await lettersApi.createRequest(formData as any);
       if (result.error) {
         toast.error(result.error);
       } else {
@@ -139,9 +139,12 @@ export default function LetterRequestsPage() {
     }
   };
 
-  const pendingRequests = requests.filter((r) => r.status === "pending");
-  const approvedRequests = requests.filter((r) => r.status === "approved");
-  const rejectedRequests = requests.filter((r) => r.status === "rejected");
+  const adminRequests = requests.filter((r) => r.requestType === "admin" || !r.requestType);
+  const companyRequests = requests.filter((r) => r.requestType === "company");
+
+  const pendingRequests = adminRequests.filter((r) => r.status === "pending");
+  const approvedRequests = adminRequests.filter((r) => r.status === "approved");
+  const rejectedRequests = adminRequests.filter((r) => r.status === "rejected");
 
   return (
     <div className="space-y-6">
@@ -162,7 +165,7 @@ export default function LetterRequestsPage() {
             New Request
           </TabsTrigger>
           <TabsTrigger value="all">
-            All Requests ({requests.length})
+            Admin Letters ({adminRequests.length})
           </TabsTrigger>
           <TabsTrigger value="pending">
             Pending ({pendingRequests.length})
@@ -172,6 +175,9 @@ export default function LetterRequestsPage() {
           </TabsTrigger>
           <TabsTrigger value="rejected">
             Rejected ({rejectedRequests.length})
+          </TabsTrigger>
+          <TabsTrigger value="company">
+            Sent to Companies ({companyRequests.length})
           </TabsTrigger>
         </TabsList>
 
@@ -412,8 +418,22 @@ export default function LetterRequestsPage() {
           <RequestsList requests={approvedRequests} isLoading={isLoading} onView={setSelectedRequest} onRefresh={loadRequests} />
         </TabsContent>
 
+        {/* Rejected Requests */}
         <TabsContent value="rejected">
-          <RequestsList requests={rejectedRequests} isLoading={isLoading} onView={setSelectedRequest} onRefresh={loadRequests} />
+          <RequestsList
+            requests={rejectedRequests}
+            isLoading={isLoading}
+            onView={(request) => setSelectedRequest(request)}
+          />
+        </TabsContent>
+
+        {/* Company Letters */}
+        <TabsContent value="company">
+          <RequestsList
+            requests={companyRequests}
+            isLoading={isLoading}
+            onView={(request) => setSelectedRequest(request)}
+          />
         </TabsContent>
       </Tabs>
 
@@ -518,8 +538,8 @@ export default function LetterRequestsPage() {
                             variant="ghost"
                             size="sm"
                             onClick={() => {
-                              navigator.clipboard.writeText(selectedRequest.referenceNumber);
-                              setCopiedCode(selectedRequest.referenceNumber);
+                              navigator.clipboard.writeText(selectedRequest.referenceNumber!);
+                              setCopiedCode(selectedRequest.referenceNumber!);
                               setTimeout(() => setCopiedCode(null), 2000);
                               toast.success("Reference number copied!");
                             }}

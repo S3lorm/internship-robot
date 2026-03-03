@@ -34,6 +34,7 @@ import {
   Edit,
   Save,
   X,
+  AlertCircle,
 } from "lucide-react";
 import {
   Dialog,
@@ -355,8 +356,8 @@ export default function AdminLetterRequestsPage() {
       )}
 
       {/* Review Dialog */}
-      <Dialog 
-        open={!!selectedRequest} 
+      <Dialog
+        open={!!selectedRequest}
         onOpenChange={() => {
           setSelectedRequest(null);
           setIsEditing(false);

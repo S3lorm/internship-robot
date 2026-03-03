@@ -13,6 +13,8 @@ export interface User {
   program?: string;
   yearOfStudy?: number;
   avatar?: string;
+  bio?: string;
+  skills?: string[];
   isEmailVerified: boolean;
   isActive?: boolean;
   createdAt: string;
@@ -46,6 +48,7 @@ export interface Internship {
   applicationsCount: number;
   status: InternshipStatus;
   category: string;
+  type?: string;
   isRemote: boolean;
   createdAt: string;
   updatedAt: string;
@@ -62,6 +65,8 @@ export interface Application {
   cvUrl: string;
   status: ApplicationStatus;
   adminNotes?: string;
+  feedback?: string;
+  appliedAt?: string;
   reviewedBy?: string;
   reviewedAt?: string;
   createdAt: string;
@@ -120,6 +125,9 @@ export interface Notification {
   type: NotificationType;
   isRead: boolean;
   link?: string;
+  priority?: string;
+  actionRequired?: boolean;
+  expiresAt?: string;
   createdAt: string;
 }
 
@@ -238,11 +246,13 @@ export interface ApplicationFilters {
 
 // Letter Request types
 export type LetterRequestStatus = 'pending' | 'approved' | 'rejected';
+export type LetterRequestType = 'admin' | 'company';
 
 export interface LetterRequest {
   id: string;
   studentId: string;
   student?: User;
+  requestType: LetterRequestType;
   companyName: string;
   companyEmail?: string;
   companyPhone?: string;
@@ -271,6 +281,7 @@ export interface LetterRequest {
 }
 
 export interface LetterRequestFormData {
+  requestType?: LetterRequestType;
   companyName: string;
   companyEmail?: string;
   companyPhone?: string;

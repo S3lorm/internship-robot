@@ -22,8 +22,9 @@ import {
   internshipsApi,
   noticesApi,
   notificationsApi,
+  lettersApi,
 } from "@/lib/api";
-import type { Application, Internship, Notice, Notification } from "@/types";
+import type { Application, Internship, Notice, Notification, LetterRequest } from "@/types";
 import {
   FileText,
   Clock,
@@ -47,6 +48,7 @@ export default function DashboardPage() {
   const [internships, setInternships] = useState<Internship[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [letterRequests, setLetterRequests] = useState<LetterRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -78,16 +80,22 @@ export default function DashboardPage() {
         if (noticesResult.error) {
           throw new Error(noticesResult.error);
         }
-        // Backend returns { data: notices[], meta: {...} }
-        setNotices(Array.isArray(noticesResult.data?.data) ? noticesResult.data.data : (Array.isArray(noticesResult.data) ? noticesResult.data : []));
+        const rawNotices = Array.isArray(noticesResult.data?.data) ? noticesResult.data.data : (Array.isArray(noticesResult.data) ? noticesResult.data : []);
+        setNotices(rawNotices);
 
         // Fetch notifications
         const notificationsResult = await notificationsApi.getAll();
         if (notificationsResult.error) {
           throw new Error(notificationsResult.error);
         }
-        // Backend returns { data: notifications[] }
-        setNotifications(Array.isArray(notificationsResult.data?.data) ? notificationsResult.data.data : (Array.isArray(notificationsResult.data) ? notificationsResult.data : []));
+        const rawNotifications = Array.isArray(notificationsResult.data?.data) ? notificationsResult.data.data : (Array.isArray(notificationsResult.data) ? notificationsResult.data : []);
+        setNotifications(rawNotifications);
+
+        // Fetch letter requests
+        const letterRequestsResult = await lettersApi.getRequests();
+        if (!letterRequestsResult.error && letterRequestsResult.data) {
+          setLetterRequests(letterRequestsResult.data.requests || []);
+        }
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         setError(err instanceof Error ? err.message : "Failed to load dashboard data");
@@ -107,10 +115,11 @@ export default function DashboardPage() {
     underReview: applications.filter((a) => a.status === "under_review").length,
     approved: applications.filter((a) => a.status === "approved").length,
     rejected: applications.filter((a) => a.status === "rejected").length,
+    lettersSentToCompany: letterRequests.filter((lr) => lr.requestType === "company").length,
   };
 
   const unreadNotifications = notifications.filter((n) => !n.isRead);
-  const activeNotices = notices.filter((n) => n.isActive);
+  const activeNotices = notices.filter((n: any) => n.isActive && !n.isRead);
 
 
 
@@ -167,23 +176,10 @@ export default function DashboardPage() {
         </Button>
       </div>
 
-      {/* Important Notice */}
-      {!loading && activeNotices.length > 0 && (
-        <Card className="border-primary/30 bg-primary/5">
-          <CardContent className="flex items-start gap-3 p-4">
-            <Bell className="mt-0.5 h-5 w-5 text-primary" />
-            <div>
-              <p className="font-medium text-foreground">{activeNotices[0].title}</p>
-              <p className="text-sm text-muted-foreground line-clamp-2">
-                {activeNotices[0].content}
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
         <Card>
           <CardContent className="flex items-center gap-4 p-6">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
@@ -250,6 +246,24 @@ export default function DashboardPage() {
                 <>
                   <p className="text-2xl font-bold">{internships.length}</p>
                   <p className="text-sm text-muted-foreground">Open Positions</p>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-100">
+              <Mail className="h-6 w-6 text-indigo-600" />
+            </div>
+            <div>
+              {loading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{stats.lettersSentToCompany}</p>
+                  <p className="text-sm text-muted-foreground">Letters Sent</p>
                 </>
               )}
             </div>
@@ -372,9 +386,16 @@ export default function DashboardPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Notifications</CardTitle>
+              <CardTitle className="text-lg flex items-center gap-2">
+                Notifications
+                {(unreadNotifications.length > 0 || activeNotices.length > 0) && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-xs bg-primary text-primary-foreground animate-pulse">
+                    {unreadNotifications.length + activeNotices.length} new
+                  </Badge>
+                )}
+              </CardTitle>
               <CardDescription>
-                {unreadNotifications.length} unread notifications
+                {unreadNotifications.length + activeNotices.length} unread notification{(unreadNotifications.length + activeNotices.length) !== 1 ? "s" : ""}
               </CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
@@ -391,33 +412,74 @@ export default function DashboardPage() {
               <div className="py-8 text-center">
                 <p className="text-destructive">{error}</p>
               </div>
-            ) : unreadNotifications.length === 0 ? (
+            ) : unreadNotifications.length === 0 && activeNotices.length === 0 ? (
               <div className="py-8 text-center">
                 <Bell className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
                 <p className="text-muted-foreground">No new notifications</p>
+                <Button variant="link" asChild className="mt-2">
+                  <Link href="/dashboard/notifications">View all notifications</Link>
+                </Button>
               </div>
             ) : (
               <div className="space-y-3">
+                {/* Important Notices as previews */}
+                {activeNotices.slice(0, 2).map((notice) => (
+                  <Link
+                    key={`notice-${notice.id}`}
+                    href="/dashboard/notifications"
+                    className="group block rounded-lg border border-amber-300/40 bg-amber-50/50 dark:bg-amber-900/10 p-3 transition-all hover:bg-amber-100/60 dark:hover:bg-amber-900/20 hover:shadow-sm"
+                  >
+                    <div className="flex items-start gap-2">
+                      <Bell className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-foreground group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors">
+                          {notice.title}
+                        </p>
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {notice.content}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                ))}
+
+                {/* Unread Notifications */}
                 {unreadNotifications.slice(0, 4).map((notification) => (
                   <Link
                     key={notification.id}
-                    href={notification.link || "#"}
-                    className="block rounded-lg border border-border p-3 transition-colors hover:bg-muted"
+                    href="/dashboard/notifications"
+                    className="group block rounded-lg border border-primary/20 bg-primary/5 p-3 transition-all hover:bg-primary/10 hover:shadow-sm"
                   >
-                    <p className="font-medium text-sm">{notification.title}</p>
-                    <p className="text-sm text-muted-foreground line-clamp-1">
-                      {notification.message}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      {new Date(notification.createdAt).toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        hour: "2-digit",
-                        minute: "2-digit",
-                      })}
-                    </p>
+                    <div className="flex items-start gap-2">
+                      <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary animate-pulse" />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
+                          {notification.title}
+                        </p>
+                        <p className="text-sm text-muted-foreground line-clamp-1">
+                          {notification.message}
+                        </p>
+                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                          <Clock className="h-3 w-3" />
+                          {new Date(notification.createdAt).toLocaleDateString("en-GB", {
+                            day: "numeric",
+                            month: "short",
+                            hour: "2-digit",
+                            minute: "2-digit",
+                          })}
+                        </p>
+                      </div>
+                    </div>
                   </Link>
                 ))}
+                {unreadNotifications.length > 4 && (
+                  <Button variant="ghost" size="sm" className="w-full text-primary" asChild>
+                    <Link href="/dashboard/notifications">
+                      +{unreadNotifications.length - 4} more notifications
+                      <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                  </Button>
+                )}
               </div>
             )}
           </CardContent>

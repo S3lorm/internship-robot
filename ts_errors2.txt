@@ -1,0 +1,36 @@
+app/admin/letter-requests/page.tsx(672,28): error TS2304: Cannot find name 'AlertCircle'.
+app/dashboard/applications/page.tsx(228,28): error TS7053: Element implicitly has an 'any' type because expression of type 'ApplicationStatus' can't be used to index type '{ pending: { label: string; color: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; }; under_review: { ...; }; approved: { ...; }; rejected: { ...; }; }'.
+  Property 'withdrawn' does not exist on type '{ pending: { label: string; color: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; }; under_review: { ...; }; approved: { ...; }; rejected: { ...; }; }'.
+app/dashboard/applications/page.tsx(259,58): error TS2339: Property 'appliedAt' does not exist on type 'Application & { internship?: Internship | undefined; }'.
+app/dashboard/applications/page.tsx(268,36): error TS2339: Property 'feedback' does not exist on type 'Application & { internship?: Internship | undefined; }'.
+app/dashboard/applications/page.tsx(271,89): error TS2339: Property 'feedback' does not exist on type 'Application & { internship?: Internship | undefined; }'.
+app/dashboard/applications/page.tsx(312,82): error TS2339: Property 'appliedAt' does not exist on type 'Application & { internship?: Internship | undefined; }'.
+app/dashboard/internships/page.tsx(303,35): error TS2339: Property 'url' does not exist on type '{ id: string; headline: string; company: string; summary: string; date: string; readTime: string; }'.
+app/dashboard/letter-requests/page.tsx(116,53): error TS2345: Argument of type 'LetterRequestFormData' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'LetterRequestFormData'.
+app/dashboard/letter-requests/page.tsx(521,61): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+app/dashboard/letter-requests/page.tsx(522,45): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'SetStateAction<string | null>'.
+  Type 'undefined' is not assignable to type 'SetStateAction<string | null>'.
+app/dashboard/notifications/page.tsx(184,22): error TS2339: Property 'priority' does not exist on type 'Notification'.
+app/dashboard/notifications/page.tsx(187,22): error TS2339: Property 'priority' does not exist on type 'Notification'.
+app/dashboard/notifications/page.tsx(190,22): error TS2339: Property 'actionRequired' does not exist on type 'Notification'.
+app/dashboard/notifications/page.tsx(337,77): error TS2339: Property 'publishDate' does not exist on type 'never'.
+app/dashboard/notifications/page.tsx(338,77): error TS2339: Property 'publishDate' does not exist on type 'never'.
+app/dashboard/notifications/page.tsx(471,47): error TS2339: Property 'expiresAt' does not exist on type 'Notification'.
+app/dashboard/notifications/page.tsx(474,69): error TS2339: Property 'expiresAt' does not exist on type 'Notification'.
+app/dashboard/page.tsx(341,51): error TS2339: Property 'appliedAt' does not exist on type 'Application'.
+app/dashboard/page.tsx(508,33): error TS2339: Property 'url' does not exist on type '{ id: string; headline: string; company: string; summary: string; date: string; readTime: string; }'.
+app/dashboard/profile/page.tsx(192,40): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(193,49): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(194,47): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(195,68): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(196,47): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(197,68): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(231,51): error TS2322: Type 'null' is not assignable to type 'string | undefined'.

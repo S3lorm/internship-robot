@@ -1,0 +1,97 @@
+app/admin/internships/page.tsx(146,7): error TS2322: Type '"open"' is not assignable to type 'InternshipStatus'.
+app/admin/internships/page.tsx(200,24): error TS2339: Property 'type' does not exist on type 'Internship'.
+app/admin/internships/page.tsx(260,42): error TS2322: Type '"full-time" | "part-time" | "remote"' is not assignable to type '"full-time"'.
+  Type '"part-time"' is not assignable to type '"full-time"'.
+app/admin/internships/page.tsx(372,43): error TS2339: Property 'filled' does not exist on type '{ total: number; open: number; closed: number; draft: number; archived: number; }'.
+app/admin/internships/page.tsx(533,60): error TS2339: Property 'type' does not exist on type 'Internship'.
+app/admin/letter-requests/page.tsx(94,33): error TS2339: Property 'requests' does not exist on type '{}'.
+app/admin/letter-requests/page.tsx(168,26): error TS2339: Property 'request' does not exist on type '{}'.
+app/admin/letter-requests/page.tsx(169,42): error TS2339: Property 'request' does not exist on type '{}'.
+app/admin/letter-requests/page.tsx(672,28): error TS2304: Cannot find name 'AlertCircle'.
+app/dashboard/applications/page.tsx(63,51): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/applications/page.tsx(64,27): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/applications/page.tsx(65,42): error TS2339: Property 'applications' does not exist on type '{}'.
+app/dashboard/applications/page.tsx(66,27): error TS2339: Property 'applications' does not exist on type '{}'.
+app/dashboard/applications/page.tsx(74,60): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/applications/page.tsx(75,36): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/applications/page.tsx(76,51): error TS2339: Property 'internships' does not exist on type '{}'.
+app/dashboard/applications/page.tsx(77,36): error TS2339: Property 'internships' does not exist on type '{}'.
+app/dashboard/applications/page.tsx(228,28): error TS7053: Element implicitly has an 'any' type because expression of type 'ApplicationStatus' can't be used to index type '{ pending: { label: string; color: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; }; under_review: { ...; }; approved: { ...; }; rejected: { ...; }; }'.
+  Property 'withdrawn' does not exist on type '{ pending: { label: string; color: string; icon: ForwardRefExoticComponent<Omit<LucideProps, "ref"> & RefAttributes<SVGSVGElement>>; }; under_review: { ...; }; approved: { ...; }; rejected: { ...; }; }'.
+app/dashboard/applications/page.tsx(259,58): error TS2339: Property 'appliedAt' does not exist on type 'Application & { internship?: Internship | undefined; }'.
+app/dashboard/applications/page.tsx(268,36): error TS2339: Property 'feedback' does not exist on type 'Application & { internship?: Internship | undefined; }'.
+app/dashboard/applications/page.tsx(271,89): error TS2339: Property 'feedback' does not exist on type 'Application & { internship?: Internship | undefined; }'.
+app/dashboard/applications/page.tsx(312,82): error TS2339: Property 'appliedAt' does not exist on type 'Application & { internship?: Internship | undefined; }'.
+app/dashboard/evaluations/page.tsx(63,48): error TS2339: Property 'evaluations' does not exist on type '{}'.
+app/dashboard/evaluations/page.tsx(64,23): error TS2339: Property 'evaluations' does not exist on type '{}'.
+app/dashboard/internships/[id]/page.tsx(75,42): error TS2339: Property 'internship' does not exist on type '{}'.
+app/dashboard/internships/[id]/page.tsx(82,55): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/internships/[id]/page.tsx(83,31): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/internships/[id]/page.tsx(84,46): error TS2339: Property 'applications' does not exist on type '{}'.
+app/dashboard/internships/[id]/page.tsx(85,31): error TS2339: Property 'applications' does not exist on type '{}'.
+app/dashboard/internships/page.tsx(70,47): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/internships/page.tsx(71,23): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/internships/page.tsx(72,38): error TS2339: Property 'internships' does not exist on type '{}'.
+app/dashboard/internships/page.tsx(73,25): error TS2339: Property 'internships' does not exist on type '{}'.
+app/dashboard/internships/page.tsx(303,35): error TS2339: Property 'url' does not exist on type '{ id: string; headline: string; company: string; summary: string; date: string; readTime: string; }'.
+app/dashboard/letter-requests/page.tsx(86,33): error TS2339: Property 'requests' does not exist on type '{}'.
+app/dashboard/letter-requests/page.tsx(116,53): error TS2345: Argument of type 'LetterRequestFormData' is not assignable to parameter of type 'Record<string, unknown>'.
+  Index signature for type 'string' is missing in type 'LetterRequestFormData'.
+app/dashboard/letter-requests/page.tsx(521,61): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+app/dashboard/letter-requests/page.tsx(522,45): error TS2345: Argument of type 'string | undefined' is not assignable to parameter of type 'SetStateAction<string | null>'.
+  Type 'undefined' is not assignable to type 'SetStateAction<string | null>'.
+app/dashboard/notifications/page.tsx(70,32): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/notifications/page.tsx(70,66): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/notifications/page.tsx(71,43): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/notifications/page.tsx(72,32): error TS2339: Property 'notifications' does not exist on type '{}'.
+app/dashboard/notifications/page.tsx(72,75): error TS2339: Property 'notifications' does not exist on type '{}'.
+app/dashboard/notifications/page.tsx(73,43): error TS2339: Property 'notifications' does not exist on type '{}'.
+app/dashboard/notifications/page.tsx(82,65): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/notifications/page.tsx(83,34): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/notifications/page.tsx(184,22): error TS2339: Property 'priority' does not exist on type 'Notification'.
+app/dashboard/notifications/page.tsx(187,22): error TS2339: Property 'priority' does not exist on type 'Notification'.
+app/dashboard/notifications/page.tsx(190,22): error TS2339: Property 'actionRequired' does not exist on type 'Notification'.
+app/dashboard/notifications/page.tsx(337,77): error TS2339: Property 'publishDate' does not exist on type 'never'.
+app/dashboard/notifications/page.tsx(338,77): error TS2339: Property 'publishDate' does not exist on type 'never'.
+app/dashboard/notifications/page.tsx(471,47): error TS2339: Property 'expiresAt' does not exist on type 'Notification'.
+app/dashboard/notifications/page.tsx(474,69): error TS2339: Property 'expiresAt' does not exist on type 'Notification'.
+app/dashboard/page.tsx(66,56): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/page.tsx(66,80): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/page.tsx(74,62): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/page.tsx(74,93): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/page.tsx(81,62): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/page.tsx(81,89): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/page.tsx(89,74): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/page.tsx(89,107): error TS2339: Property 'data' does not exist on type '{}'.
+app/dashboard/page.tsx(341,51): error TS2339: Property 'appliedAt' does not exist on type 'Application'.
+app/dashboard/page.tsx(508,33): error TS2339: Property 'url' does not exist on type '{ id: string; headline: string; company: string; summary: string; date: string; readTime: string; }'.
+app/dashboard/profile/page.tsx(192,40): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(193,49): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(194,47): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(195,68): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(196,47): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(197,68): error TS2339: Property 'data' does not exist on type '{ error: any; data?: undefined; } | { data: any; error?: undefined; } | { error: any; }'.
+  Property 'data' does not exist on type '{ error: any; }'.
+app/dashboard/profile/page.tsx(228,44): error TS2339: Property 'user' does not exist on type '{}'.
+app/dashboard/profile/page.tsx(229,52): error TS2339: Property 'user' does not exist on type '{}'.
+app/dashboard/profile/page.tsx(231,51): error TS2322: Type 'null' is not assignable to type 'string | undefined'.
+app/dashboard/settings/page.tsx(75,26): error TS2339: Property 'preferences' does not exist on type '{}'.
+app/dashboard/settings/page.tsx(76,37): error TS2339: Property 'preferences' does not exist on type '{}'.
+components/dashboard-sidebar.tsx(67,67): error TS2339: Property 'data' does not exist on type '{}'.
+components/dashboard-sidebar.tsx(67,94): error TS2339: Property 'data' does not exist on type '{}'.
+components/deadlines-widget.tsx(56,42): error TS2339: Property 'logbooks' does not exist on type '{}'.
+components/deadlines-widget.tsx(60,41): error TS2339: Property 'reports' does not exist on type '{}'.
+components/deadlines-widget.tsx(64,55): error TS2339: Property 'administrativeActions' does not exist on type '{}'.
+components/deadlines-widget.tsx(73,41): error TS2339: Property 'logbooks' does not exist on type '{}'.
+components/deadlines-widget.tsx(77,40): error TS2339: Property 'reports' does not exist on type '{}'.
+components/deadlines-widget.tsx(81,54): error TS2339: Property 'administrativeActions' does not exist on type '{}'.
+lib/supabase/api.ts(273,16): error TS2339: Property 'bio' does not exist on type 'Partial<User>'.
+lib/supabase/api.ts(273,57): error TS2339: Property 'bio' does not exist on type 'Partial<User>'.
+lib/supabase/api.ts(274,16): error TS2339: Property 'skills' does not exist on type 'Partial<User>'.
+lib/supabase/api.ts(274,63): error TS2339: Property 'skills' does not exist on type 'Partial<User>'.

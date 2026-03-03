@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { internshipCategories, mockTrendingNews } from "@/lib/mock-data";
+import { internshipCategories, mockRegionalCompanies } from "@/lib/mock-data";
 import { internshipsApi } from "@/lib/api";
 import type { Internship } from "@/types";
 import {
@@ -31,12 +31,24 @@ import {
   ChevronUp,
   Loader2,
   AlertCircle,
-  Newspaper,
-  ExternalLink,
+  Building2,
+  Send,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
 import Loading from "./loading";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { toast } from "sonner";
+import { lettersApi } from "@/lib/api";
+import type { LetterRequestFormData, RegionalCompany } from "@/types";
 
 export default function InternshipsPage() {
   const { user } = useAuth();
@@ -54,6 +66,74 @@ export default function InternshipsPage() {
   const [internships, setInternships] = useState<Internship[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [selectedCompanyRegion, setSelectedCompanyRegion] = useState<string>("all");
+
+  const [isLetterDialogOpen, setIsLetterDialogOpen] = useState(false);
+  const [selectedLetterCompany, setSelectedLetterCompany] = useState<RegionalCompany | null>(null);
+  const [isSubmittingLetter, setIsSubmittingLetter] = useState(false);
+  const [letterFormData, setLetterFormData] = useState<LetterRequestFormData>({
+    companyName: "",
+    companyEmail: "",
+    companyPhone: "",
+    companyAddress: "",
+    internshipDuration: "",
+    internshipStartDate: "",
+    internshipEndDate: "",
+    purpose: "",
+    category: "",
+    additionalNotes: "",
+  });
+
+  const handleLetterChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
+  ) => {
+    setLetterFormData((prev) => ({
+      ...prev,
+      [e.target.name]: e.target.value,
+    }));
+  };
+
+  const handleLetterSelectChange = (name: string, value: string) => {
+    setLetterFormData((prev) => ({
+      ...prev,
+      [name]: value,
+    }));
+  };
+
+  const handleSendLetter = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmittingLetter(true);
+
+    try {
+      const payload = {
+        ...letterFormData,
+        requestType: 'company',
+      };
+      const result = await lettersApi.createRequest(payload as any);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Letter request submitted successfully!");
+        setLetterFormData({
+          companyName: "",
+          companyEmail: "",
+          companyPhone: "",
+          companyAddress: "",
+          internshipDuration: "",
+          internshipStartDate: "",
+          internshipEndDate: "",
+          purpose: "",
+          category: "",
+          additionalNotes: "",
+        });
+        setIsLetterDialogOpen(false);
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to submit request");
+    } finally {
+      setIsSubmittingLetter(false);
+    }
+  };
 
   useEffect(() => {
     fetchInternships();
@@ -120,6 +200,16 @@ export default function InternshipsPage() {
   const hasActiveFilters =
     searchQuery !== "" ||
     selectedCategory !== "all";
+
+  const regions = useMemo(() => {
+    const reg = [...new Set(mockRegionalCompanies.map(c => c.region))];
+    return reg.sort();
+  }, []);
+
+  const filteredCompanies = useMemo(() => {
+    if (selectedCompanyRegion === "all") return mockRegionalCompanies;
+    return mockRegionalCompanies.filter(c => c.region === selectedCompanyRegion);
+  }, [selectedCompanyRegion]);
 
   if (loading) {
     return (
@@ -252,73 +342,297 @@ export default function InternshipsPage() {
           </CardContent>
         </Card>
 
-        {/* Daily News of Trending Companies in Ghana */}
+        {/* Companies by Region */}
         <Card>
           <CardHeader>
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <CardTitle className="text-lg flex items-center gap-2">
-                  <Newspaper className="h-5 w-5 text-primary" />
-                  Daily News: Trending Companies in Ghana
+                  <Building2 className="h-5 w-5 text-primary" />
+                  Partner Companies by Region
                 </CardTitle>
                 <CardDescription>
-                  Stay updated with the latest news from top maritime and logistics companies in Ghana
+                  Explore maritime, engineering, and logistics companies across Ghana
                 </CardDescription>
+              </div>
+              <div className="flex items-center gap-2">
+                <MapPin className="h-4 w-4 text-muted-foreground" />
+                <Select value={selectedCompanyRegion} onValueChange={setSelectedCompanyRegion}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="Select Region" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Regions</SelectItem>
+                    {regions.map((region) => (
+                      <SelectItem key={region} value={region}>
+                        {region}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 selection:bg-primary/10">
-              {mockTrendingNews.map((news) => (
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+              {filteredCompanies.map((company) => (
                 <div
-                  key={news.id}
+                  key={company.id}
                   className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-all hover:border-primary/50 hover:shadow-md"
                 >
                   <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                    <Badge variant="secondary" className="font-medium text-primary">
-                      {news.company}
+                    <Badge variant="outline" className="font-medium bg-secondary/30">
+                      {company.region} Region
                     </Badge>
-                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                      <span className="flex items-center gap-1">
-                        <Clock className="h-3 w-3" />
-                        {new Date(news.date).toLocaleDateString("en-GB", {
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </span>
-                      <span>{news.readTime}</span>
-                    </div>
                   </div>
 
                   <h3 className="mb-2 font-semibold leading-tight text-foreground transition-colors group-hover:text-primary">
-                    {news.headline}
+                    {company.name}
                   </h3>
 
-                  <p className="mb-4 text-sm text-muted-foreground flex-grow">
-                    {news.summary}
-                  </p>
-
-                  <Button variant="ghost" size="sm" className="mt-auto w-full justify-between" asChild>
-                    <a href={news.url || "#"} target="_blank" rel="noopener noreferrer">
-                      Read full article
-                      <ExternalLink className="ml-2 h-4 w-4" />
-                    </a>
+                  <div className="mb-4 space-y-2 text-sm text-muted-foreground flex-grow">
+                    <p className="flex items-center gap-2">
+                      <Briefcase className="h-4 w-4" />
+                      {company.industry}
+                    </p>
+                    <p className="flex items-center gap-2">
+                      <Mail className="h-4 w-4" />
+                      <a href={`mailto:${company.email}`} className="text-primary hover:underline truncate" title={company.email}>
+                        {company.email}
+                      </a>
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    className="w-full mt-auto"
+                    onClick={() => {
+                      setSelectedLetterCompany(company);
+                      setLetterFormData({
+                        companyName: company.name,
+                        companyEmail: company.email || "",
+                        companyPhone: "",
+                        companyAddress: "",
+                        internshipDuration: "",
+                        internshipStartDate: "",
+                        internshipEndDate: "",
+                        purpose: "",
+                        category: "",
+                        additionalNotes: "",
+                      });
+                      setIsLetterDialogOpen(true);
+                    }}
+                  >
+                    <Send className="mr-2 h-4 w-4" />
+                    Send Letter
                   </Button>
                 </div>
               ))}
             </div>
-            {mockTrendingNews.length === 0 && (
+            {filteredCompanies.length === 0 && (
               <div className="flex flex-col items-center justify-center py-8 text-center">
-                <Newspaper className="mb-3 h-10 w-10 text-muted-foreground/30" />
+                <Building2 className="mb-3 h-10 w-10 text-muted-foreground/30" />
                 <p className="text-muted-foreground">
-                  No trending news available at the moment.
+                  No companies found for the selected region.
                 </p>
               </div>
             )}
           </CardContent>
         </Card>
       </div>
+
+      {/* Send Letter Dialog */}
+      <Dialog open={isLetterDialogOpen} onOpenChange={setIsLetterDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Send Internship Letter</DialogTitle>
+            <DialogDescription>
+              Submit an official internship letter request for {selectedLetterCompany?.name}.
+            </DialogDescription>
+          </DialogHeader>
+          <form onSubmit={handleSendLetter} className="space-y-6">
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Building2 className="h-5 w-5" />
+                Company Information
+              </h3>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyName">
+                  Company Name <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="companyName"
+                  name="companyName"
+                  value={letterFormData.companyName}
+                  onChange={handleLetterChange}
+                  readOnly
+                  className="bg-muted"
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="companyEmail">Company Email</Label>
+                  <Input
+                    id="companyEmail"
+                    name="companyEmail"
+                    type="email"
+                    value={letterFormData.companyEmail}
+                    onChange={handleLetterChange}
+                    readOnly
+                    className="bg-muted"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="companyPhone">Company Phone</Label>
+                  <Input
+                    id="companyPhone"
+                    name="companyPhone"
+                    type="tel"
+                    value={letterFormData.companyPhone}
+                    onChange={handleLetterChange}
+                    placeholder="+233 XX XXX XXXX"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="companyAddress">Company Address</Label>
+                <Textarea
+                  id="companyAddress"
+                  name="companyAddress"
+                  value={letterFormData.companyAddress}
+                  onChange={handleLetterChange}
+                  placeholder="Physical address..."
+                  className="min-h-[80px]"
+                />
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Calendar className="h-5 w-5" />
+                Internship Details
+              </h3>
+
+              <div className="space-y-2">
+                <Label htmlFor="internshipDuration">
+                  Internship Duration <span className="text-destructive">*</span>
+                </Label>
+                <Input
+                  id="internshipDuration"
+                  name="internshipDuration"
+                  value={letterFormData.internshipDuration}
+                  onChange={handleLetterChange}
+                  placeholder="e.g., 3 months"
+                  required
+                />
+              </div>
+
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="space-y-2">
+                  <Label htmlFor="internshipStartDate">Start Date</Label>
+                  <Input
+                    id="internshipStartDate"
+                    name="internshipStartDate"
+                    type="date"
+                    value={letterFormData.internshipStartDate}
+                    onChange={handleLetterChange}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="internshipEndDate">End Date</Label>
+                  <Input
+                    id="internshipEndDate"
+                    name="internshipEndDate"
+                    type="date"
+                    value={letterFormData.internshipEndDate}
+                    onChange={handleLetterChange}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-semibold flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                Purpose & Category
+              </h3>
+
+              <div className="space-y-2">
+                <Label htmlFor="purpose">
+                  Purpose <span className="text-destructive">*</span>
+                </Label>
+                <Textarea
+                  id="purpose"
+                  name="purpose"
+                  value={letterFormData.purpose}
+                  onChange={handleLetterChange}
+                  placeholder="Describe the purpose of the internship..."
+                  className="min-h-[100px]"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="category">Internship Category</Label>
+                <Select
+                  value={letterFormData.category || ""}
+                  onValueChange={(value) => handleLetterSelectChange("category", value)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select category (optional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="marine-engineering">Marine Engineering</SelectItem>
+                    <SelectItem value="nautical-science">Nautical Science</SelectItem>
+                    <SelectItem value="port-shipping">Port & Shipping Administration</SelectItem>
+                    <SelectItem value="maritime-safety">Maritime Safety & Security</SelectItem>
+                    <SelectItem value="electrical-engineering">Electrical/Electronic Engineering</SelectItem>
+                    <SelectItem value="computer-science">Computer Science</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="additionalNotes">Additional Notes</Label>
+                <Textarea
+                  id="additionalNotes"
+                  name="additionalNotes"
+                  value={letterFormData.additionalNotes}
+                  onChange={handleLetterChange}
+                  placeholder="Any additional information..."
+                  className="min-h-[80px]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsLetterDialogOpen(false)}
+              >
+                Cancel
+              </Button>
+              <Button type="submit" disabled={isSubmittingLetter}>
+                {isSubmittingLetter ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Submitting...
+                  </>
+                ) : (
+                  <>
+                    <Send className="mr-2 h-4 w-4" />
+                    Submit Request
+                  </>
+                )}
+              </Button>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
     </Suspense>
   );
 }

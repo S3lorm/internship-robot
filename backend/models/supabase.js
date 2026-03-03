@@ -1252,6 +1252,7 @@ function mapLetterRequestFromSupabase(row) {
   return {
     id: row.id,
     studentId: row.student_id,
+    requestType: row.request_type || 'admin',
     companyName: row.company_name,
     companyEmail: row.company_email,
     companyPhone: row.company_phone,
@@ -1291,6 +1292,7 @@ function mapLetterRequestFromSupabase(row) {
 function mapLetterRequestToSupabase(request) {
   const mapped = {};
   if (request.studentId !== undefined) mapped.student_id = request.studentId;
+  if (request.requestType !== undefined) mapped.request_type = request.requestType;
   if (request.companyName !== undefined) mapped.company_name = request.companyName;
   if (request.companyEmail !== undefined) mapped.company_email = request.companyEmail;
   if (request.companyPhone !== undefined) mapped.company_phone = request.companyPhone;

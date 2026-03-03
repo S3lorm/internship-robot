@@ -6,8 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { notificationsApi } from "@/lib/api";
-import type { Notification } from "@/types";
+import { notificationsApi, noticesApi } from "@/lib/api";
+import type { Notification, Notice } from "@/types";
 import {
   Bell,
   CheckCircle2,
@@ -22,17 +22,25 @@ import {
   FileText,
   Calendar,
   Clock,
+  Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
+  // We'll extend Notice with an isRead property for the UI state
+  type UINotice = Notice & { isRead?: boolean };
+  const [notices, setNotices] = useState<UINotice[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
 
-  const unreadCount = notifications.filter((n) => !n.isRead).length;
-  const readCount = notifications.filter((n) => n.isRead).length;
+  const noticesUnreadCount = notices.filter((n) => !n.isRead).length;
+  const noticesReadCount = notices.filter((n) => n.isRead).length;
+
+  const totalCount = notifications.length + notices.length;
+  const unreadCount = notifications.filter((n) => !n.isRead).length + noticesUnreadCount;
+  const readCount = notifications.filter((n) => n.isRead).length + noticesReadCount;
 
   const filteredNotifications =
     filter === "all"
@@ -41,7 +49,14 @@ export default function NotificationsPage() {
         ? notifications.filter((n) => !n.isRead)
         : notifications.filter((n) => n.isRead);
 
-  // Load notifications
+  const filteredNotices =
+    filter === "all"
+      ? notices
+      : filter === "unread"
+        ? notices.filter((n) => !n.isRead)
+        : notices.filter((n) => n.isRead);
+
+  // Load notifications and notices
   const loadNotifications = async () => {
     try {
       const result = await notificationsApi.getAll();
@@ -59,6 +74,21 @@ export default function NotificationsPage() {
         }
         setNotifications(notificationsData);
       }
+
+      // Also fetch active notices
+      try {
+        const noticesResult = await noticesApi.getAll({ isActive: "true" });
+        if (noticesResult.data) {
+          const noticesData = Array.isArray(noticesResult.data?.data)
+            ? noticesResult.data.data
+            : Array.isArray(noticesResult.data)
+              ? noticesResult.data
+              : [];
+          setNotices(noticesData.filter((n: Notice) => n.isActive));
+        }
+      } catch {
+        // Silently fail for notices
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to load notifications");
     } finally {
@@ -75,33 +105,42 @@ export default function NotificationsPage() {
 
 
 
-  const markAsRead = async (id: string) => {
-    try {
-      const result = await notificationsApi.markAsRead(id);
-      if (result.error) {
-        toast.error(result.error);
-      } else {
-        setNotifications((prev) =>
-          prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
-        );
-        toast.success("Notification marked as read");
+  const markAsRead = async (id: string, isNotice: boolean = false) => {
+    // Optimistically update state so it instantly works in UI
+    if (isNotice) {
+      setNotices((prev) =>
+        prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+      );
+      toast.success("Notice marked as read");
+      try {
+        await noticesApi.markAsRead(id);
+      } catch {
+        // Ignore API errors
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to mark as read");
+      return;
+    }
+
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
+    );
+    toast.success("Notification marked as read");
+
+    try {
+      await notificationsApi.markAsRead(id);
+    } catch {
+      // Ignore errors for smoother UX
     }
   };
 
   const markAllAsRead = async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setNotices((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    toast.success("All items marked as read");
+
     try {
-      const result = await notificationsApi.markAllAsRead();
-      if (result.error) {
-        toast.error(result.error);
-      } else {
-        setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-        toast.success("All notifications marked as read");
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to mark all as read");
+      await notificationsApi.markAllAsRead();
+    } catch {
+      // Ignore errors for smoother UX
     }
   };
 
@@ -110,9 +149,15 @@ export default function NotificationsPage() {
     toast.success("Notification removed");
   };
 
+  const deleteNotice = (id: string) => {
+    setNotices((prev) => prev.filter((n) => n.id !== id));
+    toast.success("Notice dismissed");
+  };
+
   const clearAll = () => {
     setNotifications([]);
-    toast.success("All notifications cleared");
+    setNotices([]);
+    toast.success("All items cleared");
   };
 
   const getNotificationIcon = (type: string) => {
@@ -176,7 +221,7 @@ export default function NotificationsPage() {
               Mark All Read
             </Button>
           )}
-          {notifications.length > 0 && (
+          {(notifications.length > 0 || notices.length > 0) && (
             <Button variant="outline" size="sm" onClick={clearAll}>
               <Trash2 className="mr-2 h-4 w-4" />
               Clear All
@@ -193,7 +238,7 @@ export default function NotificationsPage() {
               <Bell className="h-6 w-6 text-primary" />
             </div>
             <div>
-              <p className="text-2xl font-bold">{notifications.length}</p>
+              <p className="text-2xl font-bold">{totalCount}</p>
               <p className="text-sm text-muted-foreground">Total</p>
             </div>
           </CardContent>
@@ -231,15 +276,22 @@ export default function NotificationsPage() {
             <div>
               <CardTitle>All Notifications</CardTitle>
               <CardDescription>
-                {filteredNotifications.length} notification
-                {filteredNotifications.length !== 1 ? "s" : ""}
+                {filteredNotifications.length + filteredNotices.length} item
+                {(filteredNotifications.length + filteredNotices.length) !== 1 ? "s" : ""}
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
               <Tabs value={filter} onValueChange={(v) => setFilter(v as typeof filter)}>
                 <TabsList>
-                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="all">
+                    All
+                    {totalCount > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {totalCount}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
                   <TabsTrigger value="unread">
                     Unread
                     {unreadCount > 0 && (
@@ -248,7 +300,14 @@ export default function NotificationsPage() {
                       </Badge>
                     )}
                   </TabsTrigger>
-                  <TabsTrigger value="read">Read</TabsTrigger>
+                  <TabsTrigger value="read">
+                    Read
+                    {readCount > 0 && (
+                      <Badge variant="secondary" className="ml-2">
+                        {readCount}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>
@@ -259,7 +318,7 @@ export default function NotificationsPage() {
             <div className="flex items-center justify-center py-12">
               <Loader2 className="h-8 w-8 animate-spin text-primary" />
             </div>
-          ) : filteredNotifications.length === 0 ? (
+          ) : (filteredNotifications.length + filteredNotices.length) === 0 ? (
             <div className="py-12 text-center">
               <Bell className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
               <h3 className="mb-2 text-lg font-medium">No notifications</h3>
@@ -273,101 +332,193 @@ export default function NotificationsPage() {
             </div>
           ) : (
             <div className="space-y-3">
-              {filteredNotifications.map((notification) => (
-                <div
-                  key={notification.id}
-                  className={`group relative rounded-lg border p-4 transition-all cursor-pointer hover:shadow-md ${notification.isRead
-                    ? "bg-background border-border"
-                    : "bg-primary/5 border-primary/20 shadow-sm"
-                    }`}
-                  onClick={() => {
-                    if (!notification.isRead) {
-                      markAsRead(notification.id);
-                    }
-                  }}
-                >
-                  <div className="flex items-start gap-4">
-                    <div className="mt-0.5 shrink-0">
-                      {getNotificationIcon(notification.type)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            <h3
-                              className={`font-semibold ${notification.isRead
-                                ? "text-foreground"
-                                : "text-foreground"
-                                }`}
-                            >
-                              {notification.title}
-                            </h3>
-                            {getNotificationBadge(notification)}
+              {[...filteredNotifications, ...filteredNotices]
+                .sort((a, b) => {
+                  const dateA = new Date((a as any).createdAt || (a as any).publishDate).getTime();
+                  const dateB = new Date((b as any).createdAt || (b as any).publishDate).getTime();
+                  return dateB - dateA; // Sort newest first
+                })
+                .map((item) => {
+                  const isNotice = 'publishDate' in item;
+
+                  if (isNotice) {
+                    const notice = item as UINotice;
+                    return (
+                      <div
+                        key={`notice-${notice.id}`}
+                        className={`group relative rounded-lg border p-4 transition-all cursor-pointer hover:shadow-md ${notice.isRead
+                          ? "bg-background border-border"
+                          : "border-amber-300/40 bg-amber-50/50 hover:bg-amber-100/60 dark:bg-amber-900/10 dark:hover:bg-amber-900/20"
+                          }`}
+                        onClick={() => {
+                          if (!notice.isRead) {
+                            markAsRead(notice.id, true);
+                          }
+                        }}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className={`mt-0.5 shrink-0 flex items-center justify-center h-8 w-8 rounded-full ${notice.isRead ? "bg-muted" : "bg-amber-100 dark:bg-amber-900/30"}`}>
+                            <Megaphone className={`h-4 w-4 ${notice.isRead ? "text-muted-foreground" : "text-amber-600"}`} />
                           </div>
-                          <p className="mt-1 text-sm text-muted-foreground">
-                            {notification.message}
-                          </p>
-                          <div className="flex items-center gap-3 mt-2">
-                            <p className="text-xs text-muted-foreground flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {new Date(notification.createdAt).toLocaleDateString("en-GB", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
-                            </p>
-                            {notification.expiresAt && (
-                              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                Expires: {new Date(notification.expiresAt).toLocaleDateString()}
-                              </p>
-                            )}
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <h3 className={`font-semibold ${notice.isRead ? "text-foreground" : "text-amber-900 dark:text-amber-100"}`}>
+                                    {notice.title}
+                                  </h3>
+                                  <Badge variant="outline" className={`text-xs ${notice.isRead ? "" : "border-amber-400 text-amber-600"}`}>
+                                    Notice
+                                  </Badge>
+                                  {notice.priority === "high" && (
+                                    <Badge variant={notice.isRead ? "secondary" : "destructive"} className="text-xs">High Priority</Badge>
+                                  )}
+                                </div>
+                                <p className={`mt-1 text-sm whitespace-pre-line ${notice.isRead ? "text-muted-foreground" : "text-foreground/80"}`}>
+                                  {notice.content}
+                                </p>
+                                <div className="flex items-center gap-3 mt-2">
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Clock className="h-3 w-3" />
+                                    Published {new Date(notice.publishDate).toLocaleDateString("en-GB", {
+                                      day: "numeric",
+                                      month: "short",
+                                      year: "numeric"
+                                    })}
+                                  </p>
+                                </div>
+                              </div>
+                              {!notice.isRead && (
+                                <Badge variant="secondary" className="shrink-0 bg-amber-200/50 text-amber-800 dark:bg-amber-900/50 dark:text-amber-200">
+                                  New
+                                </Badge>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              {!notice.isRead && (
+                                <Button
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-amber-600 hover:text-amber-700 hover:bg-amber-100"
+                                  onClick={(e) => { e.stopPropagation(); markAsRead(notice.id, true); }}
+                                  title="Mark as read"
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </Button>
+                              )}
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => { e.stopPropagation(); deleteNotice(notice.id); }}
+                                title="Dismiss notice"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                        {!notification.isRead && (
-                          <Badge variant="secondary" className="shrink-0">
-                            New
-                          </Badge>
-                        )}
                       </div>
-                      {notification.link && (
-                        <Button
-                          variant="link"
-                          size="sm"
-                          className="mt-2 h-auto p-0"
-                          asChild
-                        >
-                          <Link href={notification.link}>View details →</Link>
-                        </Button>
-                      )}
+                    );
+                  }
+
+                  const notification = item as Notification;
+                  return (
+                    <div
+                      key={notification.id}
+                      className={`group relative rounded-lg border p-4 transition-all cursor-pointer hover:shadow-md ${notification.isRead
+                        ? "bg-background border-border"
+                        : "bg-primary/5 border-primary/20 shadow-sm"
+                        }`}
+                      onClick={() => {
+                        if (!notification.isRead) {
+                          markAsRead(notification.id);
+                        }
+                      }}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div className="mt-0.5 shrink-0 flex items-center justify-center h-8 w-8 rounded-full bg-muted">
+                          {getNotificationIcon(notification.type)}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                <h3
+                                  className={`font-semibold ${notification.isRead
+                                    ? "text-foreground"
+                                    : "text-foreground"
+                                    }`}
+                                >
+                                  {notification.title}
+                                </h3>
+                                {getNotificationBadge(notification)}
+                              </div>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {notification.message}
+                              </p>
+                              <div className="flex items-center gap-3 mt-2">
+                                <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                  <Clock className="h-3 w-3" />
+                                  {new Date(notification.createdAt).toLocaleDateString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                </p>
+                                {notification.expiresAt && (
+                                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                                    <Calendar className="h-3 w-3" />
+                                    Expires: {new Date(notification.expiresAt).toLocaleDateString()}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                            {!notification.isRead && (
+                              <Badge variant="secondary" className="shrink-0 bg-primary/20 text-primary">
+                                New
+                              </Badge>
+                            )}
+                          </div>
+                          {notification.link && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="mt-2 h-auto p-0"
+                              asChild
+                            >
+                              <Link href={notification.link}>View details →</Link>
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex shrink-0 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          {!notification.isRead && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-primary hover:text-primary hover:bg-primary/10"
+                              onClick={(e) => { e.stopPropagation(); markAsRead(notification.id); }}
+                              title="Mark as read"
+                            >
+                              <CheckCircle2 className="h-4 w-4" />
+                            </Button>
+                          )}
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                            onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }}
+                            title="Delete"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex shrink-0 gap-1">
-                      {!notification.isRead && (
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-primary hover:text-primary"
-                          onClick={(e) => { e.stopPropagation(); markAsRead(notification.id); }}
-                          title="Mark as read"
-                        >
-                          <CheckCircle2 className="h-4 w-4" />
-                        </Button>
-                      )}
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }}
-                        title="Delete"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                  );
+                })}
             </div>
           )}
         </CardContent>

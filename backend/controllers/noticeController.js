@@ -81,5 +81,32 @@ async function remove(req, res) {
   return res.json({ message: 'Notice deleted' });
 }
 
-module.exports = { list, getById, create, update, remove };
+async function markAsRead(req, res) {
+  try {
+    const { supabase } = require('../models/supabase');
+    const noticeId = req.params.id;
+    const userId = req.user.id;
+
+    // Check if notice exists
+    const notice = await Notice.findByPk(noticeId);
+    if (!notice) return res.status(404).json({ message: 'Notice not found' });
+
+    // Insert read record (ignores if already exists due to unique constraint in Supabase)
+    const { error } = await supabase
+      .from('user_notice_reads')
+      .upsert({ user_id: userId, notice_id: noticeId, read_at: new Date() }, { onConflict: 'user_id,notice_id' });
+
+    if (error) {
+      console.error('Error marking notice as read in Supabase:', error);
+      return res.status(500).json({ message: 'Failed to mark notice as read' });
+    }
+
+    return res.json({ message: 'Notice marked as read', isRead: true });
+  } catch (err) {
+    console.error('Error in markAsRead:', err);
+    return res.status(500).json({ message: 'Server error marking notice as read' });
+  }
+}
+
+module.exports = { list, getById, create, update, remove, markAsRead };
 
