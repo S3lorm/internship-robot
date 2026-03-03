@@ -73,6 +73,8 @@ export default function NotificationsPage() {
     return () => clearInterval(interval);
   }, []);
 
+
+
   const markAsRead = async (id: string) => {
     try {
       const result = await notificationsApi.markAsRead(id);
@@ -274,11 +276,15 @@ export default function NotificationsPage() {
               {filteredNotifications.map((notification) => (
                 <div
                   key={notification.id}
-                  className={`group relative rounded-lg border p-4 transition-all ${
-                    notification.isRead
-                      ? "bg-background border-border"
-                      : "bg-primary/5 border-primary/20 shadow-sm"
-                  }`}
+                  className={`group relative rounded-lg border p-4 transition-all cursor-pointer hover:shadow-md ${notification.isRead
+                    ? "bg-background border-border"
+                    : "bg-primary/5 border-primary/20 shadow-sm"
+                    }`}
+                  onClick={() => {
+                    if (!notification.isRead) {
+                      markAsRead(notification.id);
+                    }
+                  }}
                 >
                   <div className="flex items-start gap-4">
                     <div className="mt-0.5 shrink-0">
@@ -289,11 +295,10 @@ export default function NotificationsPage() {
                         <div className="flex-1">
                           <div className="flex items-center gap-2 mb-1">
                             <h3
-                              className={`font-semibold ${
-                                notification.isRead
-                                  ? "text-foreground"
-                                  : "text-foreground"
-                              }`}
+                              className={`font-semibold ${notification.isRead
+                                ? "text-foreground"
+                                : "text-foreground"
+                                }`}
                             >
                               {notification.title}
                             </h3>
@@ -338,13 +343,13 @@ export default function NotificationsPage() {
                         </Button>
                       )}
                     </div>
-                    <div className="flex shrink-0 gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+                    <div className="flex shrink-0 gap-1">
                       {!notification.isRead && (
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-8 w-8"
-                          onClick={() => markAsRead(notification.id)}
+                          className="h-8 w-8 text-primary hover:text-primary"
+                          onClick={(e) => { e.stopPropagation(); markAsRead(notification.id); }}
                           title="Mark as read"
                         >
                           <CheckCircle2 className="h-4 w-4" />
@@ -354,7 +359,7 @@ export default function NotificationsPage() {
                         variant="ghost"
                         size="icon"
                         className="h-8 w-8 text-destructive hover:text-destructive"
-                        onClick={() => deleteNotification(notification.id)}
+                        onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }}
                         title="Delete"
                       >
                         <X className="h-4 w-4" />

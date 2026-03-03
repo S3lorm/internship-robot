@@ -18,8 +18,20 @@ async function markRead(req, res) {
 }
 
 async function markReadAll(req, res) {
-  await Notification.update({ isRead: true }, { where: { userId: req.user.id, isRead: false } });
-  return res.json({ message: 'All marked as read' });
+  try {
+    const unreadNotifications = await Notification.findAll({
+      where: { userId: req.user.id, isRead: false }
+    });
+
+    for (const n of unreadNotifications) {
+      await Notification.update(n.id, { isRead: true });
+    }
+
+    return res.json({ message: 'All marked as read' });
+  } catch (error) {
+    console.error('Error in markReadAll:', error);
+    return res.status(500).json({ message: 'Failed to mark all as read' });
+  }
 }
 
 async function remove(req, res) {

@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import {
-  mockRegionalCompanies,
+  mockTrendingNews,
 } from "@/lib/mock-data";
 import {
   applicationsApi,
@@ -36,6 +36,8 @@ import {
   MapPin,
   Mail,
   Loader2,
+  Newspaper,
+  ExternalLink,
 } from "lucide-react";
 import { DeadlinesWidget } from "@/components/deadlines-widget";
 
@@ -110,15 +112,7 @@ export default function DashboardPage() {
   const unreadNotifications = notifications.filter((n) => !n.isRead);
   const activeNotices = notices.filter((n) => n.isActive);
 
-  const [selectedRegion, setSelectedRegion] = useState<string>("all");
-  const regions = useMemo(() => {
-    const unique = [...new Set(mockRegionalCompanies.map((c) => c.region))];
-    return unique.sort();
-  }, []);
-  const filteredCompanies = useMemo(() => {
-    if (selectedRegion === "all") return mockRegionalCompanies;
-    return mockRegionalCompanies.filter((c) => c.region === selectedRegion);
-  }, [selectedRegion]);
+
 
   const getStatusIcon = (status: string) => {
     switch (status) {
@@ -430,73 +424,67 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Companies by Region - Apply via Email */}
+      {/* Daily News of Trending Companies in Ghana */}
       <Card>
         <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <CardTitle className="text-lg">Companies by Region</CardTitle>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <Newspaper className="h-5 w-5 text-primary" />
+              Daily News: Trending Companies in Ghana
+            </CardTitle>
             <CardDescription>
-              Browse companies in your region and send your application via email
+              Stay updated with the latest news from top maritime and logistics companies in Ghana
             </CardDescription>
           </div>
-          <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-            <SelectTrigger className="w-[180px]">
-              <MapPin className="mr-2 h-4 w-4" />
-              <SelectValue placeholder="Filter by region" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All regions</SelectItem>
-              {regions.map((r) => (
-                <SelectItem key={r} value={r}>
-                  {r}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </CardHeader>
         <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredCompanies.map((company) => {
-              const subject = encodeURIComponent(`Internship Application - ${user?.firstName} ${user?.lastName}`);
-              const body = encodeURIComponent(
-                `Dear Hiring Team,\n\nI am interested in applying for an internship position at ${company.name}.\n\nPlease find my details below:\nName: ${user?.firstName} ${user?.lastName}\nEmail: ${user?.email}\nStudent ID: ${user?.studentId || "N/A"}\nDepartment: ${user?.department || "N/A"}\n\nI look forward to hearing from you.\n\nBest regards`
-              );
-              const mailtoLink = `mailto:${company.email}?subject=${subject}&body=${body}`;
-              return (
-                <div
-                  key={company.id}
-                  className="flex flex-col rounded-lg border border-border p-4 transition-all hover:border-primary hover:shadow-sm"
-                >
-                  <div className="mb-3 flex items-center justify-between">
-                    <Badge variant="secondary" className="text-xs">
-                      {company.industry}
-                    </Badge>
-                    <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                      <MapPin className="h-3 w-3" />
-                      {company.region}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 selection:bg-primary/10">
+            {mockTrendingNews.map((news) => (
+              <div
+                key={news.id}
+                className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-all hover:border-primary/50 hover:shadow-md"
+              >
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                  <Badge variant="secondary" className="font-medium text-primary">
+                    {news.company}
+                  </Badge>
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1">
+                      <Clock className="h-3 w-3" />
+                      {new Date(news.date).toLocaleDateString("en-GB", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </span>
+                    <span>{news.readTime}</span>
                   </div>
-                  <h3 className="mb-1 font-medium text-foreground">
-                    {company.name}
-                  </h3>
-                  <p className="mb-3 flex items-center gap-1 text-xs text-muted-foreground">
-                    <Mail className="h-3 w-3" />
-                    {company.email}
-                  </p>
-                  <Button asChild size="sm" className="mt-auto w-full">
-                    <a href={mailtoLink} target="_blank" rel="noopener noreferrer">
-                      <Mail className="mr-2 h-4 w-4" />
-                      Send Application via Email
-                    </a>
-                  </Button>
                 </div>
-              );
-            })}
+
+                <h3 className="mb-2 font-semibold leading-tight text-foreground transition-colors group-hover:text-primary">
+                  {news.headline}
+                </h3>
+
+                <p className="mb-4 text-sm text-muted-foreground flex-grow">
+                  {news.summary}
+                </p>
+
+                <Button variant="ghost" size="sm" className="mt-auto w-full justify-between" asChild>
+                  <a href={news.url || "#"} target="_blank" rel="noopener noreferrer">
+                    Read full article
+                    <ExternalLink className="ml-2 h-4 w-4" />
+                  </a>
+                </Button>
+              </div>
+            ))}
           </div>
-          {filteredCompanies.length === 0 && (
-            <p className="py-8 text-center text-muted-foreground">
-              No companies found in this region.
-            </p>
+          {mockTrendingNews.length === 0 && (
+            <div className="flex flex-col items-center justify-center py-8 text-center">
+              <Newspaper className="mb-3 h-10 w-10 text-muted-foreground/30" />
+              <p className="text-muted-foreground">
+                No trending news available at the moment.
+              </p>
+            </div>
           )}
         </CardContent>
       </Card>

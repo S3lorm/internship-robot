@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { internshipCategories, mockRegionalCompanies } from "@/lib/mock-data";
+import { internshipCategories, mockTrendingNews } from "@/lib/mock-data";
 import { internshipsApi } from "@/lib/api";
 import type { Internship } from "@/types";
 import {
@@ -31,6 +31,8 @@ import {
   ChevronUp,
   Loader2,
   AlertCircle,
+  Newspaper,
+  ExternalLink,
 } from "lucide-react";
 import { useSearchParams } from "next/navigation";
 import { Suspense } from "react";
@@ -49,8 +51,6 @@ export default function InternshipsPage() {
   const [showRemoteOnly, setShowRemoteOnly] = useState(
     searchParams?.get("remote") === "true"
   );
-  const [selectedRegion, setSelectedRegion] = useState<string>("all");
-  const [showAllCompanies, setShowAllCompanies] = useState(false);
   const [internships, setInternships] = useState<Internship[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -70,10 +70,10 @@ export default function InternshipsPage() {
       const ints = Array.isArray(result.data?.data)
         ? result.data.data
         : Array.isArray(result.data?.internships)
-        ? result.data.internships
-        : Array.isArray(result.data)
-        ? result.data
-        : [];
+          ? result.data.internships
+          : Array.isArray(result.data)
+            ? result.data
+            : [];
       setInternships(ints);
     } catch (err) {
       console.error("Error fetching internships:", err);
@@ -89,51 +89,7 @@ export default function InternshipsPage() {
     return locs.sort();
   }, [internships]);
 
-  // Get unique regions from companies (static data)
-  const regions = useMemo(() => {
-    const unique = [...new Set(mockRegionalCompanies.map((c) => c.region))];
-    return unique.sort();
-  }, []);
 
-  // Get unique industries from companies (static data)
-  const industries = useMemo(() => {
-    const unique = [...new Set(mockRegionalCompanies.map((c) => c.industry))];
-    return unique.sort();
-  }, []);
-
-  // Filter companies by region, category, and search query (static data)
-  const filteredCompanies = useMemo(() => {
-    let filtered = mockRegionalCompanies;
-
-    // Filter by region
-    if (selectedRegion !== "all") {
-      filtered = filtered.filter((c) => c.region === selectedRegion);
-    }
-
-    // Filter by industry/category
-    if (selectedCategory !== "all") {
-      filtered = filtered.filter((c) => c.industry === selectedCategory);
-    }
-
-    // Filter by search query
-    if (searchQuery) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (c) =>
-          c.name.toLowerCase().includes(query) ||
-          c.industry.toLowerCase().includes(query) ||
-          c.region.toLowerCase().includes(query) ||
-          c.email.toLowerCase().includes(query)
-      );
-    }
-
-    return filtered;
-  }, [selectedRegion, selectedCategory, searchQuery]);
-
-  // Limit companies display
-  const displayedCompanies = useMemo(() => {
-    return showAllCompanies ? filteredCompanies : filteredCompanies.slice(0, 6);
-  }, [filteredCompanies, showAllCompanies]);
 
   // Filter internships
   const filteredInternships = useMemo(() => {
@@ -159,13 +115,11 @@ export default function InternshipsPage() {
   const clearFilters = () => {
     setSearchQuery("");
     setSelectedCategory("all");
-    setSelectedRegion("all");
   };
 
   const hasActiveFilters =
     searchQuery !== "" ||
-    selectedCategory !== "all" ||
-    selectedRegion !== "all";
+    selectedCategory !== "all";
 
   if (loading) {
     return (
@@ -230,23 +184,7 @@ export default function InternshipsPage() {
                     <span>Filter by:</span>
                   </div>
 
-                  <Select
-                    value={selectedRegion}
-                    onValueChange={setSelectedRegion}
-                  >
-                    <SelectTrigger className="w-[200px]">
-                      <MapPin className="mr-2 h-4 w-4" />
-                      <SelectValue placeholder="Select Region" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">All Regions</SelectItem>
-                      {regions.map((r) => (
-                        <SelectItem key={r} value={r}>
-                          {r}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+
 
                   <Select
                     value={selectedCategory}
@@ -284,18 +222,6 @@ export default function InternshipsPage() {
               {hasActiveFilters && (
                 <div className="flex flex-wrap items-center gap-2 pt-2 border-t">
                   <span className="text-xs text-muted-foreground">Active filters:</span>
-                  {selectedRegion !== "all" && (
-                    <Badge variant="secondary" className="gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {selectedRegion}
-                      <button
-                        onClick={() => setSelectedRegion("all")}
-                        className="ml-1 hover:text-destructive"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  )}
                   {selectedCategory !== "all" && (
                     <Badge variant="secondary" className="gap-1">
                       <Briefcase className="h-3 w-3" />
@@ -326,83 +252,68 @@ export default function InternshipsPage() {
           </CardContent>
         </Card>
 
-        {/* Companies by Region - Apply via Email */}
+        {/* Daily News of Trending Companies in Ghana */}
         <Card>
           <CardHeader>
             <div className="flex items-center justify-between">
               <div>
-                <CardTitle className="text-lg">Companies by Region</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Newspaper className="h-5 w-5 text-primary" />
+                  Daily News: Trending Companies in Ghana
+                </CardTitle>
                 <CardDescription>
-                  {filteredCompanies.length} {filteredCompanies.length === 1 ? "company" : "companies"} found
-                  {selectedRegion !== "all" && ` in ${selectedRegion}`}
+                  Stay updated with the latest news from top maritime and logistics companies in Ghana
                 </CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-              {displayedCompanies.map((company) => {
-                const subject = encodeURIComponent(`Internship Application - ${user?.firstName} ${user?.lastName}`);
-                const body = encodeURIComponent(
-                  `Dear Hiring Team,\n\nI am interested in applying for an internship position at ${company.name}.\n\nPlease find my details below:\nName: ${user?.firstName} ${user?.lastName}\nEmail: ${user?.email}\nStudent ID: ${user?.studentId || "N/A"}\nDepartment: ${user?.department || "N/A"}\n\nI look forward to hearing from you.\n\nBest regards`
-                );
-                const mailtoLink = `mailto:${company.email}?subject=${subject}&body=${body}`;
-                return (
-                  <div
-                    key={company.id}
-                    className="flex flex-col rounded-lg border border-border p-4 transition-all hover:border-primary hover:shadow-sm"
-                  >
-                    <div className="mb-3 flex items-center justify-between">
-                      <Badge variant="secondary" className="text-xs">
-                        {company.industry}
-                      </Badge>
-                      <span className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <MapPin className="h-3 w-3" />
-                        {company.region}
-                      </span>
-                    </div>
-                    <h3 className="mb-1 font-medium text-foreground">
-                      {company.name}
-                    </h3>
-                    <p className="mb-3 flex items-center gap-1 text-xs text-muted-foreground">
-                      <Mail className="h-3 w-3" />
-                      {company.email}
-                    </p>
-                    <Button asChild size="sm" className="mt-auto w-full">
-                      <a href={mailtoLink} target="_blank" rel="noopener noreferrer">
-                        <Mail className="mr-2 h-4 w-4" />
-                        Send Application via Email
-                      </a>
-                    </Button>
-                  </div>
-                );
-              })}
-            </div>
-            {filteredCompanies.length === 0 && (
-              <p className="py-8 text-center text-muted-foreground">
-                No companies found in this region.
-              </p>
-            )}
-            {filteredCompanies.length > 6 && (
-              <div className="mt-4 flex justify-center">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowAllCompanies(!showAllCompanies)}
-                  className="gap-2"
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 selection:bg-primary/10">
+              {mockTrendingNews.map((news) => (
+                <div
+                  key={news.id}
+                  className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-all hover:border-primary/50 hover:shadow-md"
                 >
-                  {showAllCompanies ? (
-                    <>
-                      <ChevronUp className="h-4 w-4" />
-                      View Less
-                    </>
-                  ) : (
-                    <>
-                      <ChevronDown className="h-4 w-4" />
-                      View All ({filteredCompanies.length} companies)
-                    </>
-                  )}
-                </Button>
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                    <Badge variant="secondary" className="font-medium text-primary">
+                      {news.company}
+                    </Badge>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {new Date(news.date).toLocaleDateString("en-GB", {
+                          day: "numeric",
+                          month: "short",
+                          year: "numeric",
+                        })}
+                      </span>
+                      <span>{news.readTime}</span>
+                    </div>
+                  </div>
+
+                  <h3 className="mb-2 font-semibold leading-tight text-foreground transition-colors group-hover:text-primary">
+                    {news.headline}
+                  </h3>
+
+                  <p className="mb-4 text-sm text-muted-foreground flex-grow">
+                    {news.summary}
+                  </p>
+
+                  <Button variant="ghost" size="sm" className="mt-auto w-full justify-between" asChild>
+                    <a href={news.url || "#"} target="_blank" rel="noopener noreferrer">
+                      Read full article
+                      <ExternalLink className="ml-2 h-4 w-4" />
+                    </a>
+                  </Button>
+                </div>
+              ))}
+            </div>
+            {mockTrendingNews.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-8 text-center">
+                <Newspaper className="mb-3 h-10 w-10 text-muted-foreground/30" />
+                <p className="text-muted-foreground">
+                  No trending news available at the moment.
+                </p>
               </div>
             )}
           </CardContent>

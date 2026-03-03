@@ -600,16 +600,17 @@ export default function LetterRequestsPage() {
                           setIsDownloading(selectedRequest.id);
                           try {
                             const html = await lettersApi.downloadLetterPDF(selectedRequest.id);
-                            // Open in new window for printing
-                            const printWindow = window.open("", "_blank");
-                            if (printWindow) {
-                              printWindow.document.write(html);
-                              printWindow.document.close();
-                              printWindow.onload = () => {
-                                printWindow.print();
-                              };
-                            }
-                            toast.success("Letter opened for download/printing");
+                            // Download as HTML file
+                            const blob = new Blob([html], { type: "text/html" });
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement("a");
+                            a.href = url;
+                            a.download = `Internship_Letter_${selectedRequest.referenceNumber || selectedRequest.id}.html`;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                            document.body.removeChild(a);
+                            toast.success("Letter downloaded successfully");
                             loadRequests(); // Refresh to update download count
                           } catch (error: any) {
                             toast.error(error.message || "Failed to download letter");
@@ -628,7 +629,7 @@ export default function LetterRequestsPage() {
                         ) : (
                           <>
                             <Download className="mr-2 h-4 w-4" />
-                            Download / Print PDF
+                            Download Letter
                           </>
                         )}
                       </Button>
@@ -666,13 +667,13 @@ export default function LetterRequestsPage() {
   );
 }
 
-function RequestsList({ 
-  requests, 
-  isLoading, 
+function RequestsList({
+  requests,
+  isLoading,
   onView,
   onRefresh
-}: { 
-  requests: LetterRequest[]; 
+}: {
+  requests: LetterRequest[];
   isLoading: boolean;
   onView: (request: LetterRequest) => void;
   onRefresh?: () => void;
@@ -708,11 +709,10 @@ function RequestsList({
         const hasNewPDF = isApproved && request.pdfUrl && !request.emailSent;
 
         return (
-          <Card 
-            key={request.id} 
-            className={`hover:shadow-md transition-shadow ${
-              hasNewPDF ? "border-green-300 bg-green-50/50" : ""
-            }`}
+          <Card
+            key={request.id}
+            className={`hover:shadow-md transition-shadow ${hasNewPDF ? "border-green-300 bg-green-50/50" : ""
+              }`}
           >
             <CardContent className="p-6">
               <div className="flex items-start justify-between gap-4">
@@ -763,15 +763,16 @@ function RequestsList({
                       onClick={async () => {
                         try {
                           const html = await lettersApi.downloadLetterPDF(request.id);
-                          const printWindow = window.open("", "_blank");
-                          if (printWindow) {
-                            printWindow.document.write(html);
-                            printWindow.document.close();
-                            printWindow.onload = () => {
-                              printWindow.print();
-                            };
-                          }
-                          toast.success("Letter opened for download/printing");
+                          const blob = new Blob([html], { type: "text/html" });
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `Internship_Letter_${request.referenceNumber || request.id}.html`;
+                          document.body.appendChild(a);
+                          a.click();
+                          window.URL.revokeObjectURL(url);
+                          document.body.removeChild(a);
+                          toast.success("Letter downloaded successfully");
                           onRefresh?.(); // Refresh to update download count
                         } catch (error: any) {
                           toast.error(error.message || "Failed to download letter");

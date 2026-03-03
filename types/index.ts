@@ -78,6 +78,17 @@ export interface RegionalCompany {
   description?: string;
 }
 
+// Trending Company News
+export interface TrendingNews {
+  id: string;
+  headline: string;
+  company: string;
+  summary: string;
+  date: string;
+  readTime: string;
+  url?: string;
+}
+
 // Notice/Announcement types
 export type NoticeType = 'general' | 'deadline' | 'urgent' | 'info';
 export type NoticePriority = 'low' | 'medium' | 'high';
