@@ -29,6 +29,29 @@ async function list(req, res) {
     offset,
     order: [['created_at', 'DESC']],
   });
+
+  // Attach isRead status for the current user
+  try {
+    const { supabase } = require('../models/supabase');
+    const userId = req.user && req.user.id;
+    if (userId && rows.length > 0) {
+      const noticeIds = rows.map(n => n.id);
+      const { data: readRecords } = await supabase
+        .from('user_notice_reads')
+        .select('notice_id')
+        .eq('user_id', userId)
+        .in('notice_id', noticeIds);
+
+      const readSet = new Set((readRecords || []).map(r => r.notice_id));
+      for (const notice of rows) {
+        notice.isRead = readSet.has(notice.id);
+      }
+    }
+  } catch (err) {
+    console.error('Error fetching notice read statuses:', err);
+    // Continue without isRead — notices will default to unread
+  }
+
   return res.json({ data: rows, meta: { page, limit, total: count } });
 }
 
@@ -108,5 +131,48 @@ async function markAsRead(req, res) {
   }
 }
 
-module.exports = { list, getById, create, update, remove, markAsRead };
+async function markAllAsRead(req, res) {
+  try {
+    const { supabase } = require('../models/supabase');
+    const userId = req.user.id;
+
+    // Fetch all active notice IDs
+    const { data: activeNotices, error: fetchError } = await supabase
+      .from('notices')
+      .select('id')
+      .eq('is_active', true);
+
+    if (fetchError) {
+      console.error('Error fetching active notices:', fetchError);
+      return res.status(500).json({ message: 'Failed to mark all notices as read' });
+    }
+
+    if (!activeNotices || activeNotices.length === 0) {
+      return res.json({ message: 'No notices to mark as read' });
+    }
+
+    // Upsert all as read
+    const records = activeNotices.map(n => ({
+      user_id: userId,
+      notice_id: n.id,
+      read_at: new Date(),
+    }));
+
+    const { error } = await supabase
+      .from('user_notice_reads')
+      .upsert(records, { onConflict: 'user_id,notice_id' });
+
+    if (error) {
+      console.error('Error marking all notices as read:', error);
+      return res.status(500).json({ message: 'Failed to mark all notices as read' });
+    }
+
+    return res.json({ message: 'All notices marked as read' });
+  } catch (err) {
+    console.error('Error in markAllAsRead:', err);
+    return res.status(500).json({ message: 'Server error marking all notices as read' });
+  }
+}
+
+module.exports = { list, getById, create, update, remove, markAsRead, markAllAsRead };
 

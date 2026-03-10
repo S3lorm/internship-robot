@@ -81,7 +81,15 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
     fetchUnreadCount();
     // Poll every 30 seconds for real-time updates
     const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
+
+    // Listen for instant updates from the notifications page
+    const handleUpdate = () => fetchUnreadCount();
+    window.addEventListener('notifications-updated', handleUpdate);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('notifications-updated', handleUpdate);
+    };
   }, []);
 
   const handleLogout = () => {

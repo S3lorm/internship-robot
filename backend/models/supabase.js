@@ -776,6 +776,10 @@ const Notice = {
 
 // Notification model helpers
 const Notification = {
+  async findByPk(id) {
+    return this.findOne({ id });
+  },
+
   async findOne(where) {
     let query = supabase.from('notifications').select('*');
 
@@ -1006,8 +1010,10 @@ function mapNoticeFromSupabase(row) {
     priority: row.priority,
     targetAudience: row.target_audience,
     isActive: row.is_active,
+    isRead: row.isRead || false,
     expiresAt: row.expires_at,
     createdBy: row.created_by,
+    publishDate: row.created_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     toJSON() {
@@ -1055,6 +1061,17 @@ function mapNotificationFromSupabase(row) {
     createdAt: row.created_at,
     toJSON() {
       return { ...this };
+    },
+    async save() {
+      return Notification.update(this.id, this);
+    },
+    async destroy() {
+      const { error } = await supabase
+        .from('notifications')
+        .delete()
+        .eq('id', this.id);
+      if (error) throw error;
+      return true;
     },
   };
 }

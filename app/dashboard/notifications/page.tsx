@@ -112,6 +112,7 @@ export default function NotificationsPage() {
         prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
       );
       toast.success("Notice marked as read");
+      window.dispatchEvent(new Event('notifications-updated'));
       try {
         await noticesApi.markAsRead(id);
       } catch {
@@ -124,6 +125,7 @@ export default function NotificationsPage() {
       prev.map((n) => (n.id === id ? { ...n, isRead: true } : n))
     );
     toast.success("Notification marked as read");
+    window.dispatchEvent(new Event('notifications-updated'));
 
     try {
       await notificationsApi.markAsRead(id);
@@ -136,9 +138,13 @@ export default function NotificationsPage() {
     setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
     setNotices((prev) => prev.map((n) => ({ ...n, isRead: true })));
     toast.success("All items marked as read");
+    window.dispatchEvent(new Event('notifications-updated'));
 
     try {
-      await notificationsApi.markAllAsRead();
+      await Promise.all([
+        notificationsApi.markAllAsRead(),
+        noticesApi.markAllAsRead(),
+      ]);
     } catch {
       // Ignore errors for smoother UX
     }

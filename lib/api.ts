@@ -281,6 +281,11 @@ export const noticesApi = {
     fetchApi(`/notices/${id}/read`, {
       method: 'PATCH',
     }),
+
+  markAllAsRead: () =>
+    fetchApi('/notices/read-all', {
+      method: 'PATCH',
+    }),
 };
 
 // Notifications API
