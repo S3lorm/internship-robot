@@ -13,10 +13,13 @@ module.exports = async function auth(req, res, next) {
 
     const decoded = jwt.verify(token, jwtConfig.secret);
     const user = await User.findOne({ id: decoded.id });
-    if (!user || !user.isActive) {
+    if (!user) {
       return res.status(401).json({ message: 'Invalid token' });
     }
-    
+    if (!user.isActive) {
+      return res.status(401).json({ message: 'Account deactivated', deactivated: true });
+    }
+
     // Remove password from user object
     delete user.password;
 
@@ -25,7 +28,7 @@ module.exports = async function auth(req, res, next) {
     // Allow access to verify-email, resend-verification, and profile update routes
     // const allowedPaths = ['/auth/verify-email', '/auth/resend-verification', '/profile'];
     // const isAllowedPath = allowedPaths.some(path => req.path.includes(path));
-    
+
     // if (user.role === 'student' && !user.isEmailVerified && !isAllowedPath) {
     //   return res.status(403).json({ 
     //     message: 'Please verify your email before accessing this resource.',

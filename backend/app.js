@@ -23,6 +23,7 @@ const reminderRoutes = require('./routes/reminders');
 const evaluationRoutes = require('./routes/evaluations');
 const feedbackAcknowledgmentRoutes = require('./routes/feedback-acknowledgment');
 const securityRoutes = require('./routes/security');
+const dashboardRoutes = require('./routes/dashboard');
 const activityLogger = require('./middleware/activityLogger');
 const { apiLimiter } = require('./middleware/security');
 
@@ -67,10 +68,10 @@ app.use('/signatures', express.static(path.join(__dirname, 'public', 'signatures
 
 // Health check endpoint (before auth middleware)
 app.get('/api/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
-    message: 'RMU Internship API is running' 
+    message: 'RMU Internship API is running'
   });
 });
 
@@ -89,6 +90,7 @@ app.use('/api/reminders', reminderRoutes);
 app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/feedback', feedbackAcknowledgmentRoutes);
 app.use('/api/security', securityRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars
@@ -106,7 +108,7 @@ app.use((err, _req, res, _next) => {
       .from('user_profiles')
       .select('id')
       .limit(1);
-    
+
     if (error) {
       console.error('❌ Supabase query error:', error.message || error);
     } else {

@@ -51,7 +51,10 @@ export default function AdminDashboard() {
 
         const applications = (appsRes as any).data?.data || (appsRes as any).data?.applications || (appsRes as any).applications || []
         const internships = (intsRes as any).data?.data || (intsRes as any).data?.internships || (intsRes as any).internships || []
-        const users = (usersRes as any).data?.data || (usersRes as any).data?.users || (usersRes as any).users || []
+        const fetchedUsers = (usersRes as any).data?.data || (usersRes as any).data?.users || (usersRes as any).users || []
+
+        // Only include students in stats
+        const users = fetchedUsers.filter((u: any) => u.role !== "admin")
 
         setApplicationsList(applications)
         setUsersList(users)

@@ -45,10 +45,7 @@ import {
   Trash2,
   Mail,
   Download,
-  Filter,
   Users,
-  UserPlus,
-  Shield,
 } from "lucide-react"
 import { User } from "@/types"
 import { usersApi } from "@/lib/api"
@@ -61,7 +58,6 @@ export default function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([])
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState("")
-  const [roleFilter, setRoleFilter] = useState<string>("all")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -76,7 +72,8 @@ export default function UserManagementPage() {
       setIsLoading(true)
       const res = await usersApi.getAll()
       const fetchedUsers = (res as any).data?.data || (res as any).data?.users || (res as any).users || []
-      setUsers(fetchedUsers)
+      // Only show student users — admins should not appear in the manage users list
+      setUsers(fetchedUsers.filter((u: User) => u.role !== "admin"))
     } catch (error) {
       toast.error("Failed to fetch users")
       console.error(error)
@@ -101,17 +98,13 @@ export default function UserManagementPage() {
       )
     }
 
-    if (roleFilter !== "all") {
-      filtered = filtered.filter((user) => user.role === roleFilter)
-    }
-
     if (statusFilter !== "all") {
       const isActive = statusFilter === "active"
       filtered = filtered.filter((user) => user.isActive === isActive)
     }
 
     setFilteredUsers(filtered)
-  }, [searchQuery, roleFilter, statusFilter, users])
+  }, [searchQuery, statusFilter, users])
 
   const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
     try {
@@ -205,8 +198,6 @@ export default function UserManagementPage() {
 
   const stats = {
     total: users.length,
-    students: users.filter((u) => u.role === "student").length,
-    admins: users.filter((u) => u.role === "admin").length,
     active: users.filter((u) => u.isActive).length,
     inactive: users.filter((u) => !u.isActive).length,
   }
@@ -228,12 +219,11 @@ export default function UserManagementPage() {
     <Suspense fallback={<Loading />}>
       <div className="space-y-6">
         {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid gap-4 md:grid-cols-3">
           {[
-            { label: "Total Users", value: stats.total, icon: Users, color: "bg-blue-500" },
-            { label: "Students", value: stats.students, icon: UserPlus, color: "bg-green-500" },
-            { label: "Administrators", value: stats.admins, icon: Shield, color: "bg-purple-500" },
-            { label: "Active Users", value: stats.active, icon: UserCheck, color: "bg-emerald-500" },
+            { label: "Total Students", value: stats.total, icon: Users, color: "bg-blue-500" },
+            { label: "Active Students", value: stats.active, icon: UserCheck, color: "bg-emerald-500" },
+            { label: "Inactive Students", value: stats.inactive, icon: UserX, color: "bg-red-500" },
           ].map((stat) => (
             <Card key={stat.label} className="border-0 shadow-sm">
               <CardContent className="p-4">
@@ -265,16 +255,7 @@ export default function UserManagementPage() {
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Select value={roleFilter} onValueChange={setRoleFilter}>
-                  <SelectTrigger className="w-36">
-                    <SelectValue placeholder="Role" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Roles</SelectItem>
-                    <SelectItem value="student">Students</SelectItem>
-                    <SelectItem value="admin">Admins</SelectItem>
-                  </SelectContent>
-                </Select>
+
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-36">
                     <SelectValue placeholder="Status" />
@@ -346,7 +327,6 @@ export default function UserManagementPage() {
                     </TableHead>
                     <TableHead>User</TableHead>
                     <TableHead>Student ID</TableHead>
-                    <TableHead>Role</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
                     <TableHead className="w-12"></TableHead>
@@ -397,18 +377,7 @@ export default function UserManagementPage() {
                         <TableCell className="text-muted-foreground">
                           {user.studentId || "-"}
                         </TableCell>
-                        <TableCell>
-                          <Badge
-                            variant="outline"
-                            className={
-                              user.role === "admin"
-                                ? "bg-purple-100 text-purple-800 border-purple-200"
-                                : "bg-blue-100 text-blue-800 border-blue-200"
-                            }
-                          >
-                            {user.role === "admin" ? "Admin" : "Student"}
-                          </Badge>
-                        </TableCell>
+
                         <TableCell>
                           <Badge
                             variant="outline"

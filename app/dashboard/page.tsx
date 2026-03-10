@@ -18,11 +18,7 @@ import {
   mockTrendingNews,
 } from "@/lib/mock-data";
 import {
-  applicationsApi,
-  internshipsApi,
-  noticesApi,
-  notificationsApi,
-  lettersApi,
+  dashboardApi,
 } from "@/lib/api";
 import type { Application, Internship, Notice, Notification, LetterRequest } from "@/types";
 import {
@@ -59,43 +55,19 @@ export default function DashboardPage() {
         setLoading(true);
         setError(null);
 
-        // Fetch applications
-        const appsResult = await applicationsApi.getMyApplications();
-        if (appsResult.error) {
-          throw new Error(appsResult.error);
+        const dashboardResult = await dashboardApi.getStudentData();
+        if (dashboardResult.error) {
+          throw new Error(dashboardResult.error);
         }
-        // Backend returns { data: applications[] }
-        setApplications(Array.isArray(appsResult.data?.data) ? appsResult.data.data : (Array.isArray(appsResult.data) ? appsResult.data : []));
 
-        // Fetch internships
-        const internshipsResult = await internshipsApi.getAll();
-        if (internshipsResult.error) {
-          throw new Error(internshipsResult.error);
-        }
-        // Backend returns { data: internships[], meta: {...} }
-        setInternships(Array.isArray(internshipsResult.data?.data) ? internshipsResult.data.data : (Array.isArray(internshipsResult.data) ? internshipsResult.data : []));
+        const data = dashboardResult.data?.data || dashboardResult.data;
 
-        // Fetch notices
-        const noticesResult = await noticesApi.getAll({ isActive: "true" });
-        if (noticesResult.error) {
-          throw new Error(noticesResult.error);
-        }
-        const rawNotices = Array.isArray(noticesResult.data?.data) ? noticesResult.data.data : (Array.isArray(noticesResult.data) ? noticesResult.data : []);
-        setNotices(rawNotices);
-
-        // Fetch notifications
-        const notificationsResult = await notificationsApi.getAll();
-        if (notificationsResult.error) {
-          throw new Error(notificationsResult.error);
-        }
-        const rawNotifications = Array.isArray(notificationsResult.data?.data) ? notificationsResult.data.data : (Array.isArray(notificationsResult.data) ? notificationsResult.data : []);
-        setNotifications(rawNotifications);
-
-        // Fetch letter requests
-        const letterRequestsResult = await lettersApi.getRequests();
-        if (!letterRequestsResult.error && letterRequestsResult.data) {
-          setLetterRequests(letterRequestsResult.data.requests || []);
-        }
+        // Backend returns an assembled object matching the previous separate responses
+        setApplications(Array.isArray(data?.applications) ? data.applications : []);
+        setInternships(Array.isArray(data?.internships) ? data.internships : []);
+        setNotices(Array.isArray(data?.notices) ? data.notices : []);
+        setNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
+        setLetterRequests(Array.isArray(data?.letterRequests) ? data.letterRequests : []);
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         setError(err instanceof Error ? err.message : "Failed to load dashboard data");

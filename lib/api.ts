@@ -73,7 +73,12 @@ async function fetchApi<T = any>(
     }
 
     if (!response.ok) {
-      return { error: data.message || data.error || `Error ${response.status}: ${response.statusText}` };
+      if (response.status === 401 && data?.deactivated) {
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new Event('account-deactivated'));
+        }
+      }
+      return { error: data.message || data.error || `Error ${response.status}: ${response.statusText}`, data };
     }
 
     return { data };
@@ -398,6 +403,11 @@ export const lettersApi = {
     fetchApi(`/letters/requests/${id}/mark-email-sent`, {
       method: 'PATCH',
     }),
+};
+
+// Dashboard Consolidated API
+export const dashboardApi = {
+  getStudentData: () => fetchApi('/dashboard/student'),
 };
 
 // Analytics API (Admin only)

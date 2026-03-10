@@ -5,6 +5,12 @@ const supabase = require('../config/supabase');
 
 // User model helpers
 const User = {
+  async findByPk(id, options = {}) {
+    const data = await this.findOne({ id });
+    if (!data) return null;
+    return data;
+  },
+
   async findOne(where) {
     let query = supabase.from('user_profiles').select('*');
 
@@ -799,6 +805,42 @@ const Notification = {
     return data ? mapNotificationFromSupabase(data) : null;
   },
 
+  async findAndCountAll(options = {}) {
+    const where = options.where || {};
+    let query = supabase.from('notifications').select('*', { count: 'exact' });
+
+    // Apply where conditions
+    Object.entries(where).forEach(([key, value]) => {
+      const mappedKey = mapKeyToSupabase(key);
+      query = query.eq(mappedKey, value);
+    });
+
+    // Apply order
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      const mappedField = mapKeyToSupabase(field);
+      query = query.order(mappedField, { ascending: direction === 'ASC' });
+    }
+
+    // Apply pagination
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    if (options.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    let rows = data.map(mapNotificationFromSupabase);
+
+    // Handle includes if necessary here
+
+    return { rows, count: count || rows.length };
+  },
+
   async findAll(options = {}) {
     let query = supabase.from('notifications').select('*');
 
@@ -1153,6 +1195,39 @@ const LetterRequest = {
     if (error) throw error;
 
     return data.map(mapLetterRequestFromSupabase);
+  },
+
+  async findAndCountAll(options = {}) {
+    let query = supabase.from('letter_requests').select('*', { count: 'exact' });
+
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        const mappedKey = mapKeyToSupabase(key);
+        query = query.eq(mappedKey, value);
+      });
+    }
+
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      const mappedField = mapKeyToSupabase(field);
+      query = query.order(mappedField, { ascending: direction === 'ASC' });
+    } else {
+      query = query.order('created_at', { ascending: false });
+    }
+
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+
+    if (options.offset) {
+      query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    return { rows: data.map(mapLetterRequestFromSupabase), count: count || data.length };
   },
 
   async findByPk(id, options = {}) {
