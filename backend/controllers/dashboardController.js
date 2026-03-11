@@ -3,11 +3,9 @@ const supabase = require('../config/supabase'); // Directly importing supabase c
 
 async function getStudentDashboard(req, res) {
     try {
-        const userId = req.user.id;
-        const studentId = req.user.studentId;
+        const studentId = req.user.id; // Use the primary key (UUID) for database lookups
 
         // Use Promise.all to fetch all pieces of dashboard data concurrently in the backend
-        // This avoids 5 round-trips from the frontend
         const [
             applicationsResult,
             internshipsResult,
@@ -15,14 +13,17 @@ async function getStudentDashboard(req, res) {
             notificationsResult,
             letterRequestsResult
         ] = await Promise.all([
-            Application.findAndCountAll({ where: { studentId } }),
-            Internship.findAndCountAll({ where: { status: 'published' }, limit: 10, order: [['created_at', 'DESC']] }),
-            Notice.findAndCountAll({ where: { isActive: true } }),
-            Notification.findAndCountAll({ where: { userId }, order: [['created_at', 'DESC']] }),
-            LetterRequest.findAndCountAll({ where: { studentId }, order: [['created_at', 'DESC']] })
+            Application.findAndCountAll({
+                where: { studentId },
+                include: [{ model: Internship }],
+                order: [['appliedAt', 'DESC']]
+            }),
+            Internship.findAndCountAll({ where: { status: 'published' }, limit: 10, order: [['updatedAt', 'DESC']] }),
+            Notice.findAndCountAll({ where: { isActive: true }, order: [['createdAt', 'DESC']] }),
+            Notification.findAndCountAll({ where: { userId: studentId }, order: [['createdAt', 'DESC']] }),
+            LetterRequest.findAndCountAll({ where: { studentId }, order: [['createdAt', 'DESC']] })
         ]);
 
-        // Send a single assembled response payload equivalent to what the frontend used to fetch in 5 calls
         return res.json({
             data: {
                 applications: applicationsResult.rows || applicationsResult || [],
@@ -33,7 +34,7 @@ async function getStudentDashboard(req, res) {
             }
         });
     } catch (error) {
-        console.error('Error fetching dashboard data:', error);
+        console.error('Final Dashboard Error:', error);
         return res.status(500).json({ message: 'Failed to fetch dashboard data' });
     }
 }

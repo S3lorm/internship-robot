@@ -320,7 +320,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-4">
                 {applications.slice(0, 3).map((application) => {
-                  const internship = internships.find((i) => i.id === application.internshipId);
+                  const internship = application.Internship;
                   return (
                     <div
                       key={application.id}
@@ -337,7 +337,7 @@ export default function DashboardPage() {
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">
                             Applied{" "}
-                            {new Date(application.appliedAt || application.createdAt).toLocaleDateString("en-GB", {
+                            {new Date(application.appliedAt || (application as any).createdAt).toLocaleDateString("en-GB", {
                               day: "numeric",
                               month: "short",
                               year: "numeric",

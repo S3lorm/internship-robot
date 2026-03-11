@@ -500,7 +500,7 @@ const Application = {
         if (include.model === Internship) {
           for (const row of rows) {
             const internship = await Internship.findOne({ id: row.internshipId });
-            if (internship) row.internship = internship;
+            if (internship) row.Internship = internship;
           }
         }
         if (include.model === User) {

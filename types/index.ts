@@ -59,6 +59,7 @@ export interface Application {
   id: string;
   internshipId: string;
   internship?: Internship;
+  Internship?: Internship;
   studentId: string;
   student?: User;
   coverLetter: string;
