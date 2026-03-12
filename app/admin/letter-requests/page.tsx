@@ -35,6 +35,7 @@ import {
   Save,
   X,
   AlertCircle,
+  Briefcase
 } from "lucide-react";
 import {
   Dialog,
@@ -57,6 +58,7 @@ export default function AdminLetterRequestsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [selectedRequest, setSelectedRequest] = useState<LetterRequest | null>(null);
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
@@ -74,18 +76,27 @@ export default function AdminLetterRequestsPage() {
     if (statusFilter !== "all") {
       filtered = filtered.filter((r) => r.status === statusFilter);
     }
+    
+    if (typeFilter !== "all") {
+      filtered = filtered.filter((r) => {
+        if (typeFilter === "general") return r.requestType === "general" || r.requestType === "admin";
+        if (typeFilter === "company") return r.requestType === "company";
+        return true;
+      });
+    }
 
     if (searchQuery) {
       filtered = filtered.filter(
         (r) =>
-          r.companyName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          (r.companyName && r.companyName.toLowerCase().includes(searchQuery.toLowerCase())) ||
           r.student?.firstName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          r.student?.lastName?.toLowerCase().includes(searchQuery.toLowerCase())
+          r.student?.lastName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+          r.student?.studentId?.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
     setFilteredRequests(filtered);
-  }, [requests, statusFilter, searchQuery]);
+  }, [requests, statusFilter, typeFilter, searchQuery]);
 
   const loadRequests = async () => {
     setIsLoading(true);
@@ -106,7 +117,8 @@ export default function AdminLetterRequestsPage() {
 
     setIsUpdating(true);
     try {
-      const sendEmail = (document.getElementById("sendEmail") as HTMLInputElement)?.checked ?? true;
+      const sendEmailCheckbox = document.getElementById("sendEmail") as HTMLInputElement;
+      const sendEmail = sendEmailCheckbox ? sendEmailCheckbox.checked : true;
       const result = await lettersApi.updateRequestStatus(
         selectedRequest.id,
         status,
@@ -134,7 +146,7 @@ export default function AdminLetterRequestsPage() {
     if (!selectedRequest) return;
     setIsEditing(true);
     setEditedData({
-      companyName: selectedRequest.companyName,
+      companyName: selectedRequest.companyName || "",
       companyEmail: selectedRequest.companyEmail || "",
       companyPhone: selectedRequest.companyPhone || "",
       companyAddress: selectedRequest.companyAddress || "",
@@ -144,6 +156,7 @@ export default function AdminLetterRequestsPage() {
       purpose: selectedRequest.purpose,
       category: selectedRequest.category || "",
       additionalNotes: selectedRequest.additionalNotes || "",
+      contactInfo: selectedRequest.contactInfo || "",
     });
   };
 
@@ -165,7 +178,6 @@ export default function AdminLetterRequestsPage() {
         setIsEditing(false);
         setEditedData({});
         loadRequests();
-        // Update selected request with new data
         if (result.data?.request) {
           setSelectedRequest(result.data.request);
         }
@@ -189,10 +201,10 @@ export default function AdminLetterRequestsPage() {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground md:text-3xl">
-          Letter Request Management
+          Stage 1: General Letter Requests
         </h1>
-        <p className="text-muted-foreground">
-          Review and manage internship letter requests from students
+        <p className="text-muted-foreground mt-1">
+          Review and manage general introduction letter requests from students. Stage 2 placements are managed in the Internship Tracking panel.
         </p>
       </div>
 
@@ -254,7 +266,7 @@ export default function AdminLetterRequestsPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search by company or student name..."
+                placeholder="Search by student name or ID..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -262,8 +274,18 @@ export default function AdminLetterRequestsPage() {
             </div>
             <div className="flex items-center gap-2">
               <Filter className="h-4 w-4 text-muted-foreground" />
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="w-[160px]">
+                  <SelectValue placeholder="Request Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="general">Stage 1 (General)</SelectItem>
+                  <SelectItem value="company">Legacy (Company)</SelectItem>
+                </SelectContent>
+              </Select>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[180px]">
+                <SelectTrigger className="w-[160px]">
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -300,47 +322,61 @@ export default function AdminLetterRequestsPage() {
           {filteredRequests.map((request) => {
             const status = statusConfig[request.status];
             const StatusIcon = status.icon;
+            const isGeneral = request.requestType === 'general' || request.requestType === 'admin';
 
             return (
               <Card key={request.id} className="hover:shadow-md transition-shadow">
                 <CardContent className="p-6">
-                  <div className="flex items-start justify-between gap-4">
+                  <div className="flex flex-col md:flex-row items-start justify-between gap-4">
                     <div className="flex-1">
                       <div className="flex items-center gap-3 mb-2">
-                        <h3 className="font-semibold text-lg">{request.companyName}</h3>
+                        <h3 className="font-semibold text-lg flex items-center gap-2">
+                          {request.student?.firstName} {request.student?.lastName}
+                          <Badge variant="secondary" className="font-normal text-xs">{request.student?.studentId}</Badge>
+                        </h3>
                         <Badge variant="outline" className={status.color}>
-                          <StatusIcon className="h-3 w-3 mr-1" />
+                          <StatusIcon className="h-3 w-3 mr-1 text-current" />
                           {status.label}
                         </Badge>
+                        {isGeneral ? (
+                          <Badge className="bg-blue-100 text-blue-800 border-blue-200">Stage 1 General</Badge>
+                        ) : (
+                          <Badge className="bg-purple-100 text-purple-800 border-purple-200">Legacy Company</Badge>
+                        )}
                       </div>
-                      <div className="space-y-1 text-sm text-muted-foreground mb-3">
-                        <p>
-                          <span className="font-medium">Student:</span> {request.student?.firstName}{" "}
-                          {request.student?.lastName} ({request.student?.studentId})
-                        </p>
-                        <p>
-                          <span className="font-medium">Duration:</span> {request.internshipDuration}
-                        </p>
-                        <p>
-                          <span className="font-medium">Purpose:</span>{" "}
-                          {request.purpose.substring(0, 100)}
-                          {request.purpose.length > 100 ? "..." : ""}
-                        </p>
-                        <p className="text-xs mt-2">
-                          Submitted: {new Date(request.createdAt).toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
+                      
+                      <div className="grid md:grid-cols-2 gap-4 mt-3">
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          <p>
+                            <span className="font-medium">Program:</span> {request.student?.program}
+                          </p>
+                          <p>
+                            <span className="font-medium">Duration:</span> {request.internshipDuration}
+                          </p>
+                          {!isGeneral && request.companyName && (
+                            <p className="flex items-center gap-1">
+                              <Building2 className="h-3 w-3"/> <span className="font-medium">To:</span> {request.companyName}
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-1 text-sm text-muted-foreground">
+                          <p className="line-clamp-2">
+                            <span className="font-medium">Purpose:</span> {request.purpose}
+                          </p>
+                          <p className="text-xs mt-2">
+                            <Clock className="h-3 w-3 inline mr-1" />
+                            {new Date(request.createdAt).toLocaleDateString("en-GB", {
+                              day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit"
+                            })}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 w-full md:w-auto mt-2 md:mt-0">
                       <Button
                         variant="outline"
                         size="sm"
+                        className="w-full"
                         onClick={() => setSelectedRequest(request)}
                       >
                         <Eye className="mr-2 h-4 w-4" />
@@ -358,19 +394,24 @@ export default function AdminLetterRequestsPage() {
       {/* Review Dialog */}
       <Dialog
         open={!!selectedRequest}
-        onOpenChange={() => {
-          setSelectedRequest(null);
-          setIsEditing(false);
-          setEditedData({});
+        onOpenChange={(open) => {
+          if (!open) {
+            setSelectedRequest(null);
+            setIsEditing(false);
+            setEditedData({});
+          }
         }}
       >
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           {selectedRequest && (
             <>
               <DialogHeader>
                 <div className="flex items-center justify-between">
-                  <DialogTitle>
+                  <DialogTitle className="flex items-center gap-2">
                     {isEditing ? "Edit Letter Request" : "Review Letter Request"}
+                    {(selectedRequest.requestType === 'general' || selectedRequest.requestType === 'admin') && (
+                      <Badge className="ml-2 bg-blue-100 text-blue-800 border-blue-200 pointer-events-none">Stage 1</Badge>
+                    )}
                   </DialogTitle>
                   <div className="flex items-center gap-2">
                     <Badge variant="outline" className={statusConfig[selectedRequest.status].color}>
@@ -390,161 +431,158 @@ export default function AdminLetterRequestsPage() {
                   </div>
                 </div>
                 <DialogDescription>
-                  Request from {selectedRequest.student?.firstName}{" "}
-                  {selectedRequest.student?.lastName} - Submitted on{" "}
-                  {new Date(selectedRequest.createdAt).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
+                  Submitted on {new Date(selectedRequest.createdAt).toLocaleDateString("en-GB", {
+                    day: "numeric", month: "long", year: "numeric", hour: "2-digit", minute: "2-digit",
                   })}
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-6">
+              <div className="space-y-6 mt-2">
                 {/* Student Info */}
-                <div>
-                  <h3 className="font-semibold mb-3">Student Information</h3>
-                  <div className="space-y-1 text-sm">
-                    <p>
-                      <span className="font-medium">Name:</span> {selectedRequest.student?.firstName}{" "}
-                      {selectedRequest.student?.lastName}
-                    </p>
-                    <p>
-                      <span className="font-medium">Student ID:</span> {selectedRequest.student?.studentId}
-                    </p>
-                    <p>
-                      <span className="font-medium">Email:</span> {selectedRequest.student?.email}
-                    </p>
-                    <p>
-                      <span className="font-medium">Program:</span> {selectedRequest.student?.program}
-                    </p>
-                    <p>
-                      <span className="font-medium">Department:</span> {selectedRequest.student?.department}
-                    </p>
+                <div className="bg-muted/30 p-4 rounded-lg border">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    User Information
+                  </h3>
+                  <div className="grid grid-cols-2 md:grid-cols-3 gap-y-3 gap-x-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground block text-xs">Name</span>
+                      <span className="font-medium">{selectedRequest.student?.firstName} {selectedRequest.student?.lastName}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-xs">Student ID</span>
+                      <span className="font-medium">{selectedRequest.student?.studentId}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-xs">Email</span>
+                      <span className="font-medium truncate">{selectedRequest.student?.email}</span>
+                    </div>
+                    <div className="col-span-2">
+                      <span className="text-muted-foreground block text-xs">Program</span>
+                      <span className="font-medium">{selectedRequest.student?.program}</span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-xs">Department</span>
+                      <span className="font-medium">{selectedRequest.student?.department}</span>
+                    </div>
                   </div>
                 </div>
 
-                {/* Company Info */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    Company Information
-                  </h3>
-                  {isEditing ? (
-                    <div className="space-y-3">
-                      <div>
-                        <Label htmlFor="companyName">Company Name *</Label>
-                        <Input
-                          id="companyName"
-                          value={editedData.companyName || ""}
-                          onChange={(e) => setEditedData({ ...editedData, companyName: e.target.value })}
-                          className="mt-1"
-                          required
-                        />
+                <div className="grid md:grid-cols-2 gap-6">
+                  {/* Internship Details */}
+                  <div>
+                    <h3 className="font-semibold mb-3 flex items-center gap-2 border-b pb-1">
+                      <Calendar className="h-4 w-4 text-muted-foreground" />
+                      Internship Details
+                    </h3>
+                    {isEditing ? (
+                      <div className="space-y-3">
+                        <div>
+                          <Label htmlFor="internshipDuration">Duration *</Label>
+                          <Input
+                            id="internshipDuration"
+                            value={editedData.internshipDuration || ""}
+                            onChange={(e) => setEditedData({ ...editedData, internshipDuration: e.target.value })}
+                            className="mt-1"
+                            required
+                          />
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                          <div>
+                            <Label htmlFor="internshipStartDate" className="text-xs">Start Date</Label>
+                            <Input
+                              id="internshipStartDate"
+                              type="date"
+                              value={editedData.internshipStartDate ? editedData.internshipStartDate.split('T')[0] : ""}
+                              onChange={(e) => setEditedData({ ...editedData, internshipStartDate: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="internshipEndDate" className="text-xs">End Date</Label>
+                            <Input
+                              id="internshipEndDate"
+                              type="date"
+                              value={editedData.internshipEndDate ? editedData.internshipEndDate.split('T')[0] : ""}
+                              onChange={(e) => setEditedData({ ...editedData, internshipEndDate: e.target.value ? new Date(e.target.value).toISOString() : "" })}
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <Label htmlFor="companyEmail">Company Email</Label>
-                        <Input
-                          id="companyEmail"
-                          type="email"
-                          value={editedData.companyEmail || ""}
-                          onChange={(e) => setEditedData({ ...editedData, companyEmail: e.target.value })}
-                          className="mt-1"
-                        />
+                    ) : (
+                      <div className="space-y-2 text-sm">
+                        <p><span className="text-muted-foreground">Duration:</span> {selectedRequest.internshipDuration}</p>
+                        {selectedRequest.internshipStartDate && (
+                          <p><span className="text-muted-foreground">Start:</span> {new Date(selectedRequest.internshipStartDate).toLocaleDateString()}</p>
+                        )}
+                        {selectedRequest.internshipEndDate && (
+                          <p><span className="text-muted-foreground">End:</span> {new Date(selectedRequest.internshipEndDate).toLocaleDateString()}</p>
+                        )}
+                        {selectedRequest.category && (
+                          <p><span className="text-muted-foreground">Category:</span> <Badge variant="secondary" className="ml-1">{selectedRequest.category}</Badge></p>
+                        )}
                       </div>
-                      <div>
-                        <Label htmlFor="companyPhone">Company Phone</Label>
-                        <Input
-                          id="companyPhone"
-                          type="tel"
-                          value={editedData.companyPhone || ""}
-                          onChange={(e) => setEditedData({ ...editedData, companyPhone: e.target.value })}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="companyAddress">Company Address</Label>
-                        <Textarea
-                          id="companyAddress"
-                          value={editedData.companyAddress || ""}
-                          onChange={(e) => setEditedData({ ...editedData, companyAddress: e.target.value })}
-                          className="mt-1"
-                          rows={2}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 text-sm">
-                      <p><span className="font-medium">Name:</span> {selectedRequest.companyName}</p>
-                      {selectedRequest.companyEmail && (
-                        <p><span className="font-medium">Email:</span> {selectedRequest.companyEmail}</p>
-                      )}
-                      {selectedRequest.companyPhone && (
-                        <p><span className="font-medium">Phone:</span> {selectedRequest.companyPhone}</p>
-                      )}
-                      {selectedRequest.companyAddress && (
-                        <p><span className="font-medium">Address:</span> {selectedRequest.companyAddress}</p>
-                      )}
-                    </div>
-                  )}
-                </div>
+                    )}
+                  </div>
 
-                {/* Internship Details */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Internship Details
-                  </h3>
-                  {isEditing ? (
-                    <div className="space-y-3">
-                      <div>
-                        <Label htmlFor="internshipDuration">Internship Duration *</Label>
-                        <Input
-                          id="internshipDuration"
-                          value={editedData.internshipDuration || ""}
-                          onChange={(e) => setEditedData({ ...editedData, internshipDuration: e.target.value })}
-                          className="mt-1"
-                          placeholder="e.g., 3 months, 6 months"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="internshipStartDate">Start Date</Label>
-                        <Input
-                          id="internshipStartDate"
-                          type="date"
-                          value={editedData.internshipStartDate ? editedData.internshipStartDate.split('T')[0] : ""}
-                          onChange={(e) => setEditedData({ ...editedData, internshipStartDate: e.target.value ? new Date(e.target.value).toISOString() : "" })}
-                          className="mt-1"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="internshipEndDate">End Date</Label>
-                        <Input
-                          id="internshipEndDate"
-                          type="date"
-                          value={editedData.internshipEndDate ? editedData.internshipEndDate.split('T')[0] : ""}
-                          onChange={(e) => setEditedData({ ...editedData, internshipEndDate: e.target.value ? new Date(e.target.value).toISOString() : "" })}
-                          className="mt-1"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-2 text-sm">
-                      <p><span className="font-medium">Duration:</span> {selectedRequest.internshipDuration}</p>
-                      {selectedRequest.internshipStartDate && (
-                        <p>
-                          <span className="font-medium">Start Date:</span>{" "}
-                          {new Date(selectedRequest.internshipStartDate).toLocaleDateString()}
-                        </p>
-                      )}
-                      {selectedRequest.internshipEndDate && (
-                        <p>
-                          <span className="font-medium">End Date:</span>{" "}
-                          {new Date(selectedRequest.internshipEndDate).toLocaleDateString()}
-                        </p>
+                  {/* Company Info (Only show if it's a legacy company request or they provided contact info) */}
+                  {(selectedRequest.requestType === 'company' || selectedRequest.companyName || selectedRequest.contactInfo) && (
+                    <div>
+                      <h3 className="font-semibold mb-3 flex items-center gap-2 border-b pb-1">
+                        <Building2 className="h-4 w-4 text-muted-foreground" />
+                        Target Entity
+                      </h3>
+                      {isEditing ? (
+                        <div className="space-y-3">
+                          {selectedRequest.requestType !== 'general' && (
+                            <>
+                              <div>
+                                <Label htmlFor="companyName">Company Name</Label>
+                                <Input
+                                  id="companyName"
+                                  value={editedData.companyName || ""}
+                                  onChange={(e) => setEditedData({ ...editedData, companyName: e.target.value })}
+                                  className="mt-1"
+                                />
+                              </div>
+                              <div>
+                                <Label htmlFor="companyEmail">Company Email</Label>
+                                <Input
+                                  id="companyEmail"
+                                  type="email"
+                                  value={editedData.companyEmail || ""}
+                                  onChange={(e) => setEditedData({ ...editedData, companyEmail: e.target.value })}
+                                  className="mt-1"
+                                />
+                              </div>
+                            </>
+                          )}
+                          <div>
+                            <Label htmlFor="contactInfo">Contact Info / Addressee</Label>
+                            <Input
+                              id="contactInfo"
+                              value={editedData.contactInfo || ""}
+                              onChange={(e) => setEditedData({ ...editedData, contactInfo: e.target.value })}
+                              className="mt-1"
+                              placeholder="e.g. To whom it may concern"
+                            />
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-2 text-sm">
+                          {selectedRequest.requestType !== 'general' && selectedRequest.companyName && (
+                            <p><span className="text-muted-foreground">Name:</span> {selectedRequest.companyName}</p>
+                          )}
+                          {selectedRequest.companyEmail && (
+                            <p><span className="text-muted-foreground">Email:</span> {selectedRequest.companyEmail}</p>
+                          )}
+                          {selectedRequest.contactInfo && (
+                            <p><span className="text-muted-foreground">Contact/Addressee:</span> {selectedRequest.contactInfo}</p>
+                          )}
+                          {!selectedRequest.companyName && !selectedRequest.contactInfo && (
+                            <p className="text-muted-foreground text-xs italic">Open generic letter</p>
+                          )}
+                        </div>
                       )}
                     </div>
                   )}
@@ -552,262 +590,172 @@ export default function AdminLetterRequestsPage() {
 
                 {/* Purpose */}
                 <div>
-                  <h3 className="font-semibold mb-3">Purpose</h3>
+                  <h3 className="font-semibold mb-2 text-sm text-foreground">Purpose & Notes</h3>
                   {isEditing ? (
-                    <Textarea
-                      value={editedData.purpose || ""}
-                      onChange={(e) => setEditedData({ ...editedData, purpose: e.target.value })}
-                      className="min-h-[100px]"
-                      placeholder="Enter the purpose of the internship..."
-                      required
-                    />
+                    <div className="space-y-4">
+                       <div className="space-y-2">
+                        <Label>Purpose</Label>
+                        <Textarea
+                          value={editedData.purpose || ""}
+                          onChange={(e) => setEditedData({ ...editedData, purpose: e.target.value })}
+                          className="min-h-[80px]"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Additional Notes (User provided)</Label>
+                        <Textarea
+                          value={editedData.additionalNotes || ""}
+                          onChange={(e) => setEditedData({ ...editedData, additionalNotes: e.target.value })}
+                          className="min-h-[60px]"
+                        />
+                      </div>
+                    </div>
                   ) : (
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {selectedRequest.purpose}
-                    </p>
+                    <div className="space-y-4">
+                      <div className="bg-muted/20 p-3 rounded border text-sm">
+                        <p className="text-xs font-semibold text-muted-foreground block mb-1">Purpose</p>
+                        <p className="whitespace-pre-wrap">{selectedRequest.purpose}</p>
+                      </div>
+                      {selectedRequest.additionalNotes && (
+                        <div className="bg-muted/20 p-3 rounded border text-sm">
+                          <p className="text-xs font-semibold text-muted-foreground block mb-1">Additional Notes</p>
+                          <p className="whitespace-pre-wrap">{selectedRequest.additionalNotes}</p>
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 
-                {/* Category */}
-                <div>
-                  <h3 className="font-semibold mb-3">Category</h3>
-                  {isEditing ? (
-                    <Select
-                      value={editedData.category || ""}
-                      onValueChange={(value) => setEditedData({ ...editedData, category: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="academic">Academic</SelectItem>
-                        <SelectItem value="professional">Professional</SelectItem>
-                        <SelectItem value="research">Research</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  ) : selectedRequest.category ? (
-                    <Badge variant="secondary">{selectedRequest.category}</Badge>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No category specified</p>
-                  )}
-                </div>
-
-                {/* Additional Notes */}
-                <div>
-                  <h3 className="font-semibold mb-3">Additional Notes</h3>
-                  {isEditing ? (
-                    <Textarea
-                      value={editedData.additionalNotes || ""}
-                      onChange={(e) => setEditedData({ ...editedData, additionalNotes: e.target.value })}
-                      className="min-h-[80px]"
-                      placeholder="Any additional notes or information..."
-                    />
-                  ) : selectedRequest.additionalNotes ? (
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
-                      {selectedRequest.additionalNotes}
-                    </p>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">No additional notes</p>
-                  )}
-                </div>
-
-                {selectedRequest.adminNotes && (
-                  <div>
-                    <h3 className="font-semibold mb-3">Previous Admin Notes</h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+                {selectedRequest.adminNotes && !isEditing && (
+                  <div className="border border-amber-200 bg-amber-50 p-4 rounded-lg">
+                    <h3 className="font-semibold text-amber-800 mb-2 flex items-center gap-2 text-sm">
+                      <AlertCircle className="h-4 w-4" /> Previous Admin Notes
+                    </h3>
+                    <p className="text-sm text-amber-900 whitespace-pre-wrap">
                       {selectedRequest.adminNotes}
                     </p>
                   </div>
                 )}
 
-                {/* Reference Number & Verification Code */}
-                {(selectedRequest.referenceNumber || selectedRequest.verificationCode) && (
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                    <h3 className="font-semibold mb-3">Document Information</h3>
-                    <div className="space-y-2 text-sm">
-                      {selectedRequest.referenceNumber && (
-                        <p>
-                          <span className="font-medium">Reference Number:</span>{" "}
-                          <code className="px-2 py-1 bg-background rounded font-mono text-xs">
-                            {selectedRequest.referenceNumber}
-                          </code>
-                        </p>
-                      )}
-                      {selectedRequest.verificationCode && (
-                        <p>
-                          <span className="font-medium">Verification Code:</span>{" "}
-                          <code className="px-2 py-1 bg-background rounded font-mono text-xs">
-                            {selectedRequest.verificationCode}
-                          </code>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* PDF Status */}
+                {/* Document Information & Actions */}
                 {selectedRequest.status === "approved" && (
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                    <h3 className="font-semibold mb-2 text-green-800">PDF Status</h3>
-                    <div className="space-y-2 text-sm">
-                      {selectedRequest.pdfUrl ? (
-                        <>
-                          <p className="text-green-700">
-                            <CheckCircle2 className="inline h-4 w-4 mr-1" />
-                            PDF generated successfully
+                  <div className="grid md:grid-cols-2 gap-4">
+                     <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                      <h3 className="font-semibold mb-3 text-sm">Document Stats</h3>
+                      <div className="space-y-2 text-sm">
+                        {selectedRequest.referenceNumber && (
+                          <p className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Ref Number:</span>{" "}
+                            <code className="px-2 py-0.5 bg-background rounded border font-mono text-xs">
+                              {selectedRequest.referenceNumber}
+                            </code>
                           </p>
-                          {selectedRequest.pdfGeneratedAt && (
-                            <p className="text-xs text-green-600">
-                              Generated: {new Date(selectedRequest.pdfGeneratedAt).toLocaleDateString()}
-                            </p>
-                          )}
-                          {selectedRequest.downloadCount !== undefined && (
-                            <p className="text-xs text-green-600">
-                              Downloaded {selectedRequest.downloadCount} time{selectedRequest.downloadCount !== 1 ? "s" : ""}
-                            </p>
-                          )}
-                        </>
-                      ) : (
-                        <p className="text-amber-700">
-                          <AlertCircle className="inline h-4 w-4 mr-1" />
-                          PDF generation pending
+                        )}
+                        <p className="flex justify-between items-center">
+                          <span className="text-muted-foreground">PDF Generated:</span>
+                          <span className="font-medium">{selectedRequest.pdfUrl ? 'Yes' : 'No'}</span>
                         </p>
-                      )}
-                      {selectedRequest.emailSent ? (
-                        <p className="text-xs text-green-600">
-                          <Mail className="inline h-3 w-3 mr-1" />
-                          Email notification sent
-                          {selectedRequest.emailSentAt && (
-                            <> on {new Date(selectedRequest.emailSentAt).toLocaleDateString()}</>
-                          )}
-                        </p>
-                      ) : (
-                        <p className="text-xs text-muted-foreground">
-                          Email notification not sent
-                        </p>
-                      )}
+                        {selectedRequest.downloadCount !== undefined && (
+                          <p className="flex justify-between items-center">
+                            <span className="text-muted-foreground">Downloads:</span>
+                            <span className="font-medium">{selectedRequest.downloadCount}</span>
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    {selectedRequest.emailSent && (
+                       <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+                        <h3 className="font-semibold mb-3 text-sm text-blue-800">Email Notification</h3>
+                        <div className="space-y-2 text-sm">
+                          <p className="flex justify-between items-center">
+                            <span className="text-blue-700/70">Status:</span>
+                            <span className="font-medium text-blue-800">Sent</span>
+                          </p>
+                          {selectedRequest.emailSentAt && (
+                            <p className="flex justify-between items-center">
+                              <span className="text-blue-700/70">Sent At:</span>
+                              <span className="font-medium text-blue-800">{new Date(selectedRequest.emailSentAt).toLocaleDateString()}</span>
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
-                {/* Admin Notes */}
-                {selectedRequest.status === "pending" && (
-                  <div>
-                    <Label htmlFor="adminNotes">Admin Notes (Optional)</Label>
-                    <Textarea
-                      id="adminNotes"
-                      value={adminNotes}
-                      onChange={(e) => setAdminNotes(e.target.value)}
-                      placeholder="Add any notes or feedback for the student..."
-                      className="mt-2 min-h-[100px]"
-                    />
-                  </div>
-                )}
-
-                {/* Email Notification Option */}
-                {selectedRequest.status === "pending" && (
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="checkbox"
-                      id="sendEmail"
-                      defaultChecked={true}
-                      className="rounded"
-                    />
-                    <Label htmlFor="sendEmail" className="text-sm font-normal cursor-pointer">
-                      Send email notification when approved
-                    </Label>
+                {/* Admin Action section if Pending */}
+                {selectedRequest.status === "pending" && !isEditing && (
+                  <div className="border-t pt-4 space-y-4">
+                    <div>
+                      <Label htmlFor="adminNotes">Notes / Reason for Rejection (Optional)</Label>
+                      <Textarea
+                        id="adminNotes"
+                        value={adminNotes}
+                        onChange={(e) => setAdminNotes(e.target.value)}
+                        placeholder="Add notes that the student will see..."
+                        className="mt-2"
+                        rows={3}
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                       <input
+                        type="checkbox"
+                        id="sendEmail"
+                        defaultChecked={true}
+                        className="rounded"
+                      />
+                      <Label htmlFor="sendEmail" className="text-sm font-normal cursor-pointer">
+                        Send email notification to student when status is updated
+                      </Label>
+                    </div>
                   </div>
                 )}
               </div>
 
-              <DialogFooter>
+              <DialogFooter className="mt-6 border-t pt-4">
                 {isEditing ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      onClick={handleCancelEdit}
-                      disabled={isSaving}
-                    >
-                      <X className="mr-2 h-4 w-4" />
+                  <div className="flex w-full justify-between items-center">
+                    <Button variant="ghost" onClick={handleCancelEdit} disabled={isSaving}>
                       Cancel
                     </Button>
-                    <Button
-                      onClick={handleSaveEdit}
-                      disabled={isSaving}
-                    >
-                      {isSaving ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Saving...
-                        </>
-                      ) : (
-                        <>
-                          <Save className="mr-2 h-4 w-4" />
-                          Save Changes
-                        </>
-                      )}
+                    <Button onClick={handleSaveEdit} disabled={isSaving}>
+                      {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      Save Changes
                     </Button>
-                  </>
+                  </div>
                 ) : selectedRequest.status === "pending" ? (
-                  <>
+                  <div className="flex w-full justify-between items-center">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       onClick={() => {
                         setSelectedRequest(null);
                         setAdminNotes("");
-                        setIsEditing(false);
-                        setEditedData({});
                       }}
                     >
-                      Cancel
+                      Close
                     </Button>
-                    <Button
-                      variant="destructive"
-                      onClick={() => {
-                        const sendEmail = (document.getElementById("sendEmail") as HTMLInputElement)?.checked ?? true;
-                        handleUpdateStatus("rejected");
-                      }}
-                      disabled={isUpdating}
-                    >
-                      {isUpdating ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Updating...
-                        </>
-                      ) : (
-                        <>
-                          <XCircle className="mr-2 h-4 w-4" />
-                          Reject
-                        </>
-                      )}
-                    </Button>
-                    <Button
-                      onClick={() => {
-                        const sendEmail = (document.getElementById("sendEmail") as HTMLInputElement)?.checked ?? true;
-                        handleUpdateStatus("approved");
-                      }}
-                      disabled={isUpdating}
-                    >
-                      {isUpdating ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          Updating...
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          Approve & Generate PDF
-                        </>
-                      )}
-                    </Button>
-                  </>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="destructive"
+                        onClick={() => handleUpdateStatus("rejected")}
+                        disabled={isUpdating}
+                      >
+                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
+                        Reject
+                      </Button>
+                      <Button
+                        onClick={() => handleUpdateStatus("approved")}
+                        disabled={isUpdating}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                        Approve & Generate Letter
+                      </Button>
+                    </div>
+                  </div>
                 ) : (
-                  <Button onClick={() => {
-                    setSelectedRequest(null);
-                    setIsEditing(false);
-                    setEditedData({});
-                  }}>Close</Button>
+                  <Button onClick={() => setSelectedRequest(null)}>Close View</Button>
                 )}
               </DialogFooter>
             </>
@@ -817,4 +765,3 @@ export default function AdminLetterRequestsPage() {
     </div>
   );
 }
-

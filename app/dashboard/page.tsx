@@ -35,6 +35,10 @@ import {
   Loader2,
   Newspaper,
   ExternalLink,
+  Download,
+  Printer,
+  FileDown,
+  FileCheck2
 } from "lucide-react";
 import { DeadlinesWidget } from "@/components/deadlines-widget";
 
@@ -147,8 +151,57 @@ export default function DashboardPage() {
           </Link>
         </Button>
       </div>
-
-
+      {/* Available Documents */}
+      {!loading && letterRequests.some(r => r.status === 'approved' && r.requestType === 'general') && (
+        <Card className="border-blue-200 bg-blue-50/30">
+          <CardHeader>
+            <CardTitle className="text-lg flex items-center gap-2">
+              <FileCheck2 className="h-5 w-5 text-blue-600" />
+              Available Documents
+            </CardTitle>
+            <CardDescription>
+              Your approved official documents ready for use.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {letterRequests
+                .filter(r => r.status === 'approved' && r.requestType === 'general')
+                .map(request => (
+                  <div key={request.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-background border rounded-xl gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
+                        <FileText className="h-5 w-5 text-blue-700" />
+                      </div>
+                      <div>
+                        <p className="font-semibold text-sm uppercase">General Internship Letter</p>
+                        <p className="text-xs text-muted-foreground">Status: Approved</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`/api/letters/requests/${request.id}/view`} target="_blank">
+                          <Eye className="mr-2 h-4 w-4" />
+                          View
+                        </a>
+                      </Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <a href={`/api/letters/requests/${request.id}/download?format=pdf`}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Download
+                        </a>
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => window.open(`/api/letters/requests/${request.id}/view`, '_blank')?.print()}>
+                        <Printer className="mr-2 h-4 w-4" />
+                        Print
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Grid */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">

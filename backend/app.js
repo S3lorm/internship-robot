@@ -24,6 +24,7 @@ const evaluationRoutes = require('./routes/evaluations');
 const feedbackAcknowledgmentRoutes = require('./routes/feedback-acknowledgment');
 const securityRoutes = require('./routes/security');
 const dashboardRoutes = require('./routes/dashboard');
+const placementRoutes = require('./routes/placements');
 const activityLogger = require('./middleware/activityLogger');
 const { apiLimiter } = require('./middleware/security');
 
@@ -91,6 +92,7 @@ app.use('/api/evaluations', evaluationRoutes);
 app.use('/api/feedback', feedbackAcknowledgmentRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/dashboard', dashboardRoutes);
+app.use('/api/placements', placementRoutes);
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars

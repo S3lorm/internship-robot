@@ -22,11 +22,20 @@ router.get('/signatures', (req, res) => {
 });
 
 // Letter Request Routes
+// Create a new request
 router.post('/requests', letterController.createRequest);
+
+// Get all requests
 router.get('/requests', letterController.getRequests);
+
+// Check general approval status (must be before /:id routes)
+router.get('/requests/general-approval-status', letterController.checkGeneralApproval);
+
+// Get a specific request
 router.get('/requests/:id', letterController.getRequestById);
 router.patch('/requests/:id', letterController.updateRequest); // Update request details (Admin only)
 router.patch('/requests/:id/status', letterController.updateRequestStatus);
+router.get('/requests/:id/view', letterController.viewLetterHTML);
 router.get('/requests/:id/download', letterController.downloadLetterPDF);
 router.patch('/requests/:id/mark-email-sent', letterController.markEmailSent);
 

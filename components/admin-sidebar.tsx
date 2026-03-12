@@ -29,6 +29,7 @@ const adminNavItems = [
   { href: "/admin/applications", label: "Applications", icon: FileText },
   { href: "/admin/evaluations", label: "Evaluations", icon: ClipboardCheck },
   { href: "/admin/letter-requests", label: "Letter Requests", icon: FileCheck },
+  { href: "/admin/internship-tracking", label: "Internship Tracking", icon: Briefcase },
   { href: "/admin/letter", label: "Application Letter", icon: FileText },
   { href: "/admin/notices", label: "Notices", icon: Bell },
   { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },

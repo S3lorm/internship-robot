@@ -247,7 +247,7 @@ export interface ApplicationFilters {
 
 // Letter Request types
 export type LetterRequestStatus = 'pending' | 'approved' | 'rejected';
-export type LetterRequestType = 'admin' | 'company';
+export type LetterRequestType = 'admin' | 'company' | 'general' | 'official';
 
 export interface LetterRequest {
   id: string;
@@ -264,6 +264,7 @@ export interface LetterRequest {
   purpose: string;
   category?: string;
   additionalNotes?: string;
+  contactInfo?: string;
   status: LetterRequestStatus;
   adminNotes?: string;
   reviewedBy?: string;
@@ -283,7 +284,7 @@ export interface LetterRequest {
 
 export interface LetterRequestFormData {
   requestType?: LetterRequestType;
-  companyName: string;
+  companyName?: string;
   companyEmail?: string;
   companyPhone?: string;
   companyAddress?: string;
@@ -293,4 +294,60 @@ export interface LetterRequestFormData {
   purpose: string;
   category?: string;
   additionalNotes?: string;
+  contactInfo?: string;
+}
+
+// Internship Placement types (Stage 2)
+export type PlacementStatus = 'pending' | 'approved' | 'rejected' | 'modification_requested';
+
+export interface InternshipPlacement {
+  id: string;
+  studentId: string;
+  generalRequestId: string;
+  organizationName: string;
+  organizationAddress?: string;
+  organizationEmail: string;
+  supervisorName: string;
+  supervisorPosition?: string;
+  supervisorContact?: string;
+  internshipStartDate?: string;
+  internshipEndDate?: string;
+  departmentRole?: string;
+  status: PlacementStatus;
+  adminNotes?: string;
+  reviewedBy?: string;
+  reviewedAt?: string;
+  officialLetterUrl?: string;
+  officialLetterGeneratedAt?: string;
+  referenceNumber?: string;
+  verificationCode?: string;
+  student?: User;
+  generalRequest?: LetterRequest;
+  evaluationTokens?: EvaluationToken[];
+  emailLogs?: EmailLog[];
+  emailSent?: boolean;
+  lastEmailSentAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface EvaluationToken {
+  id: string;
+  placementId: string;
+  tokenHash: string;
+  createdAt: string;
+  usedAt?: string;
+  usedStatus: 'unused' | 'used' | 'expired';
+}
+
+export interface EmailLog {
+  id: string;
+  placementId: string;
+  studentId: string;
+  recipientEmail: string;
+  subject?: string;
+  sentDate: string;
+  deliveryStatus: 'sent' | 'delivered' | 'failed' | 'bounced';
+  tokenId?: string;
+  createdAt: string;
 }

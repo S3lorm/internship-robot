@@ -63,17 +63,27 @@ function generateLetterHTML(user, internship = null, letterRequest = null) {
     year: 'numeric'
   });
 
+  const isGeneral = letterRequest && (letterRequest.requestType === 'general');
+
   // Use letter request details if provided, otherwise use internship details
   let internshipDetails = '';
   if (letterRequest) {
-    internshipDetails = `
-      <p><strong>Company/Organization:</strong> ${letterRequest.companyName}</p>
-      ${letterRequest.companyAddress ? `<p><strong>Address:</strong> ${letterRequest.companyAddress}</p>` : ''}
-      <p><strong>Internship Duration:</strong> ${letterRequest.internshipDuration}</p>
-      ${letterRequest.internshipStartDate ? `<p><strong>Start Date:</strong> ${new Date(letterRequest.internshipStartDate).toLocaleDateString('en-GB')}</p>` : ''}
-      ${letterRequest.internshipEndDate ? `<p><strong>End Date:</strong> ${new Date(letterRequest.internshipEndDate).toLocaleDateString('en-GB')}</p>` : ''}
-      ${letterRequest.purpose ? `<p><strong>Purpose:</strong> ${letterRequest.purpose}</p>` : ''}
-    `;
+    if (isGeneral) {
+      internshipDetails = `
+        <p><strong>Internship Duration:</strong> ${letterRequest.internshipDuration}</p>
+        ${letterRequest.internshipStartDate ? `<p><strong>Start Date:</strong> ${new Date(letterRequest.internshipStartDate).toLocaleDateString('en-GB')}</p>` : ''}
+        ${letterRequest.internshipEndDate ? `<p><strong>End Date:</strong> ${new Date(letterRequest.internshipEndDate).toLocaleDateString('en-GB')}</p>` : ''}
+      `;
+    } else {
+      internshipDetails = `
+        <p><strong>Company/Organization:</strong> ${letterRequest.companyName}</p>
+        ${letterRequest.companyAddress ? `<p><strong>Address:</strong> ${letterRequest.companyAddress}</p>` : ''}
+        <p><strong>Internship Duration:</strong> ${letterRequest.internshipDuration}</p>
+        ${letterRequest.internshipStartDate ? `<p><strong>Start Date:</strong> ${new Date(letterRequest.internshipStartDate).toLocaleDateString('en-GB')}</p>` : ''}
+        ${letterRequest.internshipEndDate ? `<p><strong>End Date:</strong> ${new Date(letterRequest.internshipEndDate).toLocaleDateString('en-GB')}</p>` : ''}
+        ${letterRequest.purpose ? `<p><strong>Purpose:</strong> ${letterRequest.purpose}</p>` : ''}
+      `;
+    }
   } else if (internship) {
     internshipDetails = `
       <p><strong>Internship Position:</strong> ${internship.title}</p>
@@ -199,13 +209,13 @@ function generateLetterHTML(user, internship = null, letterRequest = null) {
   </div>
 
   <div class="recipient">
-    <p>The Human Resources Manager</p>
-    ${internship ? `<p>${internship.company}</p>` : '<p>[Company Name]</p>'}
-    ${internship ? `<p>${internship.location}</p>` : '<p>[Company Address]</p>'}
+    ${isGeneral ? '<p>To Whom It May Concern,</p>' : `<p>The Human Resources Manager,</p>
+    ${internship ? `<p>${internship.company}</p>` : (letterRequest && letterRequest.companyName !== 'General Request' ? `<p>${letterRequest.companyName}</p>` : '<p>[Company Name]</p>')}
+    ${internship ? `<p>${internship.location}</p>` : (letterRequest && letterRequest.companyAddress ? `<p>${letterRequest.companyAddress}</p>` : '<p>[Company Address]</p>')}`}
   </div>
 
   <div class="subject">
-    SUBJECT: RECOMMENDATION FOR INTERNSHIP PLACEMENT - ${user.firstName.toUpperCase()} ${user.lastName.toUpperCase()}
+    SUBJECT: ${isGeneral ? 'GENERAL INTERNSHIP INTRODUCTION' : 'RECOMMENDATION FOR INTERNSHIP PLACEMENT'} - ${user.firstName.toUpperCase()} ${user.lastName.toUpperCase()}
   </div>
 
   <div class="content">
@@ -382,19 +392,29 @@ async function createRequest(req, res) {
       purpose,
       category,
       additionalNotes,
-      requestType, // Accept requestType
+      contactInfo,
+      requestType,
     } = req.body;
 
-    // Validation
-    if (!companyName || !internshipDuration || !purpose) {
-      return res.status(400).json({
-        message: 'Company name, internship duration, and purpose are required'
-      });
+    // Validation - general requests don't need company details
+    const isGeneral = !requestType || requestType === 'general';
+    if (isGeneral) {
+      if (!internshipDuration) {
+        return res.status(400).json({
+          message: 'Internship duration is required'
+        });
+      }
+    } else {
+      if (!companyName || !internshipDuration || !purpose) {
+        return res.status(400).json({
+          message: 'Company name, internship duration, and purpose are required'
+        });
+      }
     }
 
     const request = await LetterRequest.create({
       studentId: user.id,
-      companyName,
+      companyName: companyName || (isGeneral ? 'General Request' : ''),
       companyEmail,
       companyPhone,
       companyAddress,
@@ -404,8 +424,9 @@ async function createRequest(req, res) {
       purpose,
       category,
       additionalNotes,
-      requestType: requestType || 'admin', // Default to admin if not provided
-      status: requestType === 'company' ? 'approved' : 'pending',
+      contactInfo,
+      requestType: isGeneral ? 'general' : requestType,
+      status: 'pending',
     });
 
     // If company request, send directly to company email
@@ -670,12 +691,22 @@ async function updateRequestStatus(req, res) {
 
     // Create notification for student
     const { createNotification } = require('../services/notificationService');
-    const notificationTitle = status === 'approved'
-      ? 'Letter Request Approved - PDF Ready'
-      : 'Letter Request Rejected';
-    const notificationMessage = status === 'approved'
-      ? `Your internship letter request for ${request.companyName} has been approved. Your PDF letter is now available for download. Reference: ${request.referenceNumber || 'N/A'}`
-      : `Your internship letter request for ${request.companyName} has been rejected.`;
+    const isGeneral = request.requestType === 'general';
+    
+    let notificationTitle = '';
+    let notificationMessage = '';
+    
+    if (status === 'approved') {
+      notificationTitle = isGeneral ? 'General Internship Letter Approved' : 'Letter Request Approved - PDF Ready';
+      notificationMessage = isGeneral 
+        ? "Your General Internship Letter has been approved and is now available for viewing, download, and printing."
+        : `Your internship letter request for ${request.companyName} has been approved. Your PDF letter is now available for download. Reference: ${request.referenceNumber || 'N/A'}`;
+    } else if (status === 'rejected') {
+      notificationTitle = 'Letter Request Rejected';
+      notificationMessage = isGeneral
+        ? "Your General Internship Letter request has been rejected."
+        : `Your internship letter request for ${request.companyName} has been rejected.`;
+    }
 
     await createNotification({
       userId: request.studentId,
@@ -908,12 +939,56 @@ async function downloadLetterPDF(req, res) {
 
     // Return HTML (can be printed to PDF by browser)
     res.setHeader('Content-Type', 'text/html');
-    res.setHeader('Content-Disposition', `inline; filename="Internship_Letter_${request.referenceNumber || request.id}.html"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Internship_Letter_${request.referenceNumber || request.id}.html"`);
     res.send(html);
   } catch (error) {
     console.error('Error downloading letter PDF:', error);
     res.status(500).json({
       message: 'Failed to download letter',
+      error: error.message
+    });
+  }
+}
+
+// View Letter HTML endpoint
+async function viewLetterHTML(req, res) {
+  try {
+    const user = req.user;
+    const { LetterRequest } = require('../models');
+    const { id } = req.params;
+
+    const request = await LetterRequest.findByPk(id);
+    if (!request) {
+      return res.status(404).json({ message: 'Letter request not found' });
+    }
+
+    // Students can only view their own letters
+    if (user.role === 'student' && request.studentId !== user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    // Only approved requests can be viewed
+    if (request.status !== 'approved') {
+      return res.status(400).json({ message: 'Letter not yet approved' });
+    }
+
+    // Generate letter HTML
+    const { User } = require('../models');
+    const student = await User.findOne({ id: request.studentId });
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+
+    const html = generateLetterHTML(student, null, request);
+
+    // Return HTML (inline)
+    res.setHeader('Content-Type', 'text/html');
+    res.setHeader('Content-Disposition', 'inline');
+    res.send(html);
+  } catch (error) {
+    console.error('Error viewing letter HTML:', error);
+    res.status(500).json({
+      message: 'Failed to view letter',
       error: error.message
     });
   }
@@ -1017,6 +1092,38 @@ async function updateRequest(req, res) {
   }
 }
 
+// Check if student has an approved general request
+async function checkGeneralApproval(req, res) {
+  try {
+    const user = req.user;
+    const { LetterRequest } = require('../models');
+
+    if (!user || user.role !== 'student') {
+      return res.status(403).json({ message: 'Only students can check approval status' });
+    }
+
+    const requests = await LetterRequest.findAll({
+      where: { studentId: user.id, status: 'approved' },
+    });
+
+    // Filter for general requests
+    const approvedGeneral = requests.filter(r => r.requestType === 'general' || r.requestType === 'admin');
+
+    res.json({
+      hasApprovedGeneral: approvedGeneral.length > 0,
+      approvedRequests: approvedGeneral.map(r => ({
+        id: r.id,
+        referenceNumber: r.referenceNumber,
+        internshipDuration: r.internshipDuration,
+        createdAt: r.createdAt,
+      })),
+    });
+  } catch (error) {
+    console.error('Error checking general approval:', error);
+    res.status(500).json({ message: 'Failed to check approval status', error: error.message });
+  }
+}
+
 module.exports = {
   generateLetter,
   downloadLetter,
@@ -1027,5 +1134,7 @@ module.exports = {
   updateRequest,
   updateRequestStatus,
   downloadLetterPDF,
+  viewLetterHTML,
   markEmailSent,
+  checkGeneralApproval,
 };

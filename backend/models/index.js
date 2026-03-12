@@ -6,6 +6,9 @@ const {
   Notice, 
   Notification, 
   LetterRequest,
+  InternshipPlacement,
+  EvaluationToken,
+  EmailLog,
   Evaluation,
   Logbook,
   Report,
@@ -25,10 +28,12 @@ module.exports = {
   Notice,
   Notification,
   LetterRequest,
+  InternshipPlacement,
+  EvaluationToken,
+  EmailLog,
   Evaluation,
   Logbook,
   Report,
   AdministrativeAction,
   supabase,
 };
-

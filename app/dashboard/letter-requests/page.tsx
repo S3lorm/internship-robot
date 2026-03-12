@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,17 +15,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { lettersApi } from "@/lib/api";
 import type { LetterRequest, LetterRequestFormData } from "@/types";
 import {
   FileText,
-  Building2,
-  Mail,
-  Phone,
-  MapPin,
   Calendar,
   Clock,
   CheckCircle2,
@@ -33,11 +28,12 @@ import {
   AlertCircle,
   Loader2,
   Plus,
-  Eye,
-  Download,
   Copy,
   Check,
-  Bell,
+  Building2,
+  ArrowRight,
+  Info,
+  User as UserIcon
 } from "lucide-react";
 import {
   Dialog,
@@ -46,6 +42,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { useRouter } from "next/navigation";
 
 const statusConfig = {
   pending: { label: "Pending", color: "bg-amber-100 text-amber-800 border-amber-200", icon: Clock },
@@ -53,25 +50,18 @@ const statusConfig = {
   rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
 };
 
-export default function LetterRequestsPage() {
+export default function GeneralLetterRequestsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [requests, setRequests] = useState<LetterRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<LetterRequest | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [isDownloading, setIsDownloading] = useState<string | null>(null);
-  const [formData, setFormData] = useState<LetterRequestFormData>({
-    companyName: "",
-    companyEmail: "",
-    companyPhone: "",
-    companyAddress: "",
-    internshipDuration: "",
+  const [formData, setFormData] = useState({
+    requestType: "general",
     internshipStartDate: "",
     internshipEndDate: "",
-    purpose: "",
-    category: "",
-    additionalNotes: "",
   });
 
   useEffect(() => {
@@ -83,7 +73,9 @@ export default function LetterRequestsPage() {
     try {
       const result = await lettersApi.getRequests();
       if (result.data) {
-        setRequests(result.data.requests || []);
+        // Filter out non-general requests just in case
+        const generalRequests = result.data.requests.filter((r: LetterRequest) => r.requestType === 'general' || r.requestType === 'admin');
+        setRequests(generalRequests);
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to load requests");
@@ -119,16 +111,9 @@ export default function LetterRequestsPage() {
       } else {
         toast.success("Letter request submitted successfully!");
         setFormData({
-          companyName: "",
-          companyEmail: "",
-          companyPhone: "",
-          companyAddress: "",
-          internshipDuration: "",
+          requestType: "general",
           internshipStartDate: "",
           internshipEndDate: "",
-          purpose: "",
-          category: "",
-          additionalNotes: "",
         });
         loadRequests();
       }
@@ -139,254 +124,154 @@ export default function LetterRequestsPage() {
     }
   };
 
-  const adminRequests = requests.filter((r) => r.requestType === "admin" || !r.requestType);
-  const companyRequests = requests.filter((r) => r.requestType === "company");
-
-  const pendingRequests = adminRequests.filter((r) => r.status === "pending");
-  const approvedRequests = adminRequests.filter((r) => r.status === "approved");
-  const rejectedRequests = adminRequests.filter((r) => r.status === "rejected");
+  const approvedRequests = requests.filter((r) => r.status === "approved");
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-5xl mx-auto pb-10">
       {/* Header */}
-      <div>
-        <h1 className="text-2xl font-bold text-foreground md:text-3xl">
-          Internship Letter Requests
-        </h1>
-        <p className="text-muted-foreground">
-          Request official internship letters for your applications
-        </p>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-foreground md:text-3xl uppercase">
+            General Internship Request
+          </h1>
+          <p className="text-muted-foreground mt-1">
+            Request a general introduction letter to use when searching for internship opportunities.
+          </p>
+        </div>
+        {approvedRequests.length > 0 && (
+          <Button onClick={() => router.push('/dashboard/letter-requests/official')} className="shrink-0 bg-blue-700 hover:bg-blue-800">
+            Proceed to Stage 2: Official Placement
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        )}
+      </div>
+
+      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3 text-blue-800 shadow-sm">
+        <Info className="h-5 w-5 shrink-0 mt-0.5" />
+        <div>
+          <h3 className="font-semibold">How the Two-Stage Process Works</h3>
+          <ol className="list-decimal ml-5 mt-2 space-y-1 text-sm">
+            <li><strong>Stage 1 (Current):</strong> Request a generic introduction letter. Once approved, use this letter to apply to various companies.</li>
+            <li><strong>Stage 2 (Next):</strong> After a company accepts your application, submit an Official Placement request with their details to generate the final official letter and evaluation form.</li>
+          </ol>
+        </div>
       </div>
 
       <Tabs defaultValue="new" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="new">
+        <TabsList className="bg-muted/50 w-full justify-start overflow-x-auto">
+          <TabsTrigger value="new" className="data-[state=active]:bg-background">
             <Plus className="mr-2 h-4 w-4" />
             New Request
           </TabsTrigger>
-          <TabsTrigger value="all">
-            Admin Letters ({adminRequests.length})
-          </TabsTrigger>
-          <TabsTrigger value="pending">
-            Pending ({pendingRequests.length})
-          </TabsTrigger>
-          <TabsTrigger value="approved">
-            Approved ({approvedRequests.length})
-          </TabsTrigger>
-          <TabsTrigger value="rejected">
-            Rejected ({rejectedRequests.length})
-          </TabsTrigger>
-          <TabsTrigger value="company">
-            Sent to Companies ({companyRequests.length})
+          <TabsTrigger value="history" className="data-[state=active]:bg-background">
+            <FileText className="mr-2 h-4 w-4" />
+            My Requests ({requests.length})
           </TabsTrigger>
         </TabsList>
 
         {/* New Request Form */}
-        <TabsContent value="new">
-          <Card>
-            <CardHeader>
-              <CardTitle>Submit Letter Request</CardTitle>
+        <TabsContent value="new" className="mt-0">
+          <Card className="border-muted shadow-sm">
+            <CardHeader className="bg-muted/30 border-b pb-4">
+              <CardTitle>Submit General Letter Request</CardTitle>
               <CardDescription>
-                Fill in the details below to request an official internship letter
+                Provide details about your intended internship to receive a general introduction letter.
               </CardDescription>
             </CardHeader>
-            <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-6">
-                {/* Company Information */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Building2 className="h-5 w-5" />
-                    Company Information
-                  </h3>
+            <CardContent className="pt-6">
+              <form onSubmit={handleSubmit} className="space-y-8">
+                  {/* Student Information (Read-only from profile) */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
+                      <UserIcon className="h-5 w-5 text-blue-600" />
+                      Student Information
+                    </h3>
+                    
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Student Full Name</Label>
+                        <Input value={`${user?.firstName} ${user?.lastName}`} disabled className="bg-muted" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Student ID</Label>
+                        <Input value={user?.studentId || "N/A"} disabled className="bg-muted" />
+                      </div>
+                    </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="companyName">
-                      Company/Organization Name <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="companyName"
-                      name="companyName"
-                      value={formData.companyName}
-                      onChange={handleChange}
-                      placeholder="e.g., Ghana Ports and Harbours Authority"
-                      required
-                    />
-                  </div>
-
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="companyEmail">Company Email</Label>
-                      <div className="relative">
-                        <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          id="companyEmail"
-                          name="companyEmail"
-                          type="email"
-                          value={formData.companyEmail}
-                          onChange={handleChange}
-                          placeholder="hr@company.com"
-                          className="pl-10"
-                        />
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label>Department or Program</Label>
+                        <Input value={user?.program || "N/A"} disabled className="bg-muted" />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Academic Level or Year</Label>
+                        <Input value={user?.yearOfStudy ? `${user.yearOfStudy}${getOrdinalSuffix(user.yearOfStudy)} Year` : "N/A"} disabled className="bg-muted" />
                       </div>
                     </div>
 
                     <div className="space-y-2">
-                      <Label htmlFor="companyPhone">Company Phone</Label>
-                      <div className="relative">
-                        <Phone className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Label>Student Email</Label>
+                      <Input value={user?.email || "N/A"} disabled className="bg-muted" />
+                    </div>
+                  </div>
+
+                  {/* Internship Dates */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
+                      <Calendar className="h-5 w-5 text-blue-600" />
+                      Internship Period
+                    </h3>
+
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="internshipStartDate">Internship Start Date <span className="text-destructive">*</span></Label>
                         <Input
-                          id="companyPhone"
-                          name="companyPhone"
-                          type="tel"
-                          value={formData.companyPhone}
+                          id="internshipStartDate"
+                          name="internshipStartDate"
+                          type="date"
+                          value={formData.internshipStartDate}
                           onChange={handleChange}
-                          placeholder="+233 XX XXX XXXX"
-                          className="pl-10"
+                          required
+                        />
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label htmlFor="internshipEndDate">Internship End Date <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="internshipEndDate"
+                          name="internshipEndDate"
+                          type="date"
+                          value={formData.internshipEndDate}
+                          onChange={handleChange}
+                          required
                         />
                       </div>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="companyAddress">Company Address</Label>
-                    <div className="relative">
-                      <MapPin className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Textarea
-                        id="companyAddress"
-                        name="companyAddress"
-                        value={formData.companyAddress}
-                        onChange={handleChange}
-                        placeholder="Company address..."
-                        className="pl-10 min-h-[80px]"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Internship Details */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <Calendar className="h-5 w-5" />
-                    Internship Details
-                  </h3>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="internshipDuration">
-                      Internship Duration <span className="text-destructive">*</span>
-                    </Label>
-                    <Input
-                      id="internshipDuration"
-                      name="internshipDuration"
-                      value={formData.internshipDuration}
-                      onChange={handleChange}
-                      placeholder="e.g., 3 months, 6 months, 1 year"
-                      required
-                    />
+                  <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 flex gap-3 text-sm text-blue-800">
+                    <Info className="h-4 w-4 shrink-0 mt-0.5" />
+                    <p>
+                      This letter will be <strong>generic</strong> and will not contain any organization details. 
+                      You can use it to apply to multiple organizations.
+                    </p>
                   </div>
 
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <div className="space-y-2">
-                      <Label htmlFor="internshipStartDate">Start Date</Label>
-                      <Input
-                        id="internshipStartDate"
-                        name="internshipStartDate"
-                        type="date"
-                        value={formData.internshipStartDate}
-                        onChange={handleChange}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="internshipEndDate">End Date</Label>
-                      <Input
-                        id="internshipEndDate"
-                        name="internshipEndDate"
-                        type="date"
-                        value={formData.internshipEndDate}
-                        onChange={handleChange}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Purpose and Category */}
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold flex items-center gap-2">
-                    <FileText className="h-5 w-5" />
-                    Purpose & Category
-                  </h3>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="purpose">
-                      Purpose <span className="text-destructive">*</span>
-                    </Label>
-                    <Textarea
-                      id="purpose"
-                      name="purpose"
-                      value={formData.purpose}
-                      onChange={handleChange}
-                      placeholder="Describe the purpose of the internship and what you hope to achieve..."
-                      className="min-h-[100px]"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Internship Category</Label>
-                    <Select
-                      value={formData.category || ""}
-                      onValueChange={(value) => handleSelectChange("category", value)}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select category (optional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="marine-engineering">Marine Engineering</SelectItem>
-                        <SelectItem value="nautical-science">Nautical Science</SelectItem>
-                        <SelectItem value="port-shipping">Port & Shipping Administration</SelectItem>
-                        <SelectItem value="maritime-safety">Maritime Safety & Security</SelectItem>
-                        <SelectItem value="electrical-engineering">Electrical/Electronic Engineering</SelectItem>
-                        <SelectItem value="computer-science">Computer Science</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="additionalNotes">Additional Notes</Label>
-                    <Textarea
-                      id="additionalNotes"
-                      name="additionalNotes"
-                      value={formData.additionalNotes}
-                      onChange={handleChange}
-                      placeholder="Any additional information or special requirements..."
-                      className="min-h-[80px]"
-                    />
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2">
+                <div className="pt-4 flex justify-end gap-3 border-t">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={() => {
                       setFormData({
-                        companyName: "",
-                        companyEmail: "",
-                        companyPhone: "",
-                        companyAddress: "",
-                        internshipDuration: "",
+                        requestType: "general",
                         internshipStartDate: "",
                         internshipEndDate: "",
-                        purpose: "",
-                        category: "",
-                        additionalNotes: "",
                       });
                     }}
                   >
-                    Clear
+                    Reset Form
                   </Button>
-                  <Button type="submit" disabled={isSubmitting}>
+                  <Button type="submit" disabled={isSubmitting} className="min-w-[150px]">
                     {isSubmitting ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -405,35 +290,19 @@ export default function LetterRequestsPage() {
           </Card>
         </TabsContent>
 
-        {/* Requests List */}
-        <TabsContent value="all">
-          <RequestsList requests={requests} isLoading={isLoading} onView={setSelectedRequest} onRefresh={loadRequests} />
-        </TabsContent>
-
-        <TabsContent value="pending">
-          <RequestsList requests={pendingRequests} isLoading={isLoading} onView={setSelectedRequest} onRefresh={loadRequests} />
-        </TabsContent>
-
-        <TabsContent value="approved">
-          <RequestsList requests={approvedRequests} isLoading={isLoading} onView={setSelectedRequest} onRefresh={loadRequests} />
-        </TabsContent>
-
-        {/* Rejected Requests */}
-        <TabsContent value="rejected">
-          <RequestsList
-            requests={rejectedRequests}
-            isLoading={isLoading}
-            onView={(request) => setSelectedRequest(request)}
-          />
-        </TabsContent>
-
-        {/* Company Letters */}
-        <TabsContent value="company">
-          <RequestsList
-            requests={companyRequests}
-            isLoading={isLoading}
-            onView={(request) => setSelectedRequest(request)}
-          />
+        {/* Requests History */}
+        <TabsContent value="history" className="mt-0">
+          <Card className="border-muted shadow-sm">
+            <CardHeader className="bg-muted/30 border-b">
+              <CardTitle>My General Requests</CardTitle>
+              <CardDescription>
+                Track the status of your general introduction letter requests.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <RequestsList requests={requests} isLoading={isLoading} onView={setSelectedRequest} />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
 
@@ -443,8 +312,8 @@ export default function LetterRequestsPage() {
           {selectedRequest && (
             <>
               <DialogHeader>
-                <div className="flex items-center justify-between">
-                  <DialogTitle>Letter Request Details</DialogTitle>
+                <div className="flex items-center justify-between mb-2">
+                  <DialogTitle>General Request Details</DialogTitle>
                   <Badge variant="outline" className={statusConfig[selectedRequest.status].color}>
                     {statusConfig[selectedRequest.status].label}
                   </Badge>
@@ -460,222 +329,96 @@ export default function LetterRequestsPage() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-6">
-                {/* Company Info */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Building2 className="h-4 w-4" />
-                    Company Information
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <p><span className="font-medium">Name:</span> {selectedRequest.companyName}</p>
-                    {selectedRequest.companyEmail && (
-                      <p><span className="font-medium">Email:</span> {selectedRequest.companyEmail}</p>
-                    )}
-                    {selectedRequest.companyPhone && (
-                      <p><span className="font-medium">Phone:</span> {selectedRequest.companyPhone}</p>
-                    )}
-                    {selectedRequest.companyAddress && (
-                      <p><span className="font-medium">Address:</span> {selectedRequest.companyAddress}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Internship Details */}
-                <div>
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Internship Details
-                  </h3>
-                  <div className="space-y-2 text-sm">
-                    <p><span className="font-medium">Duration:</span> {selectedRequest.internshipDuration}</p>
-                    {selectedRequest.internshipStartDate && (
-                      <p><span className="font-medium">Start Date:</span> {new Date(selectedRequest.internshipStartDate).toLocaleDateString()}</p>
-                    )}
-                    {selectedRequest.internshipEndDate && (
-                      <p><span className="font-medium">End Date:</span> {new Date(selectedRequest.internshipEndDate).toLocaleDateString()}</p>
-                    )}
-                  </div>
-                </div>
-
-                {/* Purpose */}
-                <div>
-                  <h3 className="font-semibold mb-3">Purpose</h3>
-                  <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedRequest.purpose}</p>
-                </div>
-
-                {selectedRequest.category && (
-                  <div>
-                    <h3 className="font-semibold mb-3">Category</h3>
-                    <Badge variant="secondary">{selectedRequest.category}</Badge>
-                  </div>
-                )}
-
-                {selectedRequest.additionalNotes && (
-                  <div>
-                    <h3 className="font-semibold mb-3">Additional Notes</h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedRequest.additionalNotes}</p>
-                  </div>
-                )}
-
-                {/* Reference Number & Verification Code */}
-                {(selectedRequest.referenceNumber || selectedRequest.verificationCode) && (
-                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <FileText className="h-4 w-4" />
-                      Document Information
-                    </h3>
-                    <div className="space-y-2 text-sm">
-                      {selectedRequest.referenceNumber && (
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-medium">Reference Number:</span>
-                            <code className="ml-2 px-2 py-1 bg-background rounded font-mono text-xs">
-                              {selectedRequest.referenceNumber}
-                            </code>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(selectedRequest.referenceNumber!);
-                              setCopiedCode(selectedRequest.referenceNumber!);
-                              setTimeout(() => setCopiedCode(null), 2000);
-                              toast.success("Reference number copied!");
-                            }}
-                          >
-                            {copiedCode === selectedRequest.referenceNumber ? (
-                              <Check className="h-4 w-4" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                      {selectedRequest.verificationCode && (
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <span className="font-medium">Verification Code:</span>
-                            <code className="ml-2 px-2 py-1 bg-background rounded font-mono text-xs">
-                              {selectedRequest.verificationCode}
-                            </code>
-                          </div>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              navigator.clipboard.writeText(selectedRequest.verificationCode!);
-                              setCopiedCode(selectedRequest.verificationCode!);
-                              setTimeout(() => setCopiedCode(null), 2000);
-                              toast.success("Verification code copied!");
-                            }}
-                          >
-                            {copiedCode === selectedRequest.verificationCode ? (
-                              <Check className="h-4 w-4" />
-                            ) : (
-                              <Copy className="h-4 w-4" />
-                            )}
-                          </Button>
-                        </div>
-                      )}
-                      <p className="text-xs text-muted-foreground mt-2">
-                        Use these codes to verify the authenticity of this document.
+              <div className="space-y-6 mt-4">
+                {/* Status Notice */}
+                {selectedRequest.status === 'approved' && (
+                  <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
+                    <div>
+                      <h4 className="font-semibold">Request Approved</h4>
+                      <p className="text-sm mt-1">
+                        Your general introduction letter has been approved. You can download the PDF or you can now proceed to Stage 2 to register an official placement if a company has accepted you.
                       </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* PDF Download Section */}
-                {selectedRequest.status === "approved" && (
-                  <div className="rounded-lg border border-green-200 bg-green-50 p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <h3 className="font-semibold mb-2 flex items-center gap-2 text-green-800">
-                          <CheckCircle2 className="h-5 w-5" />
-                          Letter Ready for Download
-                        </h3>
-                        <p className="text-sm text-green-700 mb-3">
-                          Your internship letter has been approved and is ready for download.
-                        </p>
-                        {selectedRequest.downloadCount !== undefined && selectedRequest.downloadCount > 0 && (
-                          <p className="text-xs text-green-600">
-                            Downloaded {selectedRequest.downloadCount} time{selectedRequest.downloadCount !== 1 ? "s" : ""}
-                            {selectedRequest.lastDownloadedAt && (
-                              <> • Last downloaded: {new Date(selectedRequest.lastDownloadedAt).toLocaleDateString()}</>
-                            )}
-                          </p>
-                        )}
-                        {selectedRequest.emailSent && (
-                          <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
-                            <Mail className="h-3 w-3" />
-                            Email notification sent
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex gap-2 mt-4">
-                      <Button
-                        onClick={async () => {
-                          if (!selectedRequest.id) return;
-                          setIsDownloading(selectedRequest.id);
-                          try {
-                            const html = await lettersApi.downloadLetterPDF(selectedRequest.id);
-                            // Download as HTML file
-                            const blob = new Blob([html], { type: "text/html" });
-                            const url = window.URL.createObjectURL(blob);
-                            const a = document.createElement("a");
-                            a.href = url;
-                            a.download = `Internship_Letter_${selectedRequest.referenceNumber || selectedRequest.id}.html`;
-                            document.body.appendChild(a);
-                            a.click();
-                            window.URL.revokeObjectURL(url);
-                            document.body.removeChild(a);
-                            toast.success("Letter downloaded successfully");
-                            loadRequests(); // Refresh to update download count
-                          } catch (error: any) {
-                            toast.error(error.message || "Failed to download letter");
-                          } finally {
-                            setIsDownloading(null);
-                          }
-                        }}
-                        disabled={isDownloading === selectedRequest.id}
-                        className="flex-1"
-                      >
-                        {isDownloading === selectedRequest.id ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Downloading...
-                          </>
-                        ) : (
-                          <>
-                            <Download className="mr-2 h-4 w-4" />
-                            Download Letter
-                          </>
-                        )}
+                      <Button size="sm" className="mt-3 bg-green-600 hover:bg-green-700 text-white" onClick={() => router.push('/dashboard/letter-requests/official')}>
+                        Proceed to Stage 2
+                        <ArrowRight className="h-4 w-4 ml-2" />
                       </Button>
                     </div>
                   </div>
                 )}
-
-                {selectedRequest.adminNotes && (
-                  <div>
-                    <h3 className="font-semibold mb-3 flex items-center gap-2">
-                      <AlertCircle className="h-4 w-4" />
-                      Admin Notes
-                    </h3>
-                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{selectedRequest.adminNotes}</p>
+                
+                {selectedRequest.status === 'rejected' && (
+                  <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg flex items-start gap-3">
+                    <XCircle className="h-5 w-5 mt-0.5 shrink-0" />
+                    <div>
+                      <h4 className="font-semibold">Request Rejected</h4>
+                      <p className="text-sm mt-1">Please review the admin notes below and submit a new request if necessary.</p>
+                    </div>
                   </div>
                 )}
 
-                {selectedRequest.reviewedAt && (
-                  <div className="text-xs text-muted-foreground">
-                    Reviewed on {new Date(selectedRequest.reviewedAt).toLocaleDateString("en-GB", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                {/* Internship Details */}
+                <div className="bg-muted/20 p-4 rounded-lg border border-border">
+                  <h3 className="font-semibold mb-3 flex items-center gap-2">
+                    <Calendar className="h-4 w-4" />
+                    Internship Details
+                  </h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                    {selectedRequest.internshipStartDate && (
+                      <div>
+                        <span className="text-muted-foreground block text-xs">Start Date</span>
+                        <span className="font-medium">{new Date(selectedRequest.internshipStartDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                    {selectedRequest.internshipEndDate && (
+                      <div>
+                        <span className="text-muted-foreground block text-xs">End Date</span>
+                        <span className="font-medium">{new Date(selectedRequest.internshipEndDate).toLocaleDateString()}</span>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+
+
+
+
+                {/* Admin Notes */}
+                {selectedRequest.adminNotes && (
+                  <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg">
+                    <h3 className="font-semibold flex items-center gap-2 text-amber-800 mb-2">
+                      <AlertCircle className="h-4 w-4" />
+                      Admin Notes
+                    </h3>
+                    <p className="text-sm text-amber-900 whitespace-pre-wrap">{selectedRequest.adminNotes}</p>
+                  </div>
+                )}
+
+                {/* Document Information (If approved) */}
+                {selectedRequest.status === 'approved' && (
+                  <div className="flex justify-between items-center p-4 border rounded-lg bg-background">
+                    <div>
+                      <h4 className="font-semibold mb-1">Introduction Letter</h4>
+                      <p className="text-sm text-muted-foreground">Download the general letter to attach to your applications.</p>
+                    </div>
+                    <Button onClick={async () => {
+                      try {
+                        const html = await lettersApi.downloadLetterPDF(selectedRequest.id);
+                        const blob = new Blob([html], { type: "text/html" });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement("a");
+                        a.href = url;
+                        a.download = `General_Introduction_Letter.html`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                      } catch (error: any) {
+                        toast.error(error.message || "Failed to download letter");
+                      }
+                    }}>
+                      Download Letter
+                    </Button>
                   </div>
                 )}
               </div>
@@ -691,12 +434,10 @@ function RequestsList({
   requests,
   isLoading,
   onView,
-  onRefresh
 }: {
   requests: LetterRequest[];
   isLoading: boolean;
   onView: (request: LetterRequest) => void;
-  onRefresh?: () => void;
 }) {
   if (isLoading) {
     return (
@@ -708,15 +449,13 @@ function RequestsList({
 
   if (requests.length === 0) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center">
-          <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
-          <h3 className="mb-2 text-lg font-medium">No requests found</h3>
-          <p className="text-muted-foreground">
-            You haven't submitted any letter requests yet.
-          </p>
-        </CardContent>
-      </Card>
+      <div className="text-center py-12 border-2 border-dashed rounded-lg bg-muted/10">
+        <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground/30" />
+        <h3 className="mb-2 text-lg font-medium text-foreground">No requests found</h3>
+        <p className="text-muted-foreground max-w-md mx-auto">
+          You haven't submitted any general letter requests yet. Create a new request to get started.
+        </p>
+      </div>
     );
   }
 
@@ -725,95 +464,50 @@ function RequestsList({
       {requests.map((request) => {
         const status = statusConfig[request.status];
         const StatusIcon = status.icon;
-        const isApproved = request.status === "approved";
-        const hasNewPDF = isApproved && request.pdfUrl && !request.emailSent;
 
         return (
-          <Card
-            key={request.id}
-            className={`hover:shadow-md transition-shadow ${hasNewPDF ? "border-green-300 bg-green-50/50" : ""
-              }`}
-          >
-            <CardContent className="p-6">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    <h3 className="font-semibold text-lg">{request.companyName}</h3>
-                    <Badge variant="outline" className={status.color}>
-                      <StatusIcon className="h-3 w-3 mr-1" />
-                      {status.label}
-                    </Badge>
-                    {hasNewPDF && (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-                        <Bell className="h-3 w-3 mr-1" />
-                        PDF Ready
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="space-y-1 text-sm text-muted-foreground">
-                    {request.referenceNumber && (
-                      <p>
-                        <span className="font-medium">Ref:</span>{" "}
-                        <code className="text-xs font-mono bg-muted px-1.5 py-0.5 rounded">
-                          {request.referenceNumber}
-                        </code>
-                      </p>
-                    )}
-                    <p><span className="font-medium">Duration:</span> {request.internshipDuration}</p>
-                    <p><span className="font-medium">Purpose:</span> {request.purpose.substring(0, 100)}
-                      {request.purpose.length > 100 ? "..." : ""}</p>
-                    {isApproved && request.downloadCount !== undefined && request.downloadCount > 0 && (
-                      <p className="text-xs">
-                        <span className="font-medium">Downloads:</span> {request.downloadCount}
-                      </p>
-                    )}
-                    <p className="text-xs mt-2">
-                      Submitted: {new Date(request.createdAt).toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </p>
-                  </div>
-                </div>
-                <div className="flex flex-col gap-2">
-                  {isApproved && (
-                    <Button
-                      size="sm"
-                      onClick={async () => {
-                        try {
-                          const html = await lettersApi.downloadLetterPDF(request.id);
-                          const blob = new Blob([html], { type: "text/html" });
-                          const url = window.URL.createObjectURL(blob);
-                          const a = document.createElement("a");
-                          a.href = url;
-                          a.download = `Internship_Letter_${request.referenceNumber || request.id}.html`;
-                          document.body.appendChild(a);
-                          a.click();
-                          window.URL.revokeObjectURL(url);
-                          document.body.removeChild(a);
-                          toast.success("Letter downloaded successfully");
-                          onRefresh?.(); // Refresh to update download count
-                        } catch (error: any) {
-                          toast.error(error.message || "Failed to download letter");
-                        }
-                      }}
-                    >
-                      <Download className="mr-2 h-4 w-4" />
-                      Download
-                    </Button>
-                  )}
-                  <Button variant="outline" size="sm" onClick={() => onView(request)}>
-                    <Eye className="mr-2 h-4 w-4" />
-                    View
-                  </Button>
-                </div>
+          <div key={request.id} className="flex flex-col md:flex-row gap-4 p-4 rounded-lg border bg-card hover:bg-muted/20 transition-colors">
+            <div className="flex-1">
+              <div className="flex items-center gap-3 mb-2">
+                <Badge variant="outline" className={status.color}>
+                  <StatusIcon className="h-3 w-3 mr-1.5" />
+                  {status.label}
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {new Date(request.createdAt).toLocaleDateString("en-GB", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  })}
+                </span>
               </div>
-            </CardContent>
-          </Card>
+              <h4 className="font-semibold text-base mb-1 uppercase">
+                General Internship Request
+              </h4>
+              <p className="text-sm text-muted-foreground">
+                Period: {request.internshipStartDate ? new Date(request.internshipStartDate).toLocaleDateString() : 'N/A'} - {request.internshipEndDate ? new Date(request.internshipEndDate).toLocaleDateString() : 'N/A'}
+              </p>
+            </div>
+            
+            <div className="flex items-center justify-end md:justify-start gap-2 pt-2 md:pt-0 shrink-0">
+              <Button variant="outline" size="sm" onClick={() => onView(request)}>
+                View Details
+              </Button>
+            </div>
+          </div>
         );
       })}
     </div>
   );
 }
 
+function getOrdinalSuffix(num: number | string | undefined) {
+  if (!num) return '';
+  const n = typeof num === 'string' ? parseInt(num) : num;
+  const j = n % 10;
+  const k = n % 100;
+  if (j === 1 && k !== 11) return 'st';
+  if (j === 2 && k !== 12) return 'nd';
+  if (j === 3 && k !== 13) return 'rd';
+  return 'th';
+}

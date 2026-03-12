@@ -403,6 +403,54 @@ export const lettersApi = {
     fetchApi(`/letters/requests/${id}/mark-email-sent`, {
       method: 'PATCH',
     }),
+
+  checkGeneralApproval: () => 
+    fetchApi('/letters/requests/general-approval-status'),
+};
+
+// Placements API
+export const placementsApi = {
+  create: (data: Record<string, unknown>) =>
+    fetchApi('/placements', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  getAll: (status?: string) => {
+    const query = status ? `?status=${status}` : '';
+    return fetchApi(`/placements${query}`);
+  },
+
+  getById: (id: string) => fetchApi(`/placements/${id}`),
+
+  updateStatus: (id: string, status: string, adminNotes?: string) =>
+    fetchApi(`/placements/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status, adminNotes }),
+    }),
+
+  sendToOrganization: (id: string) =>
+    fetchApi(`/placements/${id}/send-email`, {
+      method: 'POST',
+    }),
+
+  getTrackingData: () => fetchApi('/placements/tracking'),
+
+  downloadLetter: (id: string) => {
+    return fetch(`${API_BASE_URL}/placements/${id}/download-letter`, {
+      method: 'GET',
+      headers:
+        typeof window !== 'undefined' && localStorage.getItem('rmu_token')
+          ? { Authorization: `Bearer ${localStorage.getItem('rmu_token')}` }
+          : undefined,
+    }).then(async res => {
+      if (!res.ok) {
+        const json = await res.json();
+        throw new Error(json.message || 'Failed to download official letter');
+      }
+      return res.text();
+    });
+  },
 };
 
 // Dashboard Consolidated API
