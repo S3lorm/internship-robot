@@ -4,6 +4,7 @@
   "description": "RMU Internship Management System - Node.js/Express backend API",
   "main": "server.js",
   "scripts": {
+    "build": "npm install",
     "db:create": "node scripts/create-db.js",
     "admin:create": "node scripts/create-admin.js",
     "smtp:configure": "node scripts/configure-smtp.js",
