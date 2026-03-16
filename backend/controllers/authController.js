@@ -84,14 +84,13 @@ async function login(req, res) {
   const ok = await bcrypt.compare(password, user.password);
   if (!ok) return res.status(401).json({ message: 'Invalid credentials' });
 
-  // TEMPORARILY DISABLED: Email verification check for testing
   // For students, check email verification
-  // if (user.role === 'student' && !user.isEmailVerified) {
-  //   return res.status(403).json({ 
-  //     message: 'Please verify your email before logging in. Check your inbox for the verification link.',
-  //     requiresVerification: true 
-  //   });
-  // }
+  if (user.role === 'student' && !user.isEmailVerified) {
+    return res.status(403).json({ 
+      message: 'Please verify your email before logging in. Check your inbox for the verification link.',
+      requiresVerification: true 
+    });
+  }
 
   const token = signToken(user);
   const safeUser = user.toJSON();
@@ -107,47 +106,59 @@ async function me(req, res) {
 const verifyEmailValidators = [body('token').notEmpty()];
 
 async function verifyEmail(req, res) {
-  const { token } = req.body;
-  const user = await User.findOne({ emailVerificationToken: token });
-  if (!user) return res.status(400).json({ message: 'Invalid token' });
+  try {
+    const { token } = req.body;
+    const user = await User.findOne({ emailVerificationToken: token });
+    if (!user) return res.status(400).json({ message: 'Invalid or expired verification token.' });
 
-  if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
-    return res.status(400).json({ message: 'Token expired' });
+    if (user.isEmailVerified) {
+      return res.json({ message: 'Email already verified. You can log in.' });
+    }
+
+    if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
+      return res.status(400).json({ message: 'Verification token has expired. Please request a new one.' });
+    }
+
+    user.isEmailVerified = true;
+    user.emailVerificationToken = null;
+    user.emailVerificationExpires = null;
+    await user.save();
+
+    return res.json({ message: 'Email verified successfully! You can now log in.' });
+  } catch (error) {
+    console.error('Error verifying email:', error);
+    return res.status(500).json({ message: 'An error occurred while verifying your email. Please try again.' });
   }
-
-  user.isEmailVerified = true;
-  user.emailVerificationToken = null;
-  user.emailVerificationExpires = null;
-  await user.save();
-
-  return res.json({ message: 'Email verified successfully' });
 }
 
 const resendVerificationValidators = [body('email').isEmail()];
 
 async function resendVerification(req, res) {
-  const { email } = req.body;
-  const user = await User.findOne({ email });
-  if (!user) return res.json({ message: 'If that email exists, a verification link was sent.' });
-  if (user.isEmailVerified) return res.json({ message: 'Email already verified' });
-
-  const token = randomToken(24);
-  user.emailVerificationToken = token;
-  user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
-  await user.save();
-
-  let emailSent = false;
   try {
-    await sendVerificationEmail(user, token);
-    emailSent = true;
-  } catch (error) {
-    console.error('Failed to resend verification email:', error.message);
-    return res.status(500).json({ 
-      message: 'Failed to send verification email. Please check SMTP configuration or try again later.' 
-    });
-  }
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) return res.json({ message: 'If that email exists, a verification link was sent.' });
+    if (user.isEmailVerified) return res.json({ message: 'Email already verified. You can log in.' });
 
-  return res.json({ message: 'Verification email sent successfully. Please check your inbox.' });
+    const token = randomToken(24);
+    user.emailVerificationToken = token;
+    user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    await user.save();
+
+    try {
+      await sendVerificationEmail(user, token);
+    } catch (emailError) {
+      console.error('Failed to resend verification email:', emailError.message);
+      return res.status(500).json({ 
+        message: 'Failed to send verification email. Please try again later.' 
+      });
+    }
+
+    return res.json({ message: 'Verification email sent successfully. Please check your inbox.' });
+  } catch (error) {
+    console.error('Error in resend verification:', error);
+    return res.status(500).json({ message: 'An error occurred. Please try again.' });
+  }
 }
 
 const forgotPasswordValidators = [body('email').isEmail()];

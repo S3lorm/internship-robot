@@ -23,18 +23,17 @@ module.exports = async function auth(req, res, next) {
     // Remove password from user object
     delete user.password;
 
-    // TEMPORARILY DISABLED: Email verification check for testing
     // For students, check email verification (except for auth routes and profile update)
     // Allow access to verify-email, resend-verification, and profile update routes
-    // const allowedPaths = ['/auth/verify-email', '/auth/resend-verification', '/profile'];
-    // const isAllowedPath = allowedPaths.some(path => req.path.includes(path));
+    const allowedPaths = ['/auth/verify-email', '/auth/resend-verification', '/profile'];
+    const isAllowedPath = allowedPaths.some(path => req.path.includes(path));
 
-    // if (user.role === 'student' && !user.isEmailVerified && !isAllowedPath) {
-    //   return res.status(403).json({ 
-    //     message: 'Please verify your email before accessing this resource.',
-    //     requiresVerification: true 
-    //   });
-    // }
+    if (user.role === 'student' && !user.isEmailVerified && !isAllowedPath) {
+      return res.status(403).json({ 
+        message: 'Please verify your email before accessing this resource.',
+        requiresVerification: true 
+      });
+    }
 
     req.user = user;
     next();

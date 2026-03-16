@@ -44,24 +44,21 @@ export default function LoginPage() {
         if (user.role === "admin") {
           router.push("/admin");
         } else {
-          // TEMPORARILY DISABLED: Email verification check for testing
-          // if (user.isEmailVerified) {
-          //   router.push("/dashboard");
-          // } else {
-          //   router.push("/verify-email");
-          // }
-          router.push("/dashboard");
+          if (user.isEmailVerified) {
+            router.push("/dashboard");
+          } else {
+            router.push("/verify-email");
+          }
         }
       } else {
         router.push("/dashboard");
       }
     } else {
-      // TEMPORARILY DISABLED: Email verification redirect for testing
       // If verification is required, redirect to verification page
-      // if ((result as any).requiresVerification) {
-      //   router.push("/verify-email");
-      //   return;
-      // }
+      if ((result as any).requiresVerification) {
+        router.push("/verify-email");
+        return;
+      }
       setError(result.error || "Login failed. Please try again.");
     }
   };
