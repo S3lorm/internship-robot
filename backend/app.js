@@ -29,6 +29,7 @@ const activityLogger = require('./middleware/activityLogger');
 const { apiLimiter } = require('./middleware/security');
 
 const app = express();
+app.set('trust proxy', 1); // Trust the first proxy (Render, Heroku, Vercel, etc.)
 
 // Middleware
 // Configure helmet to allow CORS
