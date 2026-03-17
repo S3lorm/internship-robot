@@ -64,6 +64,99 @@ const emptyNotice = {
   isActive: true,
 }
 
+const NoticeForm = ({ formData, setFormData }: { formData: any, setFormData: any }) => (
+  <div className="grid gap-4 py-4">
+    <div className="space-y-2">
+      <Label htmlFor="title">Title *</Label>
+      <Input
+        id="title"
+        value={formData.title}
+        onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+        placeholder="e.g., Internship Application Period Opens"
+      />
+    </div>
+
+    <div className="space-y-2">
+      <Label htmlFor="content">Content *</Label>
+      <Textarea
+        id="content"
+        value={formData.content}
+        onChange={(e) => setFormData({ ...formData, content: e.target.value })}
+        placeholder="Enter the notice content..."
+        rows={5}
+      />
+    </div>
+
+    <div className="grid grid-cols-2 gap-4">
+      <div className="space-y-2">
+        <Label htmlFor="priority">Priority</Label>
+        <Select
+          value={formData.priority}
+          onValueChange={(value: Notice["priority"]) =>
+            setFormData({ ...formData, priority: value })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="low">Low</SelectItem>
+            <SelectItem value="medium">Medium</SelectItem>
+            <SelectItem value="high">High</SelectItem>
+            <SelectItem value="urgent">Urgent</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="audience">Target Audience</Label>
+        <Select
+          value={formData.targetAudience}
+          onValueChange={(value: Notice["targetAudience"]) =>
+            setFormData({ ...formData, targetAudience: value })
+          }
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Users</SelectItem>
+            <SelectItem value="students">Students Only</SelectItem>
+            <SelectItem value="admins">Admins Only</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+    </div>
+
+    <div className="space-y-2">
+      <Label htmlFor="expiresAt">Expiration Date (optional)</Label>
+      <Input
+        id="expiresAt"
+        type="date"
+        value={formData.expiresAt}
+        onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
+      />
+      <p className="text-xs text-muted-foreground">
+        Leave empty for no expiration
+      </p>
+    </div>
+
+    <div className="flex items-center justify-between p-4 border border-border rounded-lg">
+      <div>
+        <Label htmlFor="isActive">Publish Immediately</Label>
+        <p className="text-sm text-muted-foreground">
+          Make this notice visible to users right away
+        </p>
+      </div>
+      <Switch
+        id="isActive"
+        checked={formData.isActive}
+        onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
+      />
+    </div>
+  </div>
+)
+
 export default function NoticesManagementPage() {
   const [notices, setNotices] = useState<Notice[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -182,99 +275,6 @@ export default function NoticesManagementPage() {
     setEditDialog({ open: true, notice })
   }
 
-  const NoticeForm = () => (
-    <div className="grid gap-4 py-4">
-      <div className="space-y-2">
-        <Label htmlFor="title">Title *</Label>
-        <Input
-          id="title"
-          value={formData.title}
-          onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-          placeholder="e.g., Internship Application Period Opens"
-        />
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="content">Content *</Label>
-        <Textarea
-          id="content"
-          value={formData.content}
-          onChange={(e) => setFormData({ ...formData, content: e.target.value })}
-          placeholder="Enter the notice content..."
-          rows={5}
-        />
-      </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        <div className="space-y-2">
-          <Label htmlFor="priority">Priority</Label>
-          <Select
-            value={formData.priority}
-            onValueChange={(value: Notice["priority"]) =>
-              setFormData({ ...formData, priority: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="low">Low</SelectItem>
-              <SelectItem value="medium">Medium</SelectItem>
-              <SelectItem value="high">High</SelectItem>
-              <SelectItem value="urgent">Urgent</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label htmlFor="audience">Target Audience</Label>
-          <Select
-            value={formData.targetAudience}
-            onValueChange={(value: Notice["targetAudience"]) =>
-              setFormData({ ...formData, targetAudience: value })
-            }
-          >
-            <SelectTrigger>
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Users</SelectItem>
-              <SelectItem value="students">Students Only</SelectItem>
-              <SelectItem value="admins">Admins Only</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="expiresAt">Expiration Date (optional)</Label>
-        <Input
-          id="expiresAt"
-          type="date"
-          value={formData.expiresAt}
-          onChange={(e) => setFormData({ ...formData, expiresAt: e.target.value })}
-        />
-        <p className="text-xs text-muted-foreground">
-          Leave empty for no expiration
-        </p>
-      </div>
-
-      <div className="flex items-center justify-between p-4 border border-border rounded-lg">
-        <div>
-          <Label htmlFor="isActive">Publish Immediately</Label>
-          <p className="text-sm text-muted-foreground">
-            Make this notice visible to users right away
-          </p>
-        </div>
-        <Switch
-          id="isActive"
-          checked={formData.isActive}
-          onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
-        />
-      </div>
-    </div>
-  )
-
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -315,7 +315,7 @@ export default function NoticesManagementPage() {
                 Create an announcement to notify students about important updates
               </DialogDescription>
             </DialogHeader>
-            <NoticeForm />
+            <NoticeForm formData={formData} setFormData={setFormData} />
             <DialogFooter>
               <Button variant="outline" onClick={() => setCreateDialog(false)}>
                 Cancel
@@ -510,7 +510,7 @@ export default function NoticesManagementPage() {
             <DialogTitle>Edit Notice</DialogTitle>
             <DialogDescription>Update the notice details</DialogDescription>
           </DialogHeader>
-          <NoticeForm />
+          <NoticeForm formData={formData} setFormData={setFormData} />
           <DialogFooter>
             <Button variant="outline" onClick={() => setEditDialog({ open: false, notice: null })}>
               Cancel

@@ -25,6 +25,7 @@ const feedbackAcknowledgmentRoutes = require('./routes/feedback-acknowledgment')
 const securityRoutes = require('./routes/security');
 const dashboardRoutes = require('./routes/dashboard');
 const placementRoutes = require('./routes/placements');
+const supervisorEvaluationRoutes = require('./routes/supervisorEvaluation');
 const activityLogger = require('./middleware/activityLogger');
 const { apiLimiter } = require('./middleware/security');
 
@@ -110,6 +111,13 @@ app.use('/api/feedback', feedbackAcknowledgmentRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/placements', placementRoutes);
+
+// Public routes (no auth required)
+app.use('/api/evaluate', supervisorEvaluationRoutes);
+
+// Public document verification
+const { verifyDocument } = require('./controllers/placementController');
+app.get('/api/verify/:code', verifyDocument);
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars

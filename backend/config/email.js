@@ -57,7 +57,7 @@ const transporter = nodemailer.createTransport({
     console.error('❌ SMTP Configuration Error:', error.message || error);
     console.error('   Please check your SMTP settings in backend/.env');
     console.error('   Email verification will not work until SMTP is configured correctly.');
-    
+
     // Provide helpful error messages
     if (error.code === 'EAUTH') {
       console.error('   → Authentication failed. Check SMTP_USER and SMTP_PASS');
@@ -74,4 +74,3 @@ const transporter = nodemailer.createTransport({
 });
 
 module.exports = transporter;
-

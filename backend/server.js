@@ -40,3 +40,4 @@ start().catch((err) => {
   process.exit(1);
 });
 
+require("dotenv").config();

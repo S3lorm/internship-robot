@@ -189,13 +189,29 @@ async function updatePlacementStatus(req, res) {
         String(now.getMonth() + 1).padStart(2, '0') +
         String(now.getDate()).padStart(2, '0');
       const randomSuffix = String(Math.floor(Math.random() * 100000)).padStart(5, '0');
-      updateData.referenceNumber = `OP-${datePart}-${randomSuffix}`;
+      updateData.referenceNumber = `INT-${datePart}-${randomSuffix}`;
       
-      // Generate verification code
-      updateData.verificationCode = String(Math.floor(Math.random() * 1000000)).padStart(6, '0');
+      // Generate alphanumeric verification code
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+      let vCode = '';
+      for (let i = 0; i < 7; i++) vCode += chars[Math.floor(Math.random() * chars.length)];
+      updateData.verificationCode = vCode;
 
       updateData.officialLetterUrl = `/api/placements/${id}/download-letter`;
       updateData.officialLetterGeneratedAt = new Date().toISOString();
+
+      // Calculate midpoint date
+      if (placement.internshipStartDate && placement.internshipEndDate) {
+        const start = new Date(placement.internshipStartDate);
+        const end = new Date(placement.internshipEndDate);
+        const midMs = start.getTime() + (end.getTime() - start.getTime()) / 2;
+        updateData.midpointDate = new Date(midMs).toISOString().split('T')[0];
+      }
+
+      // Store supervisor email from organization email
+      if (placement.organizationEmail) {
+        updateData.supervisorEmail = placement.organizationEmail;
+      }
 
       // Generate secure evaluation token using SHA-256
       const tokenRaw = `${id}-${placement.studentId}-${Date.now()}-${crypto.randomBytes(32).toString('hex')}`;
@@ -270,10 +286,12 @@ async function sendToOrganization(req, res) {
 
     // Send email
     const transporter = require('../config/email');
-    const emailFrom = process.env.EMAIL_FROM || process.env.SMTP_USER || 'noreply@rmu.edu.gh';
+    const { generateOfficialLetterPDF } = require('../services/pdfService');
+    // Use EMAIL_FROM as-is (already includes name + address), fallback to SMTP_USER
+    const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
 
     const mailOptions = {
-      from: `"RMU Internship Portal" <${emailFrom}>`,
+      from: emailFrom,
       to: placement.organizationEmail,
       subject: `Official Internship Placement - ${student.firstName} ${student.lastName} | Regional Maritime University`,
       html: `
@@ -367,6 +385,23 @@ async function sendToOrganization(req, res) {
       `,
     };
 
+    // Generate PDF and attach it
+    try {
+      const signature = require('../controllers/letterController').programSignatures[student.program] || {
+        name: 'Dr. [Name]',
+        title: 'Dean of Academic Affairs',
+        department: 'Regional Maritime University',
+      };
+      const pdfBuffer = await generateOfficialLetterPDF(placement, student, signature);
+      mailOptions.attachments = [{
+        filename: `Official_Letter_${placement.referenceNumber || placement.id}.pdf`,
+        content: pdfBuffer,
+        contentType: 'application/pdf',
+      }];
+    } catch (pdfErr) {
+      console.error('⚠️ PDF generation failed, sending email without attachment:', pdfErr.message);
+    }
+
     await transporter.sendMail(mailOptions);
 
     // Log the email
@@ -397,11 +432,12 @@ async function sendToOrganization(req, res) {
   }
 }
 
-// Download official letter for a placement
+// Download official letter for a placement (PDF)
 async function downloadOfficialLetter(req, res) {
   try {
     const user = req.user;
-    const { InternshipPlacement, User: UserModel, LetterRequest } = require('../models');
+    const { InternshipPlacement, User: UserModel } = require('../models');
+    const { generateOfficialLetterPDF } = require('../services/pdfService');
     const { id } = req.params;
 
     const placement = await InternshipPlacement.findByPk(id);
@@ -428,119 +464,12 @@ async function downloadOfficialLetter(req, res) {
       department: 'Regional Maritime University',
     };
 
-    const currentDate = new Date().toLocaleDateString('en-GB', {
-      day: 'numeric', month: 'long', year: 'numeric'
-    });
+    const pdfBuffer = await generateOfficialLetterPDF(placement, student, signature);
 
-    const html = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Official Internship Placement Letter - ${student.firstName} ${student.lastName}</title>
-  <style>
-    @media print { body { margin: 0; } .no-print { display: none; } }
-    body { font-family: 'Times New Roman', serif; max-width: 800px; margin: 0 auto; padding: 40px 20px; line-height: 1.6; color: #000; }
-    .header { text-align: center; margin-bottom: 30px; border-bottom: 2px solid #000; padding-bottom: 20px; }
-    .logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }
-    .university-name { font-size: 18px; font-weight: bold; margin-bottom: 5px; }
-    .address { font-size: 12px; margin-top: 10px; }
-    .date { text-align: right; margin-bottom: 30px; }
-    .recipient { margin-bottom: 30px; }
-    .subject { font-weight: bold; margin-bottom: 20px; text-decoration: underline; }
-    .content { text-align: justify; margin-bottom: 20px; }
-    .content p { margin-bottom: 15px; text-indent: 30px; }
-    .signature-section { margin-top: 50px; }
-    .signature-line { border-top: 1px solid #000; width: 300px; margin-top: 60px; }
-    .signature-name { margin-top: 5px; font-weight: bold; }
-    .signature-title { font-size: 12px; }
-    .reference-info { margin-top: 30px; padding: 15px; border: 1px solid #ccc; background: #f9f9f9; font-size: 12px; }
-    .footer { margin-top: 30px; font-size: 10px; text-align: center; color: #666; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="logo">RMU</div>
-    <div class="university-name">REGIONAL MARITIME UNIVERSITY</div>
-    <div class="address">
-      P.O. Box GP 1115, Accra, Ghana<br>
-      Tel: +233 302 712 775 | Email: info@rmu.edu.gh<br>
-      Website: www.rmu.edu.gh
-    </div>
-  </div>
-
-  <div class="date">${currentDate}</div>
-
-  <div class="recipient">
-    <p>${placement.supervisorName}</p>
-    <p>${placement.supervisorPosition || 'Supervisor'}</p>
-    <p>${placement.organizationName}</p>
-    ${placement.organizationAddress ? `<p>${placement.organizationAddress}</p>` : ''}
-  </div>
-
-  <div class="subject">
-    SUBJECT: OFFICIAL INTERNSHIP PLACEMENT - ${student.firstName.toUpperCase()} ${student.lastName.toUpperCase()}
-  </div>
-
-  <div class="content">
-    <p>
-      I am writing to officially confirm the internship placement of <strong>${student.firstName} ${student.lastName}</strong>,
-      Student ID: <strong>${student.studentId || 'N/A'}</strong>, a student enrolled in the <strong>${student.program || 'N/A'}</strong>
-      program at the Regional Maritime University, with your esteemed organization.
-    </p>
-
-    <p>
-      <strong>Placement Details:</strong><br>
-      Organization: ${placement.organizationName}<br>
-      Department/Role: ${placement.departmentRole || 'N/A'}<br>
-      ${placement.internshipStartDate ? `Start Date: ${new Date(placement.internshipStartDate).toLocaleDateString('en-GB')}<br>` : ''}
-      ${placement.internshipEndDate ? `End Date: ${new Date(placement.internshipEndDate).toLocaleDateString('en-GB')}<br>` : ''}
-    </p>
-
-    <p>
-      The university fully endorses this placement and requests your kind cooperation in supervising and
-      mentoring the student during the internship period. An evaluation form has been provided separately
-      to assess the student's performance at the conclusion of the internship.
-    </p>
-
-    <p>
-      We are confident that ${student.firstName} will demonstrate professionalism, diligence, and a strong
-      work ethic during the internship. The university remains available for any support or clarification
-      you may require.
-    </p>
-
-    <p>
-      Thank you for your partnership in developing the next generation of professionals.
-    </p>
-  </div>
-
-  <div class="signature-section">
-    <p>Yours faithfully,</p>
-    <div class="signature-line"></div>
-    <div class="signature-name">${signature.name}</div>
-    <div class="signature-title">${signature.title}</div>
-    <div class="signature-title">${signature.department}</div>
-    <div class="signature-title">Regional Maritime University</div>
-  </div>
-
-  <div class="reference-info">
-    <p><strong>Document Reference:</strong> ${placement.referenceNumber || 'N/A'}</p>
-    <p><strong>Verification Code:</strong> ${placement.verificationCode || 'N/A'}</p>
-    <p><em>This document can be verified by contacting the Regional Maritime University with the reference number above.</em></p>
-  </div>
-
-  <div class="footer">
-    <p>This is an official document from the Regional Maritime University</p>
-    <p>For verification, please contact: info@rmu.edu.gh</p>
-  </div>
-</body>
-</html>
-    `;
-
-    res.setHeader('Content-Type', 'text/html');
-    res.setHeader('Content-Disposition', `inline; filename="Official_Letter_${placement.referenceNumber || placement.id}.html"`);
-    res.send(html);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="Official_Letter_${placement.referenceNumber || placement.id}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
   } catch (error) {
     console.error('Error downloading official letter:', error);
     res.status(500).json({ message: 'Failed to download official letter', error: error.message });
@@ -594,6 +523,42 @@ async function getTrackingData(req, res) {
   }
 }
 
+// Public: verify a document by verification code
+async function verifyDocument(req, res) {
+  try {
+    const { code } = req.params;
+    const { InternshipPlacement, User } = require('../models');
+
+    // Search by verification code
+    const placement = await InternshipPlacement.findOne({ verificationCode: code });
+    if (!placement) {
+      return res.json({
+        valid: false,
+        message: 'No document found with this verification code.',
+      });
+    }
+
+    // Load student data
+    const student = await User.findByPk(placement.studentId);
+
+    res.json({
+      valid: true,
+      document: {
+        studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
+        organisationName: placement.organizationName,
+        dateIssued: placement.officialLetterGeneratedAt
+          ? new Date(placement.officialLetterGeneratedAt).toLocaleDateString('en-GB')
+          : 'N/A',
+        referenceNumber: placement.referenceNumber,
+        status: placement.status === 'approved' ? 'Valid' : 'Invalid',
+      },
+    });
+  } catch (error) {
+    console.error('Error verifying document:', error);
+    res.status(500).json({ message: 'Verification failed', error: error.message });
+  }
+}
+
 module.exports = {
   createPlacement,
   getPlacements,
@@ -602,4 +567,5 @@ module.exports = {
   sendToOrganization,
   downloadOfficialLetter,
   getTrackingData,
+  verifyDocument,
 };

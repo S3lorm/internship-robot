@@ -444,9 +444,9 @@ async function createRequest(req, res) {
 
         // Send email to company
         const transporter = require('../config/email');
-        const emailFrom = process.env.EMAIL_FROM || process.env.SMTP_USER || 'noreply@rmu.edu.gh';
+        const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
         const mailOptions = {
-          from: `"RMU Internship Portal" <${emailFrom}>`,
+          from: emailFrom,
           to: companyEmail,
           subject: `Internship Application - ${user.firstName} ${user.lastName}`,
           html: `
@@ -793,10 +793,10 @@ async function sendLetterEmailNotification(request, updatedRequest) {
     throw new Error('Student email not found');
   }
 
-  const emailFrom = process.env.EMAIL_FROM || process.env.SMTP_USER || 'noreply@rmu.edu.gh';
+  const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
 
   const mailOptions = {
-    from: `"RMU Internship Portal" <${emailFrom}>`,
+    from: emailFrom,
     to: student.email,
     subject: `Internship Letter Approved - ${request.referenceNumber || 'Reference'}`,
     html: `

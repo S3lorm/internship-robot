@@ -3,7 +3,7 @@ const jwt = require('jsonwebtoken');
 const { body } = require('express-validator');
 
 const jwtConfig = require('../config/jwt');
-const { User } = require('../models/supabase');
+const { User } = require('../models');
 const { randomToken, validateStudentEmail } = require('../utils/helpers');
 const { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetOtp } = require('../services/emailService');
 
@@ -25,28 +25,36 @@ async function register(req, res) {
     return res.status(400).json({ message: 'Only @st.rmu.edu.gh email addresses are allowed' });
   }
 
-  const existing = await User.findOne({ email });
-  if (existing) return res.status(400).json({ message: 'Email already in use' });
+  const existing = await User.findOne({ where: { email } });
+  if (existing) {
+    return res.status(400).json({ message: 'Email already in use' });
+  }
 
   const hashed = await bcrypt.hash(password, 10);
   const token = randomToken(24);
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-  const user = await User.create({
-    email,
-    password: hashed,
-    firstName,
-    lastName,
-    studentId,
-    phone,
-    department,
-    program,
-    yearOfStudy,
-    role: 'student',
-    isEmailVerified: false,
-    emailVerificationToken: token,
-    emailVerificationExpires: expires,
-  });
+  let user;
+  try {
+    user = await User.create({
+      email,
+      password: hashed,
+      firstName,
+      lastName,
+      studentId,
+      phone,
+      department,
+      program,
+      yearOfStudy,
+      role: 'student',
+      isEmailVerified: false,
+      emailVerificationToken: token,
+      emailVerificationExpires: expires,
+    });
+  } catch (err) {
+    console.error('[Register] Error creating user:', err);
+    return res.status(500).json({ message: 'Server error during registration' });
+  }
 
   let emailSent = false;
   let emailError = null;
@@ -58,7 +66,6 @@ async function register(req, res) {
     console.error('❌ Failed to send verification email during registration:', error.message);
     console.error('   User can still register and resend verification email later');
     // Log the error but still allow registration
-    // User can resend verification email later
   }
 
   const responseMessage = emailSent 
@@ -78,7 +85,7 @@ const loginValidators = [body('email').isEmail(), body('password').notEmpty()];
 
 async function login(req, res) {
   const { email, password } = req.body;
-  const user = await User.findOne({ email });
+  const user = await User.findOne({ where: { email } });
   if (!user || !user.isActive) return res.status(401).json({ message: 'Invalid credentials' });
 
   const ok = await bcrypt.compare(password, user.password);

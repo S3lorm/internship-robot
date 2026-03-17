@@ -106,19 +106,27 @@ async function sendVerificationEmail(user, token) {
 async function sendPasswordResetEmail(user, token) {
   const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
   const resetUrl = `${frontend}/reset-password?token=${token}`;
+  const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || '"RMU Internship Portal" <noreply@rmu.edu.gh>',
-    to: user.email,
-    subject: 'Reset Your Password - RMU Internship Portal',
-    html: `
-      <h1>Password Reset</h1>
-      <p>Hi ${user.firstName},</p>
-      <p>Click the link below to reset your password:</p>
-      <p><a href="${resetUrl}">Reset Password</a></p>
-      <p>This link expires in 1 hour.</p>
-    `,
-  });
+  try {
+    await transporter.sendMail({
+      from: emailFrom,
+      to: user.email,
+      subject: 'Reset Your Password - RMU Internship Portal',
+      html: `
+        <h1>Password Reset</h1>
+        <p>Hi ${user.firstName},</p>
+        <p>Click the link below to reset your password:</p>
+        <p><a href="${resetUrl}">Reset Password</a></p>
+        <p>This link expires in 1 hour.</p>
+      `,
+      text: `Hi ${user.firstName},\n\nClick this link to reset your password: ${resetUrl}\n\nThis link expires in 1 hour.`,
+    });
+    console.log(`✅ Password reset email sent to ${user.email}`);
+  } catch (error) {
+    console.error(`❌ Failed to send password reset email to ${user.email}:`, error.message);
+    throw error;
+  }
 }
 
 async function sendPasswordResetOtp(user, otp) {
@@ -177,20 +185,28 @@ async function sendApplicationStatusEmail(user, application, internship) {
     under_review: 'Your application is now under review.',
     pending: 'Your application has been received and is pending review.',
   };
+  const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
 
-  await transporter.sendMail({
-    from: process.env.EMAIL_FROM || '"RMU Internship Portal" <noreply@rmu.edu.gh>',
-    to: user.email,
-    subject: `Application Update - ${internship.title}`,
-    html: `
-      <h1>Application Status Update</h1>
-      <p>Hi ${user.firstName},</p>
-      <p>${statusMessages[application.status] || 'Your application status was updated.'}</p>
-      <p><strong>Position:</strong> ${internship.title}</p>
-      <p><strong>Company:</strong> ${internship.company}</p>
-      ${application.feedback ? `<p><strong>Feedback:</strong> ${application.feedback}</p>` : ''}
-    `,
-  });
+  try {
+    await transporter.sendMail({
+      from: emailFrom,
+      to: user.email,
+      subject: `Application Update - ${internship.title}`,
+      html: `
+        <h1>Application Status Update</h1>
+        <p>Hi ${user.firstName},</p>
+        <p>${statusMessages[application.status] || 'Your application status was updated.'}</p>
+        <p><strong>Position:</strong> ${internship.title}</p>
+        <p><strong>Company:</strong> ${internship.company}</p>
+        ${application.feedback ? `<p><strong>Feedback:</strong> ${application.feedback}</p>` : ''}
+      `,
+      text: `Hi ${user.firstName},\n\n${statusMessages[application.status] || 'Your application status was updated.'}\n\nPosition: ${internship.title}\nCompany: ${internship.company}${application.feedback ? `\nFeedback: ${application.feedback}` : ''}`,
+    });
+    console.log(`✅ Application status email sent to ${user.email}`);
+  } catch (error) {
+    console.error(`❌ Failed to send application status email to ${user.email}:`, error.message);
+    throw error;
+  }
 }
 
 module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetOtp, sendApplicationStatusEmail };
