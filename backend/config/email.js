@@ -54,7 +54,7 @@ const transporter = nodemailer.createTransport({
     console.log(`   User: ${smtpUser}`);
     console.log(`   From: ${process.env.EMAIL_FROM || smtpUser}`);
   } catch (error) {
-    console.error('❌ SMTP Configuration Error:', error.message || error);
+    console.error('❌ SMTP Configuration Error:', error.message, error.stack || error);
     console.error('   Please check your SMTP settings in backend/.env');
     console.error('   Email verification will not work until SMTP is configured correctly.');
 
