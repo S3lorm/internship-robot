@@ -1,0 +1,1 @@
+Could not find the 'reference_number' column of 'internship_placements' in the schema cache

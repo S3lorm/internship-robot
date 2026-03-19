@@ -200,19 +200,6 @@ async function updatePlacementStatus(req, res) {
       updateData.officialLetterUrl = `/api/placements/${id}/download-letter`;
       updateData.officialLetterGeneratedAt = new Date().toISOString();
 
-      // Calculate midpoint date
-      if (placement.internshipStartDate && placement.internshipEndDate) {
-        const start = new Date(placement.internshipStartDate);
-        const end = new Date(placement.internshipEndDate);
-        const midMs = start.getTime() + (end.getTime() - start.getTime()) / 2;
-        updateData.midpointDate = new Date(midMs).toISOString().split('T')[0];
-      }
-
-      // Store supervisor email from organization email
-      if (placement.organizationEmail) {
-        updateData.supervisorEmail = placement.organizationEmail;
-      }
-
       // Generate secure evaluation token using SHA-256
       const tokenRaw = `${id}-${placement.studentId}-${Date.now()}-${crypto.randomBytes(32).toString('hex')}`;
       const tokenHash = crypto.createHash('sha256').update(tokenRaw).digest('hex');

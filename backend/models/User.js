@@ -10,9 +10,10 @@ function mapUserFromSupabase(row) {
     role: row.role,
     firstName: row.first_name,
     lastName: row.last_name,
-    indexNumber: row.index_number,
+    studentId: row.student_id, // Fixed: actual DB column is student_id
     referenceNumber: row.reference_number,
     department: row.department,
+    program: row.program, // Fix: missing program mapping
     level: row.level,
     yearOfStudy: row.year_of_study,
     classOf: row.class_of,
@@ -51,9 +52,10 @@ function mapUserToSupabase(user) {
   if (user.role !== undefined) mapped.role = user.role;
   if (user.firstName !== undefined) mapped.first_name = user.firstName;
   if (user.lastName !== undefined) mapped.last_name = user.lastName;
-  if (user.indexNumber !== undefined) mapped.index_number = user.indexNumber;
+  if (user.studentId !== undefined) mapped.student_id = user.studentId; // Fixed mapping
   if (user.referenceNumber !== undefined) mapped.reference_number = user.referenceNumber;
   if (user.department !== undefined) mapped.department = user.department;
+  if (user.program !== undefined) mapped.program = user.program; // Fix missing program field
   if (user.level !== undefined) mapped.level = user.level;
   if (user.yearOfStudy !== undefined) mapped.year_of_study = user.yearOfStudy;
   if (user.classOf !== undefined) mapped.class_of = user.classOf;

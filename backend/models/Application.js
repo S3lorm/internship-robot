@@ -56,7 +56,7 @@ const Application = {
   },
 
   async findAll(options = {}) {
-    let query = supabase.from('applications').select('*, user_profiles(*), internships(*)');
+    let query = supabase.from('applications').select('*, user_profiles!student_id(*), internships(*)');
 
     if (options.where) {
       Object.entries(options.where).forEach(([key, value]) => {
@@ -101,6 +101,70 @@ const Application = {
       }
       return app;
     }) : [];
+  },
+
+  async findAndCountAll(options = {}) {
+    let query = supabase.from('applications').select('*, user_profiles!student_id(*), internships(*)', { count: 'exact' });
+
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        const mappedKey = mapKeyToSupabase(key);
+         if (value && typeof value === 'object' && value[Symbol.for('Op.in')]) {
+             query = query.in(mappedKey, value[Symbol.for('Op.in')]);
+         } else if (value && typeof value === 'object' && value[Symbol.for('Op.gte')]) {
+             query = query.gte(mappedKey, value[Symbol.for('Op.gte')]);
+         } else if (value && typeof value === 'object' && value.in !== undefined) {
+             query = query.in(mappedKey, value.in);
+         } else if (value && typeof value === 'object' && value.gte !== undefined) {
+             query = query.gte(mappedKey, value.gte);
+         } else {
+             query = query.eq(mappedKey, value);
+         }
+      });
+    }
+
+    if (options.order) {
+        const [field, direction] = options.order[0];
+        const mappedField = mapKeyToSupabase(field);
+        query = query.order(mappedField, { ascending: direction === 'ASC' });
+    } else {
+        query = query.order('applied_at', { ascending: false });
+    }
+
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    if (options.offset) {
+        query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+
+    const { data, count, error } = await query;
+
+    if (error) throw error;
+
+    let rows = data ? data.map(row => {
+      const app = mapApplicationFromSupabase(row);
+      if (row.user_profiles) {
+         app.student = {
+             id: row.user_profiles.id,
+             firstName: row.user_profiles.first_name,
+             lastName: row.user_profiles.last_name,
+             email: row.user_profiles.email,
+             department: row.user_profiles.department,
+             level: row.user_profiles.level
+         };
+      }
+      if (row.internships) {
+          app.internship = {
+              id: row.internships.id,
+              title: row.internships.title,
+              company: row.internships.company
+          };
+      }
+      return app;
+    }) : [];
+
+    return { rows, count: count || rows.length };
   },
 
   async count(options = {}) {

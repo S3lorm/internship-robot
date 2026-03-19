@@ -118,9 +118,9 @@ async function sendPasswordResetEmail(user, token) {
         <p>Hi ${user.firstName},</p>
         <p>Click the link below to reset your password:</p>
         <p><a href="${resetUrl}">Reset Password</a></p>
-        <p>This link expires in 1 hour.</p>
+        <p>This link expires in 15 minutes.</p>
       `,
-      text: `Hi ${user.firstName},\n\nClick this link to reset your password: ${resetUrl}\n\nThis link expires in 1 hour.`,
+      text: `Hi ${user.firstName},\n\nClick this link to reset your password: ${resetUrl}\n\nThis link expires in 15 minutes.`,
     });
     console.log(`✅ Password reset email sent to ${user.email}`);
   } catch (error) {
@@ -157,7 +157,7 @@ async function sendPasswordResetOtp(user, otp) {
           <p>Hi ${user.firstName},</p>
           <p>Use this one-time code to reset your password:</p>
           <div class="otp-box">${otp}</div>
-          <p>Enter this code on the reset password page. It expires in 1 hour.</p>
+          <p>Enter this code on the reset password page. It expires in 15 minutes.</p>
           <p style="text-align: center;">
             <a href="${resetUrl}" class="button">Reset password</a>
           </p>
@@ -174,7 +174,7 @@ async function sendPasswordResetOtp(user, otp) {
     to: user.email,
     subject: 'Your password reset code - RMU Internship Portal',
     html,
-    text: `Hi ${user.firstName},\n\nYour password reset code is: ${otp}\n\nEnter it on the reset password page. It expires in 1 hour.\n\n${resetUrl}\n\nIf you didn't request this, ignore this email.`,
+    text: `Hi ${user.firstName},\n\nYour password reset code is: ${otp}\n\nEnter it on the reset password page. It expires in 15 minutes.\n\n${resetUrl}\n\nIf you didn't request this, ignore this email.`,
   });
 }
 

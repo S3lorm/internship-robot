@@ -76,7 +76,7 @@ export default function RegisterPage() {
       setSuccess(true);
       // Redirect to verification page after registration
       setTimeout(() => {
-        router.push("/verify-email");
+        router.push(`/verify-email?email=${encodeURIComponent(formData.email)}`);
       }, 3000);
     } else {
       setError(result.error || "Registration failed. Please try again.");

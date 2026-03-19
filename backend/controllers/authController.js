@@ -171,23 +171,33 @@ async function resendVerification(req, res) {
 const forgotPasswordValidators = [body('email').isEmail()];
 
 async function forgotPassword(req, res) {
-  const { email } = req.body;
-  const user = await User.findOne({ email });
-
-  if (!user) return res.json({ message: 'If that email exists, a reset code was sent.' });
-
-  const otp = String(Math.floor(100000 + Math.random() * 900000));
-  user.passwordResetToken = otp;
-  user.passwordResetExpires = new Date(Date.now() + 60 * 60 * 1000);
-  await user.save();
-
   try {
-    await sendPasswordResetOtp(user, otp);
-  } catch (err) {
-    console.error('Failed to send password reset OTP email:', err.message);
-  }
+    const { email } = req.body;
+    const user = await User.findOne({ email });
 
-  return res.json({ message: 'If that email exists, a reset code was sent.' });
+    if (!user) {
+      // Security: return success even if user doesn't exist to prevent email enumeration
+      return res.json({ message: 'If that email exists, a reset code was sent.' });
+    }
+
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    user.passwordResetToken = otp;
+    user.passwordResetExpires = new Date(Date.now() + 15 * 60 * 1000); // 15 minutes
+    await user.save();
+
+    try {
+      await sendPasswordResetOtp(user, otp);
+      return res.json({ message: 'If that email exists, a reset code was sent.' });
+    } catch (err) {
+      console.error('Failed to send password reset OTP email:', err.message);
+      return res.status(500).json({ 
+        message: 'Failed to send the reset code email due to a server error. Please try again later.' 
+      });
+    }
+  } catch (error) {
+    console.error('Error in forgotPassword:', error);
+    return res.status(500).json({ message: 'An unexpected server error occurred. Please try again later.' });
+  }
 }
 
 const resetPasswordValidators = [

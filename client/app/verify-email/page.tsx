@@ -32,6 +32,8 @@ function VerifyEmailContent() {
   const [error, setError] = useState<string | null>(null);
 
   const token = searchParams.get("token");
+  const emailFromQuery = searchParams.get("email");
+  const displayEmail = user?.email || emailFromQuery;
 
   useEffect(() => {
     // If user is already verified, redirect to dashboard
@@ -138,7 +140,8 @@ function VerifyEmailContent() {
 
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>
-              We've sent a verification email to <strong>{user?.email}</strong>
+              We've sent a verification email to{" "}
+              {displayEmail ? <strong>{displayEmail}</strong> : "your email address"}
             </p>
             <p>
               Click the link in the email to verify your account. The link will

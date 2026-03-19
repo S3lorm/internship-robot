@@ -1,0 +1,1 @@
+app/evaluate/[token]/page.tsx(71,51): error TS2365: Operator '>' cannot be applied to types 'string | number' and 'number'.

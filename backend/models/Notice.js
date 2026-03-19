@@ -86,6 +86,10 @@ const Notice = {
              query = query.in(mappedKey, value[Symbol.for('Op.in')]);
          } else if (value && typeof value === 'object' && value[Symbol.for('Op.gte')]) {
              query = query.gte(mappedKey, value[Symbol.for('Op.gte')]);
+         } else if (value && typeof value === 'object' && value.in !== undefined) {
+             query = query.in(mappedKey, value.in);
+         } else if (value && typeof value === 'object' && value.gte !== undefined) {
+             query = query.gte(mappedKey, value.gte);
          } else {
              query = query.eq(mappedKey, value);
          }
@@ -101,12 +105,59 @@ const Notice = {
     if (options.limit) {
       query = query.limit(options.limit);
     }
+    
+    // offset support
+    if (options.offset) {
+       query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
 
     const { data, error } = await query;
 
     if (error) throw error;
 
     return data ? data.map(mapNoticeFromSupabase) : [];
+  },
+
+  async findAndCountAll(options = {}) {
+    let query = supabase.from('notices').select('*', { count: 'exact' });
+
+    if (options.where) {
+      Object.entries(options.where).forEach(([key, value]) => {
+        const mappedKey = mapKeyToSupabase(key);
+         if (value && typeof value === 'object' && value[Symbol.for('Op.in')]) {
+             query = query.in(mappedKey, value[Symbol.for('Op.in')]);
+         } else if (value && typeof value === 'object' && value[Symbol.for('Op.gte')]) {
+             query = query.gte(mappedKey, value[Symbol.for('Op.gte')]);
+         } else if (value && typeof value === 'object' && value.in !== undefined) {
+             query = query.in(mappedKey, value.in);
+         } else if (value && typeof value === 'object' && value.gte !== undefined) {
+             query = query.gte(mappedKey, value.gte);
+         } else {
+             query = query.eq(mappedKey, value);
+         }
+      });
+    }
+
+    if (options.order) {
+      const [field, direction] = options.order[0];
+      const mappedField = mapKeyToSupabase(field);
+      query = query.order(mappedField, { ascending: direction === 'ASC' });
+    }
+
+    if (options.limit) {
+      query = query.limit(options.limit);
+    }
+    if (options.offset) {
+        query = query.range(options.offset, options.offset + (options.limit || 10) - 1);
+    }
+
+    const { data, error, count } = await query;
+
+    if (error) throw error;
+
+    let rows = data ? data.map(mapNoticeFromSupabase) : [];
+    
+    return { rows, count: count || rows.length };
   },
 
   async create(noticeData) {

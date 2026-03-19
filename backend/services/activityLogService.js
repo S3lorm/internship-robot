@@ -16,14 +16,14 @@ async function logActivity({
 }) {
   try {
     const { data, error } = await supabase.rpc('log_activity', {
-      p_user_id: userId,
+      p_user_id: userId || null,
       p_action_type: actionType,
-      p_resource_type: resourceType,
-      p_resource_id: resourceId,
-      p_description: description,
-      p_ip_address: ipAddress,
-      p_user_agent: userAgent,
-      p_metadata: metadata,
+      p_resource_type: resourceType || null,
+      p_resource_id: resourceId || null,
+      p_description: description || null,
+      p_ip_address: ipAddress || null,
+      p_user_agent: userAgent || null,
+      p_metadata: metadata || {},
     });
 
     if (error) {

@@ -1,0 +1,1 @@
+{"error":{"code":"42703","details":null,"hint":null,"message":"column internship_placements.reference_number does not exist"},"data":null,"count":null,"status":400,"statusText":"Bad Request"}

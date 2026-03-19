@@ -396,18 +396,33 @@ async function createRequest(req, res) {
       requestType,
     } = req.body;
 
+    let finalDuration = internshipDuration;
+    if (!finalDuration && internshipStartDate && internshipEndDate) {
+      const start = new Date(internshipStartDate);
+      const end = new Date(internshipEndDate);
+      const weeks = Math.round((end - start) / (1000 * 60 * 60 * 24 * 7));
+      const months = Math.round(weeks / 4);
+      if (months >= 1) {
+        finalDuration = `${months} month${months > 1 ? 's' : ''}`;
+      } else if (weeks > 0) {
+        finalDuration = `${weeks} week${weeks > 1 ? 's' : ''}`;
+      } else {
+        finalDuration = 'Less than a week';
+      }
+    }
+
     // Validation - general requests don't need company details
     const isGeneral = !requestType || requestType === 'general';
     if (isGeneral) {
-      if (!internshipDuration) {
+      if (!finalDuration) {
         return res.status(400).json({
-          message: 'Internship duration is required'
+          message: 'Internship duration or start/end dates are required'
         });
       }
     } else {
-      if (!companyName || !internshipDuration || !purpose) {
+      if (!companyName || !finalDuration || !purpose) {
         return res.status(400).json({
-          message: 'Company name, internship duration, and purpose are required'
+          message: 'Company name, internship duration/dates, and purpose are required'
         });
       }
     }
@@ -418,10 +433,10 @@ async function createRequest(req, res) {
       companyEmail,
       companyPhone,
       companyAddress,
-      internshipDuration,
+      internshipDuration: finalDuration,
       internshipStartDate,
       internshipEndDate,
-      purpose,
+      purpose: purpose || (isGeneral ? 'General Internship Placement' : 'Internship Placement'),
       category,
       additionalNotes,
       contactInfo,

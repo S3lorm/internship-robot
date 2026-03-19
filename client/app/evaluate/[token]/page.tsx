@@ -68,7 +68,7 @@ export default function EvaluatePage() {
     e.preventDefault();
 
     // Validate
-    const allRated = RATING_CATEGORIES.every(c => form[c.key as keyof typeof form] > 0);
+    const allRated = RATING_CATEGORIES.every(c => Number(form[c.key as keyof typeof form]) > 0);
     if (!form.supervisorName.trim()) {
       toast.error('Please enter your name');
       return;
