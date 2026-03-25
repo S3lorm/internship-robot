@@ -7,6 +7,7 @@ const dotenv = require('dotenv');
 
 dotenv.config();
 
+const config = require('./config/config');
 const supabase = require('./config/supabase');
 
 const authRoutes = require('./routes/auth');
@@ -45,15 +46,9 @@ app.use(
     origin: function (origin, callback) {
       // Allow requests with no origin (like mobile apps or curl requests)
       if (!origin) return callback(null, true);
-      
-      const allowedOrigins = [
-        process.env.FRONTEND_URL,
-        'http://localhost:3000',
-        'https://internship-robot-omega.vercel.app',
-      ].filter(Boolean); // Remove undefined/null values
 
       // Check if origin is explicitly allowed or if it's a Vercel preview URL
-      if (allowedOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
+      if (config.corsOrigins.indexOf(origin) !== -1 || origin.endsWith('.vercel.app')) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -77,10 +72,6 @@ app.use('/api', apiLimiter);
 
 // Activity logging middleware
 app.use('/api', activityLogger);
-
-// Static files (uploads)
-const uploadPath = process.env.UPLOAD_PATH || path.join(__dirname, 'uploads');
-app.use('/uploads', express.static(uploadPath));
 
 // Static files (signatures)
 app.use('/signatures', express.static(path.join(__dirname, 'public', 'signatures')));

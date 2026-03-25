@@ -1,37 +1,7 @@
-const fs = require('fs');
-const path = require('path');
 const multer = require('multer');
 
-function ensureDir(p) {
-  if (!fs.existsSync(p)) fs.mkdirSync(p, { recursive: true });
-}
-
-const baseUploadPath = process.env.UPLOAD_PATH
-  ? path.resolve(process.env.UPLOAD_PATH)
-  : path.join(__dirname, '..', 'uploads');
-
-const cvsDir = path.join(baseUploadPath, 'cvs');
-const avatarsDir = path.join(baseUploadPath, 'avatars');
-ensureDir(cvsDir);
-ensureDir(avatarsDir);
-
-const cvStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, cvsDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `cv-${req.user.id}-${uniqueSuffix}${ext}`);
-  },
-});
-
-const avatarStorage = multer.diskStorage({
-  destination: (_req, _file, cb) => cb(null, avatarsDir),
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
-    cb(null, `avatar-${req.user.id}-${uniqueSuffix}${ext}`);
-  },
-});
+// Store files in memory as Buffers instead of writing them to the local disk
+const storage = multer.memoryStorage();
 
 const cvFileFilter = (_req, file, cb) => {
   const allowed = [
@@ -51,12 +21,12 @@ const avatarFileFilter = (_req, file, cb) => {
 
 const maxFileSize = process.env.MAX_FILE_SIZE ? Number(process.env.MAX_FILE_SIZE) : 5 * 1024 * 1024;
 
-const uploadCv = multer({ storage: cvStorage, fileFilter: cvFileFilter, limits: { fileSize: maxFileSize } });
+const uploadCv = multer({ storage, fileFilter: cvFileFilter, limits: { fileSize: maxFileSize } });
 const uploadAvatar = multer({
-  storage: avatarStorage,
+  storage,
   fileFilter: avatarFileFilter,
   limits: { fileSize: maxFileSize },
 });
 
-module.exports = { uploadCv, uploadAvatar, baseUploadPath, cvsDir, avatarsDir };
+module.exports = { uploadCv, uploadAvatar };
 

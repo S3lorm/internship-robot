@@ -62,11 +62,37 @@ async function submit(req, res) {
   const existing = await Application.findOne({ where: { studentId, internshipId } });
   if (existing) return res.status(400).json({ message: 'You have already applied' });
 
+  let publicCvUrl = null;
+
+  if (req.file) {
+    const supabase = require('../config/supabase');
+    const path = require('path');
+    const fileExt = path.extname(req.file.originalname);
+    const fileName = `cv-${req.user.id}-${Date.now()}${fileExt}`;
+
+    const { error: uploadError } = await supabase.storage
+      .from('cvs')
+      .upload(fileName, req.file.buffer, {
+        contentType: req.file.mimetype,
+        upsert: true,
+      });
+
+    if (uploadError) {
+      return res.status(500).json({ message: 'Failed to upload CV', error: uploadError.message });
+    }
+
+    const { data: { publicUrl } } = supabase.storage
+      .from('cvs')
+      .getPublicUrl(fileName);
+      
+    publicCvUrl = publicUrl;
+  }
+
   const application = await Application.create({
     studentId,
     internshipId,
     coverLetter,
-    cvUrl: req.file ? req.file.path : null,
+    cvUrl: publicCvUrl,
     status: 'pending',
   });
 

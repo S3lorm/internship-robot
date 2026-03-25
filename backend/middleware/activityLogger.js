@@ -7,7 +7,6 @@ function activityLogger(req, res, next) {
   // Skip logging for health checks and static files
   if (
     req.path === '/api/health' ||
-    req.path.startsWith('/uploads') ||
     req.path.startsWith('/signatures')
   ) {
     return next();

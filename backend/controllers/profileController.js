@@ -41,10 +41,6 @@ async function uploadAvatar(req, res) {
       return res.status(400).json({ message: 'No file uploaded' });
     }
 
-    if (!req.file.path) {
-      return res.status(400).json({ message: 'File path not available' });
-    }
-
     // Delete old avatar from Supabase Storage if exists
     if (user.avatar) {
       try {
@@ -80,8 +76,8 @@ async function uploadAvatar(req, res) {
       }
     }
 
-    // Read the uploaded file
-    const fileBuffer = fs.readFileSync(req.file.path);
+    // Use the memory buffer directly
+    const fileBuffer = req.file.buffer;
     const fileExt = path.extname(req.file.originalname);
     const fileName = `avatar-${req.user.id}-${Date.now()}${fileExt}`;
     const filePath = fileName; // Just the filename, bucket is specified in .from()
@@ -95,8 +91,6 @@ async function uploadAvatar(req, res) {
       });
 
     if (uploadError) {
-      // Clean up local file
-      fs.unlinkSync(req.file.path);
       throw new Error(`Failed to upload to storage: ${uploadError.message}`);
     }
 
@@ -104,13 +98,6 @@ async function uploadAvatar(req, res) {
     const { data: { publicUrl } } = supabase.storage
       .from('avatars')
       .getPublicUrl(filePath);
-
-    // Clean up local file
-    try {
-      fs.unlinkSync(req.file.path);
-    } catch (err) {
-      console.error('Error deleting local file:', err);
-    }
 
     // Update only the avatar field
     const updatedUser = await User.update(req.user.id, { avatar: publicUrl });
@@ -124,14 +111,6 @@ async function uploadAvatar(req, res) {
       avatarUrl: publicUrl
     });
   } catch (error) {
-    // Clean up local file on error
-    if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-      try {
-        fs.unlinkSync(req.file.path);
-      } catch (err) {
-        console.error('Error cleaning up file:', err);
-      }
-    }
     console.error('Error uploading avatar:', error);
     return res.status(500).json({ 
       message: 'Failed to upload avatar', 
