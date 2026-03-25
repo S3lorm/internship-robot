@@ -41,6 +41,10 @@ import {
   Clock,
   Loader2,
   AlertCircle,
+  Star,
+  User,
+  MessageSquare,
+  Award,
 } from "lucide-react";
 import { evaluationsApi, usersApi, internshipsApi } from "@/lib/api";
 import { toast } from "sonner";
@@ -49,6 +53,7 @@ interface Evaluation {
   id: string;
   studentId: string;
   internshipId?: string;
+  placementId?: string;
   title: string;
   description?: string;
   evaluationType: string;
@@ -61,6 +66,19 @@ interface Evaluation {
   requiresAcknowledgment: boolean;
   acknowledgmentDeadline?: string;
   createdAt: string;
+  // Supervisor evaluation fields
+  supervisorName?: string;
+  supervisorPosition?: string;
+  supervisorDepartment?: string;
+  workEthicRating?: number;
+  communicationRating?: number;
+  technicalSkillsRating?: number;
+  teamworkRating?: number;
+  punctualityRating?: number;
+  problemSolvingRating?: number;
+  supervisorComments?: string;
+  finalRecommendation?: string;
+  submittedAt?: string;
 }
 
 interface User {
@@ -86,7 +104,9 @@ export default function EvaluationsManagementPage() {
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null);
+  const [reviewEvaluation, setReviewEvaluation] = useState<Evaluation | null>(null);
   const [formData, setFormData] = useState({
     studentId: "",
     internshipId: "",
@@ -207,6 +227,11 @@ export default function EvaluationsManagementPage() {
     setIsEditDialogOpen(true);
   };
 
+  const handleReview = (evaluation: Evaluation) => {
+    setReviewEvaluation(evaluation);
+    setIsReviewDialogOpen(true);
+  };
+
   const resetForm = () => {
     setFormData({
       studentId: "",
@@ -229,6 +254,9 @@ export default function EvaluationsManagementPage() {
   };
 
   const getStatusBadge = (evaluation: Evaluation) => {
+    if (evaluation.submittedAt) {
+      return <Badge className="bg-green-600">Submitted</Badge>;
+    }
     if (!evaluation.isAvailable) {
       return <Badge variant="secondary">Not Available</Badge>;
     }
@@ -239,6 +267,40 @@ export default function EvaluationsManagementPage() {
       return <Badge>Viewed</Badge>;
     }
     return <Badge className="bg-blue-600">New</Badge>;
+  };
+
+  const hasSubmittedScores = (evaluation: Evaluation) => {
+    return evaluation.submittedAt && evaluation.workEthicRating !== undefined && evaluation.workEthicRating !== null;
+  };
+
+  // Rating bar component
+  const RatingBar = ({ label, rating }: { label: string; rating: number | undefined }) => {
+    const value = rating || 0;
+    const percentage = (value / 5) * 100;
+    const getColor = (val: number) => {
+      if (val >= 4) return "bg-green-500";
+      if (val >= 3) return "bg-yellow-500";
+      if (val >= 2) return "bg-orange-500";
+      return "bg-red-500";
+    };
+
+    return (
+      <div className="space-y-1">
+        <div className="flex items-center justify-between text-sm">
+          <span className="text-muted-foreground">{label}</span>
+          <span className="font-semibold flex items-center gap-1">
+            {value}/5
+            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+          </span>
+        </div>
+        <div className="h-2.5 w-full rounded-full bg-muted overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all duration-500 ${getColor(value)}`}
+            style={{ width: `${percentage}%` }}
+          />
+        </div>
+      </div>
+    );
   };
 
   if (loading) {
@@ -257,7 +319,7 @@ export default function EvaluationsManagementPage() {
             Evaluations Management
           </h1>
           <p className="text-muted-foreground">
-            Create and manage student evaluations from companies
+            Create and manage student evaluations from supervisors
           </p>
         </div>
         <Button onClick={() => setIsCreateDialogOpen(true)}>
@@ -287,6 +349,7 @@ export default function EvaluationsManagementPage() {
                 <SelectItem value="all">All Types</SelectItem>
                 <SelectItem value="initial">Initial</SelectItem>
                 <SelectItem value="midterm">Midterm</SelectItem>
+                <SelectItem value="supervisor">Supervisor</SelectItem>
                 <SelectItem value="final">Final</SelectItem>
               </SelectContent>
             </Select>
@@ -315,9 +378,10 @@ export default function EvaluationsManagementPage() {
                 <TableRow>
                   <TableHead>Title</TableHead>
                   <TableHead>Student</TableHead>
+                  <TableHead>Supervisor</TableHead>
                   <TableHead>Type</TableHead>
                   <TableHead>Status</TableHead>
-                  <TableHead>Deadline</TableHead>
+                  <TableHead>Submitted</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -326,6 +390,7 @@ export default function EvaluationsManagementPage() {
                   <TableRow key={evaluation.id}>
                     <TableCell className="font-medium">{evaluation.title}</TableCell>
                     <TableCell>{getStudentName(evaluation.studentId)}</TableCell>
+                    <TableCell>{evaluation.supervisorName || "—"}</TableCell>
                     <TableCell>
                       <Badge variant="outline">
                         {evaluation.evaluationType.charAt(0).toUpperCase() +
@@ -334,18 +399,31 @@ export default function EvaluationsManagementPage() {
                     </TableCell>
                     <TableCell>{getStatusBadge(evaluation)}</TableCell>
                     <TableCell>
-                      {evaluation.deadline
-                        ? new Date(evaluation.deadline).toLocaleDateString()
-                        : "N/A"}
+                      {evaluation.submittedAt
+                        ? new Date(evaluation.submittedAt).toLocaleDateString()
+                        : "—"}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEdit(evaluation)}
-                      >
-                        <Edit className="h-4 w-4" />
-                      </Button>
+                      <div className="flex items-center gap-1">
+                        {hasSubmittedScores(evaluation) && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleReview(evaluation)}
+                            title="Review evaluation scores"
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleEdit(evaluation)}
+                          title="Edit evaluation"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -354,6 +432,190 @@ export default function EvaluationsManagementPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Review Dialog */}
+      <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <ClipboardCheck className="h-5 w-5 text-primary" />
+              Evaluation Review
+            </DialogTitle>
+            <DialogDescription>
+              {reviewEvaluation?.title}
+            </DialogDescription>
+          </DialogHeader>
+
+          {reviewEvaluation && (
+            <div className="space-y-6">
+              {/* Supervisor Info */}
+              <Card className="border-primary/20">
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <User className="h-4 w-4" />
+                    Supervisor Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <span className="text-muted-foreground">Name</span>
+                      <p className="font-medium">{reviewEvaluation.supervisorName || "N/A"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Position</span>
+                      <p className="font-medium">{reviewEvaluation.supervisorPosition || "N/A"}</p>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground">Department</span>
+                      <p className="font-medium">{reviewEvaluation.supervisorDepartment || "N/A"}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Student Info */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Award className="h-4 w-4" />
+                    Student
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <p className="font-medium">{getStudentName(reviewEvaluation.studentId)}</p>
+                  {reviewEvaluation.submittedAt && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Submitted on {new Date(reviewEvaluation.submittedAt).toLocaleDateString("en-US", {
+                        year: "numeric",
+                        month: "long",
+                        day: "numeric",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </p>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Ratings */}
+              <Card>
+                <CardHeader className="pb-3">
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                    Performance Ratings
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <RatingBar label="Work Ethic" rating={reviewEvaluation.workEthicRating} />
+                    <RatingBar label="Communication" rating={reviewEvaluation.communicationRating} />
+                    <RatingBar label="Technical Skills" rating={reviewEvaluation.technicalSkillsRating} />
+                    <RatingBar label="Teamwork" rating={reviewEvaluation.teamworkRating} />
+                    <RatingBar label="Punctuality" rating={reviewEvaluation.punctualityRating} />
+                    <RatingBar label="Problem Solving" rating={reviewEvaluation.problemSolvingRating} />
+
+                    {/* Average */}
+                    <div className="border-t pt-4 mt-4">
+                      <div className="flex items-center justify-between">
+                        <span className="font-semibold">Overall Average</span>
+                        <span className="text-lg font-bold text-primary">
+                          {(() => {
+                            const ratings = [
+                              reviewEvaluation.workEthicRating,
+                              reviewEvaluation.communicationRating,
+                              reviewEvaluation.technicalSkillsRating,
+                              reviewEvaluation.teamworkRating,
+                              reviewEvaluation.punctualityRating,
+                              reviewEvaluation.problemSolvingRating,
+                            ].filter((r): r is number => r !== undefined && r !== null);
+                            if (ratings.length === 0) return "N/A";
+                            const avg = ratings.reduce((a, b) => a + b, 0) / ratings.length;
+                            return `${avg.toFixed(1)}/5`;
+                          })()}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Comments */}
+              {reviewEvaluation.supervisorComments && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <MessageSquare className="h-4 w-4" />
+                      Supervisor Comments
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="bg-muted/50 rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap">
+                      {reviewEvaluation.supervisorComments}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Final Recommendation */}
+              {reviewEvaluation.finalRecommendation && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-green-600" />
+                      Final Recommendation
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Badge
+                      className={
+                        reviewEvaluation.finalRecommendation.toLowerCase().includes("excellent") ||
+                        reviewEvaluation.finalRecommendation.toLowerCase().includes("outstanding")
+                          ? "bg-green-600 text-white text-sm px-3 py-1"
+                          : reviewEvaluation.finalRecommendation.toLowerCase().includes("good")
+                          ? "bg-blue-600 text-white text-sm px-3 py-1"
+                          : reviewEvaluation.finalRecommendation.toLowerCase().includes("satisfactory")
+                          ? "bg-yellow-600 text-white text-sm px-3 py-1"
+                          : "bg-gray-600 text-white text-sm px-3 py-1"
+                      }
+                    >
+                      {reviewEvaluation.finalRecommendation}
+                    </Badge>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Acknowledgment Status */}
+              <div className="text-sm text-muted-foreground border-t pt-4">
+                {reviewEvaluation.feedbackAcknowledgedAt ? (
+                  <div className="flex items-center gap-2 text-green-600">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Student acknowledged on{" "}
+                    {new Date(reviewEvaluation.feedbackAcknowledgedAt).toLocaleDateString()}
+                  </div>
+                ) : reviewEvaluation.viewedAt ? (
+                  <div className="flex items-center gap-2">
+                    <Eye className="h-4 w-4" />
+                    Student viewed on{" "}
+                    {new Date(reviewEvaluation.viewedAt).toLocaleDateString()}
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4" />
+                    Student has not viewed yet
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsReviewDialogOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Create Dialog */}
       <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
@@ -627,4 +889,3 @@ export default function EvaluationsManagementPage() {
     </div>
   );
 }
-
