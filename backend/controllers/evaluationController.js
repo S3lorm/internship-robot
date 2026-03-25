@@ -1,6 +1,4 @@
 const { Evaluation } = require('../models');
-const { createNotification } = require('../services/notificationService');
-const { notifyEvaluationAvailable } = require('../services/reminderService');
 
 // Get all evaluations for current user
 async function getEvaluations(req, res) {
@@ -117,13 +115,20 @@ async function acknowledgeEvaluationFeedback(req, res) {
       });
 
       // Create notification for admin (optional)
-      await createNotification({
-        userId: evaluation.createdBy || user.id, // Notify creator/admin
-        type: 'system',
-        title: 'Evaluation Feedback Acknowledged',
-        message: `Student has acknowledged feedback for evaluation: ${evaluation.title}`,
-        priority: 'low',
-      });
+      try {
+        const { createNotification } = require('../services/notificationService');
+        await createNotification({
+          userId: evaluation.createdBy || user.id, // Notify creator/admin
+          type: 'system',
+          title: 'Evaluation Feedback Acknowledged',
+          message: `Student have acknowledged feedback for evaluation: ${evaluation.title}`,
+          relatedId: evaluation.id,
+          priority: 'low',
+        });
+      } catch (notifyErr) {
+        console.error('Error sending acknowledgment notification:', notifyErr);
+        // Don't fail the whole request if notification fails
+      }
     }
 
     res.json({ message: 'Evaluation feedback acknowledged successfully' });
@@ -174,8 +179,13 @@ async function createEvaluation(req, res) {
     });
 
     // Send notification if evaluation is immediately available
-    if (evaluation.isAvailable) {
-      await notifyEvaluationAvailable(evaluation);
+    if (evaluation && evaluation.isAvailable) {
+      try {
+        const { notifyEvaluationAvailable } = require('../services/reminderService');
+        await notifyEvaluationAvailable(evaluation);
+      } catch (notifyErr) {
+        console.error('Error sending availability notification:', notifyErr);
+      }
     }
 
     res.status(201).json({
@@ -210,8 +220,13 @@ async function updateEvaluation(req, res) {
     const updated = await Evaluation.update(id, updates);
 
     // Send notification if evaluation just became available
-    if (!wasAvailable && updated.isAvailable) {
-      await notifyEvaluationAvailable(updated);
+    if (updated && !wasAvailable && updated.isAvailable) {
+      try {
+        const { notifyEvaluationAvailable } = require('../services/reminderService');
+        await notifyEvaluationAvailable(updated);
+      } catch (notifyErr) {
+        console.error('Error sending update notification:', notifyErr);
+      }
     }
 
     res.json({
