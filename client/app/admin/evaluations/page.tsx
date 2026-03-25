@@ -102,6 +102,7 @@ export default function EvaluationsManagementPage() {
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [recommendationFilter, setRecommendationFilter] = useState<string>("all");
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
@@ -167,12 +168,39 @@ export default function EvaluationsManagementPage() {
   };
 
   const filteredEvaluations = evaluations.filter((evaluation) => {
+    const studentName = getStudentName(evaluation.studentId).toLowerCase();
+    const supervisorName = (evaluation.supervisorName || "").toLowerCase();
+    
+    // Find internship safely
+    let companyName = "";
+    if (evaluation.internshipId) {
+      const internship = internships.find((i) => i.id === evaluation.internshipId);
+      if (internship) companyName = internship.company.toLowerCase();
+    }
+
+    const searchLower = searchQuery.toLowerCase();
+
     const matchesSearch =
       !searchQuery ||
-      evaluation.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      evaluation.description?.toLowerCase().includes(searchQuery.toLowerCase());
+      evaluation.title.toLowerCase().includes(searchLower) ||
+      (evaluation.description?.toLowerCase().includes(searchLower) ?? false) ||
+      studentName.includes(searchLower) ||
+      supervisorName.includes(searchLower) ||
+      companyName.includes(searchLower) ||
+      (evaluation.supervisorComments?.toLowerCase().includes(searchLower) ?? false);
+
     const matchesType = typeFilter === "all" || evaluation.evaluationType === typeFilter;
-    return matchesSearch && matchesType;
+    
+    let matchesRecommendation = true;
+    if (recommendationFilter !== "all") {
+      if (recommendationFilter === "pending") {
+        matchesRecommendation = !evaluation.finalRecommendation;
+      } else {
+        matchesRecommendation = evaluation.finalRecommendation === recommendationFilter;
+      }
+    }
+
+    return matchesSearch && matchesType && matchesRecommendation;
   });
 
   const handleCreate = async () => {
@@ -349,7 +377,7 @@ export default function EvaluationsManagementPage() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search evaluations..."
+                placeholder="Search by student, company, or comments..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10"
@@ -365,6 +393,19 @@ export default function EvaluationsManagementPage() {
                 <SelectItem value="midterm">Midterm</SelectItem>
                 <SelectItem value="supervisor">Supervisor</SelectItem>
                 <SelectItem value="final">Final</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={recommendationFilter} onValueChange={setRecommendationFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Filter by Recommendation" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Recommendations</SelectItem>
+                <SelectItem value="Excellent">Excellent</SelectItem>
+                <SelectItem value="Good">Good</SelectItem>
+                <SelectItem value="Average">Average</SelectItem>
+                <SelectItem value="Needs Improvement">Needs Improvement</SelectItem>
+                <SelectItem value="pending">Pending</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -394,6 +435,7 @@ export default function EvaluationsManagementPage() {
                   <TableHead>Student</TableHead>
                   <TableHead>Supervisor</TableHead>
                   <TableHead>Type</TableHead>
+                  <TableHead className="hidden md:table-cell max-w-[250px]">Compliments/Comments</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Actions</TableHead>
@@ -410,6 +452,16 @@ export default function EvaluationsManagementPage() {
                         {evaluation.evaluationType.charAt(0).toUpperCase() +
                           evaluation.evaluationType.slice(1)}
                       </Badge>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell max-w-[250px] truncate" title={evaluation.supervisorComments || "No comments"}>
+                      {evaluation.supervisorComments ? (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground cursor-help">
+                          <MessageSquare className="h-3 w-3 shrink-0 text-primary" />
+                          <span className="truncate">{evaluation.supervisorComments}</span>
+                        </div>
+                      ) : (
+                        "—"
+                      )}
                     </TableCell>
                     <TableCell>{getStatusBadge(evaluation)}</TableCell>
                     <TableCell>
