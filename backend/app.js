@@ -110,6 +110,17 @@ app.use('/api/evaluate', supervisorEvaluationRoutes);
 const { verifyDocument } = require('./controllers/placementController');
 app.get('/api/verify/:code', verifyDocument);
 
+app.get('/', (req, res) => {
+  // res.send('RMU Internship API is running');
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    message: 'RMU Internship API is running'
+  });
+
+});
+
+
 // Global error handler
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
