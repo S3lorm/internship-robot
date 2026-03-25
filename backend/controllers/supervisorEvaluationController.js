@@ -112,7 +112,7 @@ async function submitEvaluation(req, res) {
       studentId: placement.studentId,
       placementId: placement.id,
       title: `Supervisor Evaluation - ${placement.organizationName}`,
-      evaluationType: 'supervisor_midterm',
+      evaluationType: 'supervisor',
       isAvailable: true,
       supervisorName,
       supervisorPosition,
