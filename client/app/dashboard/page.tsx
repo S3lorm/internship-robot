@@ -19,7 +19,10 @@ import {
 } from "@/lib/mock-data";
 import {
   dashboardApi,
+  API_BASE_URL,
+  lettersApi,
 } from "@/lib/api";
+import { toast } from "sonner";
 import type { Application, Internship, Notice, Notification, LetterRequest } from "@/types";
 import {
   FileText,
@@ -132,6 +135,51 @@ export default function DashboardPage() {
     );
   };
 
+  const handleDownloadLetter = async (id: string, ref?: string) => {
+    try {
+      const html = await lettersApi.downloadLetterPDF(id);
+      const blob = new Blob([html], { type: "text/html" });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Internship_Letter_${ref || id}.html`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err: any) {
+      toast.error(err.message || "Failed to download letter");
+    }
+  };
+
+  const handleViewLetter = async (id: string) => {
+    try {
+      const html = await lettersApi.downloadLetterPDF(id);
+      const blob = new Blob([html], { type: "text/html" });
+      const url = window.URL.createObjectURL(blob);
+      window.open(url, '_blank');
+    } catch (err: any) {
+      toast.error(err.message || "Failed to view letter");
+    }
+  };
+
+  const handlePrintLetter = async (id: string) => {
+    try {
+      const html = await lettersApi.downloadLetterPDF(id);
+      const printWindow = window.open('', '_blank');
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        printWindow.focus();
+        setTimeout(() => {
+          printWindow.print();
+        }, 500);
+      }
+    } catch (err: any) {
+      toast.error(err.message || "Failed to prepare document for printing");
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Welcome Header */}
@@ -179,19 +227,15 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={`/api/letters/requests/${request.id}/view`} target="_blank">
-                          <Eye className="mr-2 h-4 w-4" />
-                          View
-                        </a>
+                      <Button variant="outline" size="sm" onClick={() => handleViewLetter(request.id)}>
+                        <Eye className="mr-2 h-4 w-4" />
+                        View
                       </Button>
-                      <Button variant="outline" size="sm" asChild>
-                        <a href={`/api/letters/requests/${request.id}/download?format=pdf`}>
-                          <Download className="mr-2 h-4 w-4" />
-                          Download
-                        </a>
+                      <Button variant="outline" size="sm" onClick={() => handleDownloadLetter(request.id, request.referenceNumber)}>
+                        <Download className="mr-2 h-4 w-4" />
+                        Download
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => window.open(`/api/letters/requests/${request.id}/view`, '_blank')?.print()}>
+                      <Button variant="outline" size="sm" onClick={() => handlePrintLetter(request.id)}>
                         <Printer className="mr-2 h-4 w-4" />
                         Print
                       </Button>

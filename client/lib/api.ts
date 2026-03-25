@@ -9,7 +9,7 @@ const getApiBaseUrl = () => {
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 };
 
-const API_BASE_URL = getApiBaseUrl();
+export const API_BASE_URL = getApiBaseUrl();
 
 // Helper function to make API requests
 async function fetchApi<T = any>(
