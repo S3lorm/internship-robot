@@ -177,7 +177,14 @@ export default function EvaluationsManagementPage() {
 
   const handleCreate = async () => {
     try {
-      const result = await evaluationsApi.create(formData);
+      const payload = { ...formData };
+      // Sanitize empty strings to pass Postgres constraints (UUIDs and Dates)
+      if (!payload.internshipId) (payload as any).internshipId = null;
+      if (!payload.availableFrom) (payload as any).availableFrom = null;
+      if (!payload.deadline) (payload as any).deadline = null;
+      if (!payload.acknowledgmentDeadline) (payload as any).acknowledgmentDeadline = null;
+
+      const result = await evaluationsApi.create(payload);
       if (result.error) throw new Error(result.error);
       toast.success("Evaluation created successfully");
       setIsCreateDialogOpen(false);
@@ -191,7 +198,14 @@ export default function EvaluationsManagementPage() {
   const handleUpdate = async () => {
     if (!selectedEvaluation) return;
     try {
-      const result = await evaluationsApi.update(selectedEvaluation.id, formData);
+      const payload = { ...formData };
+      // Sanitize empty strings to pass Postgres constraints (UUIDs and Dates)
+      if (!payload.internshipId) (payload as any).internshipId = null;
+      if (!payload.availableFrom) (payload as any).availableFrom = null;
+      if (!payload.deadline) (payload as any).deadline = null;
+      if (!payload.acknowledgmentDeadline) (payload as any).acknowledgmentDeadline = null;
+
+      const result = await evaluationsApi.update(selectedEvaluation.id, payload);
       if (result.error) throw new Error(result.error);
       toast.success("Evaluation updated successfully");
       setIsEditDialogOpen(false);
