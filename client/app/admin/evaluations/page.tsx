@@ -167,41 +167,7 @@ export default function EvaluationsManagementPage() {
     }
   };
 
-  const filteredEvaluations = evaluations.filter((evaluation) => {
-    const studentName = getStudentName(evaluation.studentId).toLowerCase();
-    const supervisorName = (evaluation.supervisorName || "").toLowerCase();
-    
-    // Find internship safely
-    let companyName = "";
-    if (evaluation.internshipId) {
-      const internship = internships.find((i) => i.id === evaluation.internshipId);
-      if (internship) companyName = internship.company.toLowerCase();
-    }
-
-    const searchLower = searchQuery.toLowerCase();
-
-    const matchesSearch =
-      !searchQuery ||
-      evaluation.title.toLowerCase().includes(searchLower) ||
-      (evaluation.description?.toLowerCase().includes(searchLower) ?? false) ||
-      studentName.includes(searchLower) ||
-      supervisorName.includes(searchLower) ||
-      companyName.includes(searchLower) ||
-      (evaluation.supervisorComments?.toLowerCase().includes(searchLower) ?? false);
-
-    const matchesType = typeFilter === "all" || evaluation.evaluationType === typeFilter;
-    
-    let matchesRecommendation = true;
-    if (recommendationFilter !== "all") {
-      if (recommendationFilter === "pending") {
-        matchesRecommendation = !evaluation.finalRecommendation;
-      } else {
-        matchesRecommendation = evaluation.finalRecommendation === recommendationFilter;
-      }
-    }
-
-    return matchesSearch && matchesType && matchesRecommendation;
-  });
+  // Removed filteredEvaluations from here, moved to line 348 to prevent ReferenceError (getStudentName used before initialization)
 
   const handleCreate = async () => {
     try {
@@ -344,6 +310,42 @@ export default function EvaluationsManagementPage() {
       </div>
     );
   };
+
+  const filteredEvaluations = evaluations.filter((evaluation) => {
+    const studentName = getStudentName(evaluation.studentId).toLowerCase();
+    const supervisorName = (evaluation.supervisorName || "").toLowerCase();
+    
+    // Find internship safely
+    let companyName = "";
+    if (evaluation.internshipId) {
+      const internship = internships.find((i) => i.id === evaluation.internshipId);
+      if (internship) companyName = internship.company.toLowerCase();
+    }
+
+    const searchLower = searchQuery.toLowerCase();
+
+    const matchesSearch =
+      !searchQuery ||
+      evaluation.title.toLowerCase().includes(searchLower) ||
+      (evaluation.description?.toLowerCase().includes(searchLower) ?? false) ||
+      studentName.includes(searchLower) ||
+      supervisorName.includes(searchLower) ||
+      companyName.includes(searchLower) ||
+      (evaluation.supervisorComments?.toLowerCase().includes(searchLower) ?? false);
+
+    const matchesType = typeFilter === "all" || evaluation.evaluationType === typeFilter;
+    
+    let matchesRecommendation = true;
+    if (recommendationFilter !== "all") {
+      if (recommendationFilter === "pending") {
+        matchesRecommendation = !evaluation.finalRecommendation;
+      } else {
+        matchesRecommendation = evaluation.finalRecommendation === recommendationFilter;
+      }
+    }
+
+    return matchesSearch && matchesType && matchesRecommendation;
+  });
 
   if (loading) {
     return (
