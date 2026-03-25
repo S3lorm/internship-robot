@@ -91,32 +91,24 @@ export default function AdminDashboard() {
     {
       title: "Total Students",
       value: stats.totalStudents,
-      change: "+12%",
-      changeType: "positive",
       icon: Users,
       color: "bg-blue-500",
     },
     {
       title: "Active Internships",
       value: stats.activeInternships,
-      change: "+5",
-      changeType: "positive",
       icon: Briefcase,
       color: "bg-green-500",
     },
     {
       title: "Total Applications",
       value: stats.totalApplications,
-      change: "+23%",
-      changeType: "positive",
       icon: FileText,
       color: "bg-purple-500",
     },
     {
       title: "Pending Review",
       value: stats.pendingApplications,
-      change: "-3",
-      changeType: "negative",
       icon: Clock,
       color: "bg-amber-500",
     },
@@ -166,14 +158,6 @@ export default function AdminDashboard() {
               <div className="flex items-center justify-between">
                 <div className={`w-12 h-12 rounded-lg ${stat.color} flex items-center justify-center`}>
                   <stat.icon className="h-6 w-6 text-white" />
-                </div>
-                <div className={`flex items-center gap-1 text-sm ${stat.changeType === "positive" ? "text-green-600" : "text-red-600"
-                  }`}>
-                  {stat.changeType === "positive"
-                    ? <ArrowUpRight className="h-4 w-4" />
-                    : <ArrowDownRight className="h-4 w-4" />
-                  }
-                  {stat.change}
                 </div>
               </div>
               <div className="mt-4">

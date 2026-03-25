@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -15,10 +15,9 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
-import { lettersApi } from "@/lib/api";
-import type { LetterRequest, LetterRequestFormData } from "@/types";
+import { lettersApi, placementsApi } from "@/lib/api";
+import type { LetterRequest, InternshipPlacement } from "@/types";
 import {
   FileText,
   Calendar,
@@ -27,13 +26,15 @@ import {
   XCircle,
   AlertCircle,
   Loader2,
-  Plus,
+  Building2,
+  Info,
+  User as UserIcon,
+  Lock,
+  Unlock,
+  Briefcase,
+  Mail,
   Copy,
   Check,
-  Building2,
-  ArrowRight,
-  Info,
-  User as UserIcon
 } from "lucide-react";
 import {
   Dialog,
@@ -42,237 +43,379 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { useRouter } from "next/navigation";
 
-const statusConfig = {
+const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pending", color: "bg-amber-100 text-amber-800 border-amber-200", icon: Clock },
   approved: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
   rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
+  modification_requested: { label: "Modifications Requested", color: "bg-blue-100 text-blue-800 border-blue-200", icon: AlertCircle },
 };
 
-export default function GeneralLetterRequestsPage() {
+export default function LetterRequestsPage() {
   const { user } = useAuth();
-  const router = useRouter();
-  const [requests, setRequests] = useState<LetterRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedRequest, setSelectedRequest] = useState<LetterRequest | null>(null);
-  const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [formData, setFormData] = useState({
+
+  // Stage 1 state
+  const [generalRequests, setGeneralRequests] = useState<LetterRequest[]>([]);
+  const [isLoadingGeneral, setIsLoadingGeneral] = useState(true);
+  const [isSubmittingGeneral, setIsSubmittingGeneral] = useState(false);
+  const [selectedGeneralRequest, setSelectedGeneralRequest] = useState<LetterRequest | null>(null);
+  const [generalForm, setGeneralForm] = useState({
     requestType: "general",
     internshipStartDate: "",
     internshipEndDate: "",
   });
 
+  // Stage 2 state
+  const [placements, setPlacements] = useState<InternshipPlacement[]>([]);
+  const [approvedGeneralRequests, setApprovedGeneralRequests] = useState<any[]>([]);
+  const [isSubmittingPlacement, setIsSubmittingPlacement] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null);
+  const [selectedPlacement, setSelectedPlacement] = useState<InternshipPlacement | null>(null);
+  const [copiedCode, setCopiedCode] = useState<string | null>(null);
+  const [placementForm, setPlacementForm] = useState({
+    generalRequestId: "",
+    organizationName: "",
+    organizationAddress: "",
+    organizationEmail: "",
+    supervisorName: "",
+    supervisorPosition: "",
+    supervisorContact: "",
+    internshipStartDate: "",
+    internshipEndDate: "",
+    departmentRole: "",
+  });
+
   useEffect(() => {
-    loadRequests();
+    loadAllData();
   }, []);
 
-  const loadRequests = async () => {
-    setIsLoading(true);
+  const loadAllData = async () => {
+    setIsLoadingGeneral(true);
     try {
-      const result = await lettersApi.getRequests();
-      if (result.data) {
-        // Filter out non-general requests just in case
-        const generalRequests = result.data.requests.filter((r: LetterRequest) => r.requestType === 'general' || r.requestType === 'admin');
-        setRequests(generalRequests);
+      // Load general requests
+      const generalResult = await lettersApi.getRequests();
+      if (generalResult.data) {
+        const gRequests = (generalResult.data.requests || []).filter(
+          (r: LetterRequest) => r.requestType === "general" || r.requestType === "admin"
+        );
+        setGeneralRequests(gRequests);
+      }
+
+      // Check for approved general requests and load placements
+      try {
+        const generalStatus = await lettersApi.checkGeneralApproval();
+        if (generalStatus.data) {
+          setApprovedGeneralRequests(generalStatus.data.approvedRequests || []);
+          if (generalStatus.data.approvedRequests?.length === 1) {
+            setPlacementForm((prev) => ({
+              ...prev,
+              generalRequestId: generalStatus.data.approvedRequests[0].id,
+            }));
+          }
+        }
+      } catch {
+        // If checkGeneralApproval fails, just continue
+      }
+
+      try {
+        const placementsResult = await placementsApi.getAll();
+        if (placementsResult.data) {
+          setPlacements(placementsResult.data.placements || []);
+        }
+      } catch {
+        // If placements fail, just continue
       }
     } catch (error: any) {
-      toast.error(error.message || "Failed to load requests");
+      toast.error(error.message || "Failed to load data");
     } finally {
-      setIsLoading(false);
+      setIsLoadingGeneral(false);
     }
   };
 
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
-  ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
-  };
+  // Derived state
+  const hasPendingOrApprovedGeneral = generalRequests.some(
+    (r) => r.status === "pending" || r.status === "approved"
+  );
+  const hasApprovedGeneral = generalRequests.some((r) => r.status === "approved");
+  const stage1Locked = hasPendingOrApprovedGeneral;
+  const stage2Unlocked = hasApprovedGeneral;
 
-  const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }));
-  };
+  const latestGeneralRequest = generalRequests.length > 0
+    ? generalRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+    : null;
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Stage 1 handlers
+  const handleGeneralSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsSubmitting(true);
-
+    setIsSubmittingGeneral(true);
     try {
-      const result = await lettersApi.createRequest(formData as any);
+      const result = await lettersApi.createRequest(generalForm as any);
       if (result.error) {
         toast.error(result.error);
       } else {
-        toast.success("Letter request submitted successfully!");
-        setFormData({
-          requestType: "general",
-          internshipStartDate: "",
-          internshipEndDate: "",
-        });
-        loadRequests();
+        toast.success("General letter request submitted successfully!");
+        setGeneralForm({ requestType: "general", internshipStartDate: "", internshipEndDate: "" });
+        loadAllData();
       }
     } catch (error: any) {
       toast.error(error.message || "Failed to submit request");
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingGeneral(false);
     }
   };
 
-  const approvedRequests = requests.filter((r) => r.status === "approved");
+  // Stage 2 handlers
+  const handlePlacementSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!placementForm.generalRequestId) {
+      toast.error("Please select an approved general request to link this placement to.");
+      return;
+    }
+    setIsSubmittingPlacement(true);
+    try {
+      const result = await placementsApi.create(placementForm as any);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Official placement request submitted successfully!");
+        setPlacementForm({
+          generalRequestId: placementForm.generalRequestId,
+          organizationName: "",
+          organizationAddress: "",
+          organizationEmail: "",
+          supervisorName: "",
+          supervisorPosition: "",
+          supervisorContact: "",
+          internshipStartDate: "",
+          internshipEndDate: "",
+          departmentRole: "",
+        });
+        loadAllData();
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to submit placement");
+    } finally {
+      setIsSubmittingPlacement(false);
+    }
+  };
+
+  const handleSendEmail = async (id: string, orgName: string) => {
+    if (!confirm(`Send official letter and evaluation form to ${orgName}?`)) return;
+    setIsSendingEmail(id);
+    try {
+      const result = await placementsApi.sendToOrganization(id);
+      if (result.error) {
+        toast.error(result.error);
+      } else {
+        toast.success("Email sent successfully!");
+        loadAllData();
+      }
+    } catch (error: any) {
+      toast.error(error.message || "Failed to send email");
+    } finally {
+      setIsSendingEmail(null);
+    }
+  };
+
+  if (isLoadingGeneral) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
-    <div className="space-y-6 max-w-5xl mx-auto pb-10">
+    <div className="space-y-8 max-w-5xl mx-auto pb-10">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground md:text-3xl uppercase">
-            General Internship Request
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Request a general introduction letter to use when searching for internship opportunities.
-          </p>
-        </div>
-        {approvedRequests.length > 0 && (
-          <Button onClick={() => router.push('/dashboard/letter-requests/official')} className="shrink-0 bg-blue-700 hover:bg-blue-800">
-            Proceed to Stage 2: Official Placement
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
-        )}
+      <div>
+        <h1 className="text-2xl font-bold text-foreground md:text-3xl uppercase">
+          Internship Letter Requests
+        </h1>
+        <p className="text-muted-foreground mt-1">
+          Complete both stages to get your official internship documents.
+        </p>
       </div>
 
+      {/* How it works */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3 text-blue-800 shadow-sm">
         <Info className="h-5 w-5 shrink-0 mt-0.5" />
         <div>
           <h3 className="font-semibold">How the Two-Stage Process Works</h3>
           <ol className="list-decimal ml-5 mt-2 space-y-1 text-sm">
-            <li><strong>Stage 1 (Current):</strong> Request a generic introduction letter. Once approved, use this letter to apply to various companies.</li>
-            <li><strong>Stage 2 (Next):</strong> After a company accepts your application, submit an Official Placement request with their details to generate the final official letter and evaluation form.</li>
+            <li><strong>Stage 1:</strong> Request a general introduction letter. Once approved by admin, use it to apply to companies.</li>
+            <li><strong>Stage 2:</strong> After a company accepts you, register the official placement with their details. This is <strong>locked</strong> until Stage 1 is approved.</li>
           </ol>
         </div>
       </div>
 
-      <Tabs defaultValue="new" className="space-y-6">
-        <TabsList className="bg-muted/50 w-full justify-start overflow-x-auto">
-          <TabsTrigger value="new" className="data-[state=active]:bg-background">
-            <Plus className="mr-2 h-4 w-4" />
-            New Request
-          </TabsTrigger>
-          <TabsTrigger value="history" className="data-[state=active]:bg-background">
-            <FileText className="mr-2 h-4 w-4" />
-            My Requests ({requests.length})
-          </TabsTrigger>
-        </TabsList>
+      {/* ============================================ */}
+      {/* STAGE 1: General Letter Request */}
+      {/* ============================================ */}
+      <div className="relative">
+        <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground font-bold text-sm">1</div>
+          <h2 className="text-xl font-bold">Stage 1: General Introduction Letter</h2>
+          {stage1Locked && (
+            <Badge variant="outline" className="ml-auto text-amber-700 border-amber-300 bg-amber-50">
+              <Lock className="h-3 w-3 mr-1" />
+              {latestGeneralRequest?.status === "pending" ? "Pending Approval" : "Approved"}
+            </Badge>
+          )}
+        </div>
 
-        {/* New Request Form */}
-        <TabsContent value="new" className="mt-0">
-          <Card className="border-muted shadow-sm">
-            <CardHeader className="bg-muted/30 border-b pb-4">
-              <CardTitle>Submit General Letter Request</CardTitle>
-              <CardDescription>
-                Provide details about your intended internship to receive a general introduction letter.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <form onSubmit={handleSubmit} className="space-y-8">
-                  {/* Student Information (Read-only from profile) */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
-                      <UserIcon className="h-5 w-5 text-blue-600" />
-                      Student Information
-                    </h3>
-                    
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Student Full Name</Label>
-                        <Input value={`${user?.firstName} ${user?.lastName}`} disabled className="bg-muted" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Student ID</Label>
-                        <Input value={user?.studentId || "N/A"} disabled className="bg-muted" />
-                      </div>
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label>Department or Program</Label>
-                        <Input value={user?.program || "N/A"} disabled className="bg-muted" />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Academic Level or Year</Label>
-                        <Input value={user?.yearOfStudy ? `${user.yearOfStudy}${getOrdinalSuffix(user.yearOfStudy)} Year` : "N/A"} disabled className="bg-muted" />
-                      </div>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label>Student Email</Label>
-                      <Input value={user?.email || "N/A"} disabled className="bg-muted" />
-                    </div>
-                  </div>
-
-                  {/* Internship Dates */}
-                  <div className="space-y-4">
-                    <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
-                      <Calendar className="h-5 w-5 text-blue-600" />
-                      Internship Period
-                    </h3>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                      <div className="space-y-2">
-                        <Label htmlFor="internshipStartDate">Internship Start Date <span className="text-destructive">*</span></Label>
-                        <Input
-                          id="internshipStartDate"
-                          name="internshipStartDate"
-                          type="date"
-                          value={formData.internshipStartDate}
-                          onChange={handleChange}
-                          required
-                        />
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label htmlFor="internshipEndDate">Internship End Date <span className="text-destructive">*</span></Label>
-                        <Input
-                          id="internshipEndDate"
-                          name="internshipEndDate"
-                          type="date"
-                          value={formData.internshipEndDate}
-                          onChange={handleChange}
-                          required
-                        />
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="bg-blue-50/50 p-4 rounded-lg border border-blue-100 flex gap-3 text-sm text-blue-800">
-                    <Info className="h-4 w-4 shrink-0 mt-0.5" />
-                    <p>
-                      This letter will be <strong>generic</strong> and will not contain any organization details. 
-                      You can use it to apply to multiple organizations.
+        <Card className={`border-muted shadow-sm ${stage1Locked ? "opacity-75" : ""}`}>
+          <CardHeader className="bg-muted/30 border-b pb-4">
+            <CardTitle className="text-base">
+              {stage1Locked
+                ? "Request Already Submitted"
+                : "Submit General Letter Request"}
+            </CardTitle>
+            <CardDescription>
+              {stage1Locked
+                ? `Your request is currently "${latestGeneralRequest?.status}". You cannot submit another request until it is processed.`
+                : "Provide your internship period details to receive a general introduction letter."}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="pt-6">
+            {/* Show current request status if locked */}
+            {stage1Locked && latestGeneralRequest && (
+              <div className={`p-4 rounded-lg border mb-6 flex items-start gap-3 ${
+                latestGeneralRequest.status === "approved"
+                  ? "bg-green-50 border-green-200 text-green-800"
+                  : latestGeneralRequest.status === "rejected"
+                  ? "bg-red-50 border-red-200 text-red-800"
+                  : "bg-amber-50 border-amber-200 text-amber-800"
+              }`}>
+                {latestGeneralRequest.status === "approved" ? (
+                  <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
+                ) : latestGeneralRequest.status === "rejected" ? (
+                  <XCircle className="h-5 w-5 mt-0.5 shrink-0" />
+                ) : (
+                  <Clock className="h-5 w-5 mt-0.5 shrink-0" />
+                )}
+                <div>
+                  <h4 className="font-semibold">
+                    {latestGeneralRequest.status === "approved"
+                      ? "Request Approved ✓"
+                      : latestGeneralRequest.status === "rejected"
+                      ? "Request Rejected"
+                      : "Request Pending Review"}
+                  </h4>
+                  <p className="text-sm mt-1">
+                    {latestGeneralRequest.status === "approved"
+                      ? "Your general letter has been approved. You can now proceed to Stage 2 below to register your official placement."
+                      : latestGeneralRequest.status === "rejected"
+                      ? "Your request was rejected. Please check any admin notes and contact admin if needed."
+                      : "Your request is being reviewed by the admin. You will be notified once it's approved."}
+                  </p>
+                  {latestGeneralRequest.status === "approved" && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="mt-3"
+                      onClick={async () => {
+                        try {
+                          const html = await lettersApi.downloadLetterPDF(latestGeneralRequest.id);
+                          const blob = new Blob([html], { type: "text/html" });
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = `General_Introduction_Letter.html`;
+                          document.body.appendChild(a);
+                          a.click();
+                          window.URL.revokeObjectURL(url);
+                          document.body.removeChild(a);
+                        } catch (error: any) {
+                          toast.error(error.message || "Failed to download letter");
+                        }
+                      }}
+                    >
+                      <FileText className="mr-2 h-4 w-4" />
+                      Download Letter
+                    </Button>
+                  )}
+                  {latestGeneralRequest.internshipStartDate && latestGeneralRequest.internshipEndDate && (
+                    <p className="text-xs mt-2 opacity-75">
+                      Period: {new Date(latestGeneralRequest.internshipStartDate as string).toLocaleDateString()} - {new Date(latestGeneralRequest.internshipEndDate as string).toLocaleDateString()}
                     </p>
-                  </div>
+                  )}
+                </div>
+              </div>
+            )}
 
+            {/* Form - disabled when locked */}
+            <form onSubmit={handleGeneralSubmit} className="space-y-6">
+              <fieldset disabled={stage1Locked} className={stage1Locked ? "pointer-events-none" : ""}>
+                {/* Student Information */}
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
+                    <UserIcon className="h-5 w-5 text-blue-600" />
+                    Student Information
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Full Name</Label>
+                      <Input value={`${user?.firstName} ${user?.lastName}`} disabled className="bg-muted" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Student ID</Label>
+                      <Input value={user?.studentId || "N/A"} disabled className="bg-muted" />
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label>Program</Label>
+                      <Input value={user?.program || "N/A"} disabled className="bg-muted" />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Year of Study</Label>
+                      <Input value={user?.yearOfStudy ? `${user.yearOfStudy}${getOrdinalSuffix(user.yearOfStudy)} Year` : "N/A"} disabled className="bg-muted" />
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input value={user?.email || "N/A"} disabled className="bg-muted" />
+                  </div>
+                </div>
+
+                {/* Internship Dates */}
+                <div className="space-y-4 mt-6">
+                  <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
+                    <Calendar className="h-5 w-5 text-blue-600" />
+                    Internship Period
+                  </h3>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="internshipStartDate">Start Date <span className="text-destructive">*</span></Label>
+                      <Input
+                        id="internshipStartDate"
+                        name="internshipStartDate"
+                        type="date"
+                        value={generalForm.internshipStartDate}
+                        onChange={(e) => setGeneralForm({ ...generalForm, internshipStartDate: e.target.value })}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="internshipEndDate">End Date <span className="text-destructive">*</span></Label>
+                      <Input
+                        id="internshipEndDate"
+                        name="internshipEndDate"
+                        type="date"
+                        value={generalForm.internshipEndDate}
+                        onChange={(e) => setGeneralForm({ ...generalForm, internshipEndDate: e.target.value })}
+                        required
+                      />
+                    </div>
+                  </div>
+                </div>
+              </fieldset>
+
+              {!stage1Locked && (
                 <div className="pt-4 flex justify-end gap-3 border-t">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setFormData({
-                        requestType: "general",
-                        internshipStartDate: "",
-                        internshipEndDate: "",
-                      });
-                    }}
-                  >
-                    Reset Form
-                  </Button>
-                  <Button type="submit" disabled={isSubmitting} className="min-w-[150px]">
-                    {isSubmitting ? (
+                  <Button type="submit" disabled={isSubmittingGeneral} className="min-w-[150px]">
+                    {isSubmittingGeneral ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                         Submitting...
@@ -285,140 +428,484 @@ export default function GeneralLetterRequestsPage() {
                     )}
                   </Button>
                 </div>
-              </form>
+              )}
+            </form>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* ============================================ */}
+      {/* STAGE 2: Official Placement */}
+      {/* ============================================ */}
+      <div className="relative">
+        <div className="flex items-center gap-3 mb-4">
+          <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${
+            stage2Unlocked ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"
+          }`}>2</div>
+          <h2 className={`text-xl font-bold ${!stage2Unlocked ? "text-muted-foreground" : ""}`}>
+            Stage 2: Official Placement
+          </h2>
+          {stage2Unlocked ? (
+            <Badge variant="outline" className="ml-auto text-green-700 border-green-300 bg-green-50">
+              <Unlock className="h-3 w-3 mr-1" />
+              Unlocked
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="ml-auto text-muted-foreground">
+              <Lock className="h-3 w-3 mr-1" />
+              Locked — Stage 1 approval required
+            </Badge>
+          )}
+        </div>
+
+        {!stage2Unlocked ? (
+          /* Locked state */
+          <Card className="border-dashed border-2 border-muted">
+            <CardContent className="py-12 text-center">
+              <Lock className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
+              <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                Stage 2 is Locked
+              </h3>
+              <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                You need an approved Stage 1 general letter request before you can register an official placement. 
+                {!hasPendingOrApprovedGeneral && " Submit your Stage 1 request above to get started."}
+                {latestGeneralRequest?.status === "pending" && " Your Stage 1 request is currently pending approval."}
+              </p>
             </CardContent>
           </Card>
-        </TabsContent>
+        ) : (
+          /* Unlocked - show placement form and history */
+          <div className="space-y-6">
+            {/* Placement Form */}
+            <Card className="border-muted shadow-sm">
+              <CardHeader className="bg-muted/30 border-b pb-4">
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Building2 className="h-5 w-5 text-primary" />
+                  Register Official Internship Placement
+                </CardTitle>
+                <CardDescription>
+                  Provide the exact details of the organization where you will be doing your internship.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-6">
+                <form onSubmit={handlePlacementSubmit} className="space-y-8">
+                  {/* Link to Stage 1 */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
+                      <FileText className="h-5 w-5 text-blue-600" />
+                      Link to Approved Request
+                    </h3>
+                    <div className="space-y-2">
+                      <Label>Select Approved General Request <span className="text-destructive">*</span></Label>
+                      <Select
+                        value={placementForm.generalRequestId}
+                        onValueChange={(value) => setPlacementForm({ ...placementForm, generalRequestId: value })}
+                        required
+                      >
+                        <SelectTrigger className="w-full md:w-[400px]">
+                          <SelectValue placeholder="Select a request..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {approvedGeneralRequests.map((req) => (
+                            <SelectItem key={req.id} value={req.id}>
+                              Valid for: {req.internshipDuration} (Ref: {req.referenceNumber || "N/A"})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
 
-        {/* Requests History */}
-        <TabsContent value="history" className="mt-0">
-          <Card className="border-muted shadow-sm">
-            <CardHeader className="bg-muted/30 border-b">
-              <CardTitle>My General Requests</CardTitle>
-              <CardDescription>
-                Track the status of your general introduction letter requests.
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <RequestsList requests={requests} isLoading={isLoading} onView={setSelectedRequest} />
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+                  {/* Organization Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
+                      <Building2 className="h-5 w-5 text-blue-600" />
+                      Organization Details
+                    </h3>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="organizationName">Organization Name <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="organizationName"
+                          value={placementForm.organizationName}
+                          onChange={(e) => setPlacementForm({ ...placementForm, organizationName: e.target.value })}
+                          placeholder="e.g., Ghana Ports and Harbours Authority"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="organizationEmail">Official Contact Email <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="organizationEmail"
+                          type="email"
+                          value={placementForm.organizationEmail}
+                          onChange={(e) => setPlacementForm({ ...placementForm, organizationEmail: e.target.value })}
+                          placeholder="hr@company.com"
+                          required
+                        />
+                        <p className="text-xs text-amber-600 font-medium">⚠️ The official letter will be emailed here.</p>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="organizationAddress">Physical Address</Label>
+                      <Textarea
+                        id="organizationAddress"
+                        value={placementForm.organizationAddress}
+                        onChange={(e) => setPlacementForm({ ...placementForm, organizationAddress: e.target.value })}
+                        placeholder="Company's physical location..."
+                        className="min-h-[80px]"
+                      />
+                    </div>
+                  </div>
 
-      {/* Request Detail Dialog */}
-      <Dialog open={!!selectedRequest} onOpenChange={() => setSelectedRequest(null)}>
+                  {/* Supervisor Information */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
+                      <UserIcon className="h-5 w-5 text-blue-600" />
+                      Supervisor / Contact Person
+                    </h3>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="supervisorName">Supervisor Name <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="supervisorName"
+                          value={placementForm.supervisorName}
+                          onChange={(e) => setPlacementForm({ ...placementForm, supervisorName: e.target.value })}
+                          placeholder="e.g., Mr. John Doe"
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="supervisorPosition">Position / Title</Label>
+                        <Input
+                          id="supervisorPosition"
+                          value={placementForm.supervisorPosition}
+                          onChange={(e) => setPlacementForm({ ...placementForm, supervisorPosition: e.target.value })}
+                          placeholder="e.g., HR Manager"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="supervisorContact">Phone Number</Label>
+                      <Input
+                        id="supervisorContact"
+                        type="tel"
+                        value={placementForm.supervisorContact}
+                        onChange={(e) => setPlacementForm({ ...placementForm, supervisorContact: e.target.value })}
+                        placeholder="+233 XX XXX XXXX"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Placement Details */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold flex items-center gap-2 border-b pb-2">
+                      <Briefcase className="h-5 w-5 text-blue-600" />
+                      Placement Details
+                    </h3>
+                    <div className="space-y-2">
+                      <Label htmlFor="departmentRole">Assigned Department / Role</Label>
+                      <Input
+                        id="departmentRole"
+                        value={placementForm.departmentRole}
+                        onChange={(e) => setPlacementForm({ ...placementForm, departmentRole: e.target.value })}
+                        placeholder="e.g., IT Support Intern"
+                      />
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <Label htmlFor="placementStartDate">Confirmed Start Date <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="placementStartDate"
+                          type="date"
+                          value={placementForm.internshipStartDate}
+                          onChange={(e) => setPlacementForm({ ...placementForm, internshipStartDate: e.target.value })}
+                          required
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="placementEndDate">Confirmed End Date <span className="text-destructive">*</span></Label>
+                        <Input
+                          id="placementEndDate"
+                          type="date"
+                          value={placementForm.internshipEndDate}
+                          onChange={(e) => setPlacementForm({ ...placementForm, internshipEndDate: e.target.value })}
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-4 flex justify-end gap-3 border-t">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        setPlacementForm({
+                          generalRequestId: placementForm.generalRequestId,
+                          organizationName: "",
+                          organizationAddress: "",
+                          organizationEmail: "",
+                          supervisorName: "",
+                          supervisorPosition: "",
+                          supervisorContact: "",
+                          internshipStartDate: "",
+                          internshipEndDate: "",
+                          departmentRole: "",
+                        })
+                      }
+                    >
+                      Reset Form
+                    </Button>
+                    <Button type="submit" disabled={isSubmittingPlacement} className="min-w-[150px]">
+                      {isSubmittingPlacement ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          <Check className="mr-2 h-4 w-4" />
+                          Register Placement
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            {/* Existing Placements */}
+            {placements.length > 0 && (
+              <Card className="border-muted shadow-sm">
+                <CardHeader className="bg-muted/30 border-b">
+                  <CardTitle className="text-base">My Placements ({placements.length})</CardTitle>
+                  <CardDescription>Track your official placements and send documents to companies.</CardDescription>
+                </CardHeader>
+                <CardContent className="pt-6">
+                  <div className="space-y-4">
+                    {placements.map((placement) => {
+                      const status = statusConfig[placement.status] || statusConfig.pending;
+                      const StatusIcon = status.icon;
+                      return (
+                        <div key={placement.id} className="flex flex-col md:flex-row gap-4 p-4 rounded-lg border bg-card hover:bg-muted/10 transition-colors shadow-sm">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Badge variant="outline" className={status.color}>
+                                <StatusIcon className="h-3 w-3 mr-1.5" />
+                                {status.label}
+                              </Badge>
+                              {placement.status === "approved" && placement.emailSent && (
+                                <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
+                                  <Check className="h-3 w-3 mr-1" />
+                                  Emails Sent
+                                </Badge>
+                              )}
+                              <span className="text-xs text-muted-foreground ml-auto hidden md:inline-block">
+                                {new Date(placement.createdAt).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <h4 className="font-semibold text-base mb-1">{placement.organizationName}</h4>
+                            <p className="text-sm text-muted-foreground flex items-center gap-1.5">
+                              <Mail className="h-3.5 w-3.5" /> {placement.organizationEmail}
+                            </p>
+                          </div>
+                          <div className="flex items-center justify-end border-t md:border-t-0 pt-3 md:pt-0 shrink-0">
+                            <Button
+                              variant={placement.status === "approved" && !placement.emailSent ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setSelectedPlacement(placement)}
+                            >
+                              {placement.status === "approved" && !placement.emailSent ? "Send Emails" : "View Details"}
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* General Request Detail Dialog */}
+      <Dialog open={!!selectedGeneralRequest} onOpenChange={() => setSelectedGeneralRequest(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          {selectedRequest && (
+          {selectedGeneralRequest && (
             <>
               <DialogHeader>
                 <div className="flex items-center justify-between mb-2">
                   <DialogTitle>General Request Details</DialogTitle>
-                  <Badge variant="outline" className={statusConfig[selectedRequest.status].color}>
-                    {statusConfig[selectedRequest.status].label}
+                  <Badge variant="outline" className={statusConfig[selectedGeneralRequest.status]?.color || ""}>
+                    {statusConfig[selectedGeneralRequest.status]?.label || selectedGeneralRequest.status}
                   </Badge>
                 </div>
                 <DialogDescription>
-                  Submitted on {new Date(selectedRequest.createdAt).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "long",
-                    year: "numeric",
-                    hour: "2-digit",
-                    minute: "2-digit",
+                  Submitted on {new Date(selectedGeneralRequest.createdAt).toLocaleDateString("en-GB", {
+                    day: "numeric", month: "long", year: "numeric",
                   })}
                 </DialogDescription>
               </DialogHeader>
-
-              <div className="space-y-6 mt-4">
-                {/* Status Notice */}
-                {selectedRequest.status === 'approved' && (
-                  <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 mt-0.5 shrink-0" />
-                    <div>
-                      <h4 className="font-semibold">Request Approved</h4>
-                      <p className="text-sm mt-1">
-                        Your general introduction letter has been approved. You can download the PDF or you can now proceed to Stage 2 to register an official placement if a company has accepted you.
-                      </p>
-                      <Button size="sm" className="mt-3 bg-green-600 hover:bg-green-700 text-white" onClick={() => router.push('/dashboard/letter-requests/official')}>
-                        Proceed to Stage 2
-                        <ArrowRight className="h-4 w-4 ml-2" />
-                      </Button>
-                    </div>
-                  </div>
-                )}
-                
-                {selectedRequest.status === 'rejected' && (
-                  <div className="bg-red-50 border border-red-200 text-red-800 p-4 rounded-lg flex items-start gap-3">
-                    <XCircle className="h-5 w-5 mt-0.5 shrink-0" />
-                    <div>
-                      <h4 className="font-semibold">Request Rejected</h4>
-                      <p className="text-sm mt-1">Please review the admin notes below and submit a new request if necessary.</p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Internship Details */}
-                <div className="bg-muted/20 p-4 rounded-lg border border-border">
-                  <h3 className="font-semibold mb-3 flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
-                    Internship Details
-                  </h3>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    {selectedRequest.internshipStartDate && (
+              <div className="space-y-4 mt-4">
+                {selectedGeneralRequest.internshipStartDate && (
+                  <div className="bg-muted/20 p-4 rounded-lg border">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-muted-foreground block text-xs">Start Date</span>
-                        <span className="font-medium">{new Date(selectedRequest.internshipStartDate).toLocaleDateString()}</span>
+                        <span className="font-medium">{new Date(selectedGeneralRequest.internshipStartDate).toLocaleDateString()}</span>
                       </div>
-                    )}
-                    {selectedRequest.internshipEndDate && (
                       <div>
                         <span className="text-muted-foreground block text-xs">End Date</span>
-                        <span className="font-medium">{new Date(selectedRequest.internshipEndDate).toLocaleDateString()}</span>
+                        <span className="font-medium">{new Date(selectedGeneralRequest.internshipEndDate).toLocaleDateString()}</span>
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
-
-
-
-
-
-                {/* Admin Notes */}
-                {selectedRequest.adminNotes && (
+                )}
+                {selectedGeneralRequest.adminNotes && (
                   <div className="border-l-4 border-amber-500 bg-amber-50 p-4 rounded-r-lg">
                     <h3 className="font-semibold flex items-center gap-2 text-amber-800 mb-2">
                       <AlertCircle className="h-4 w-4" />
                       Admin Notes
                     </h3>
-                    <p className="text-sm text-amber-900 whitespace-pre-wrap">{selectedRequest.adminNotes}</p>
+                    <p className="text-sm text-amber-900 whitespace-pre-wrap">{selectedGeneralRequest.adminNotes}</p>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Placement Detail Dialog */}
+      <Dialog open={!!selectedPlacement} onOpenChange={() => setSelectedPlacement(null)}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          {selectedPlacement && (
+            <>
+              <DialogHeader>
+                <div className="flex items-center justify-between mb-2">
+                  <DialogTitle>Placement Details</DialogTitle>
+                  <Badge variant="outline" className={statusConfig[selectedPlacement.status]?.color || ""}>
+                    {statusConfig[selectedPlacement.status]?.label || selectedPlacement.status}
+                  </Badge>
+                </div>
+                <DialogDescription>
+                  Registered on {new Date(selectedPlacement.createdAt).toLocaleDateString("en-GB", {
+                    day: "numeric", month: "long", year: "numeric",
+                  })}
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-6 mt-4">
+                {selectedPlacement.status === "approved" && !selectedPlacement.emailSent && (
+                  <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg">
+                    <h4 className="font-semibold flex items-center gap-2 mb-2">
+                      <CheckCircle2 className="h-5 w-5" />
+                      Approved — Ready to Send
+                    </h4>
+                    <p className="text-sm">
+                      Your placement has been approved. Send the official letter to <strong>{selectedPlacement.organizationEmail}</strong>.
+                    </p>
+                    <div className="mt-4 flex justify-end">
+                      <Button
+                        className="bg-green-600 hover:bg-green-700 text-white"
+                        disabled={isSendingEmail === selectedPlacement.id}
+                        onClick={() => handleSendEmail(selectedPlacement.id, selectedPlacement.organizationName)}
+                      >
+                        {isSendingEmail === selectedPlacement.id ? (
+                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
+                        ) : (
+                          <><Mail className="h-4 w-4 mr-2" /> Send Official Documents</>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 )}
 
-                {/* Document Information (If approved) */}
-                {selectedRequest.status === 'approved' && (
-                  <div className="flex justify-between items-center p-4 border rounded-lg bg-background">
-                    <div>
-                      <h4 className="font-semibold mb-1">Introduction Letter</h4>
-                      <p className="text-sm text-muted-foreground">Download the general letter to attach to your applications.</p>
+                {selectedPlacement.status === "approved" && selectedPlacement.emailSent && (
+                  <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg">
+                    <h4 className="font-semibold flex items-center gap-2 mb-1">
+                      <Mail className="h-5 w-5" />
+                      Documents Sent
+                    </h4>
+                    <p className="text-sm">
+                      Official letter and evaluation link sent to {selectedPlacement.organizationEmail}.
+                    </p>
+                  </div>
+                )}
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    <h3 className="font-semibold flex items-center gap-2 text-muted-foreground border-b pb-1">
+                      <Building2 className="h-4 w-4" /> Organization
+                    </h3>
+                    <div className="text-sm space-y-1.5 pl-1">
+                      <p className="font-medium text-base">{selectedPlacement.organizationName}</p>
+                      <p className="text-muted-foreground flex items-center gap-2"><Mail className="h-3 w-3" /> {selectedPlacement.organizationEmail}</p>
+                      {selectedPlacement.organizationAddress && <p className="text-muted-foreground">{selectedPlacement.organizationAddress}</p>}
                     </div>
-                    <Button onClick={async () => {
-                      try {
-                        const html = await lettersApi.downloadLetterPDF(selectedRequest.id);
-                        const blob = new Blob([html], { type: "text/html" });
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement("a");
-                        a.href = url;
-                        a.download = `General_Introduction_Letter.html`;
-                        document.body.appendChild(a);
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        document.body.removeChild(a);
-                      } catch (error: any) {
-                        toast.error(error.message || "Failed to download letter");
-                      }
-                    }}>
-                      Download Letter
-                    </Button>
+                  </div>
+                  <div className="space-y-3">
+                    <h3 className="font-semibold flex items-center gap-2 text-muted-foreground border-b pb-1">
+                      <UserIcon className="h-4 w-4" /> Supervisor
+                    </h3>
+                    <div className="text-sm space-y-1.5 pl-1">
+                      <p className="font-medium">{selectedPlacement.supervisorName}</p>
+                      {selectedPlacement.supervisorPosition && <p className="text-muted-foreground text-xs">{selectedPlacement.supervisorPosition}</p>}
+                      {selectedPlacement.supervisorContact && <p className="text-muted-foreground">{selectedPlacement.supervisorContact}</p>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-muted/30 p-4 rounded-lg border">
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-sm">
+                    {selectedPlacement.departmentRole && (
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground block text-xs">Department/Role</span>
+                        <span className="font-medium">{selectedPlacement.departmentRole}</span>
+                      </div>
+                    )}
+                    <div>
+                      <span className="text-muted-foreground block text-xs">Start Date</span>
+                      <span className="font-medium">
+                        {selectedPlacement.internshipStartDate ? new Date(selectedPlacement.internshipStartDate).toLocaleDateString() : "N/A"}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-muted-foreground block text-xs">End Date</span>
+                      <span className="font-medium">
+                        {selectedPlacement.internshipEndDate ? new Date(selectedPlacement.internshipEndDate as string).toLocaleDateString() : "N/A"}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {selectedPlacement.status === "approved" && selectedPlacement.referenceNumber && (
+                  <div className="rounded-lg border border-primary/20 bg-primary/5 p-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <span className="font-medium text-sm">Reference Number:</span>
+                        <code className="ml-2 px-2 py-1 bg-background rounded font-mono text-xs border border-primary/20">
+                          {selectedPlacement.referenceNumber}
+                        </code>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedPlacement.referenceNumber!);
+                          setCopiedCode(selectedPlacement.referenceNumber!);
+                          setTimeout(() => setCopiedCode(null), 2000);
+                          toast.success("Reference number copied!");
+                        }}
+                      >
+                        {copiedCode === selectedPlacement.referenceNumber ? (
+                          <Check className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <Copy className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>
@@ -430,84 +917,13 @@ export default function GeneralLetterRequestsPage() {
   );
 }
 
-function RequestsList({
-  requests,
-  isLoading,
-  onView,
-}: {
-  requests: LetterRequest[];
-  isLoading: boolean;
-  onView: (request: LetterRequest) => void;
-}) {
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (requests.length === 0) {
-    return (
-      <div className="text-center py-12 border-2 border-dashed rounded-lg bg-muted/10">
-        <FileText className="mx-auto mb-4 h-12 w-12 text-muted-foreground/30" />
-        <h3 className="mb-2 text-lg font-medium text-foreground">No requests found</h3>
-        <p className="text-muted-foreground max-w-md mx-auto">
-          You haven't submitted any general letter requests yet. Create a new request to get started.
-        </p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-4">
-      {requests.map((request) => {
-        const status = statusConfig[request.status];
-        const StatusIcon = status.icon;
-
-        return (
-          <div key={request.id} className="flex flex-col md:flex-row gap-4 p-4 rounded-lg border bg-card hover:bg-muted/20 transition-colors">
-            <div className="flex-1">
-              <div className="flex items-center gap-3 mb-2">
-                <Badge variant="outline" className={status.color}>
-                  <StatusIcon className="h-3 w-3 mr-1.5" />
-                  {status.label}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {new Date(request.createdAt).toLocaleDateString("en-GB", {
-                    day: "numeric",
-                    month: "short",
-                    year: "numeric",
-                  })}
-                </span>
-              </div>
-              <h4 className="font-semibold text-base mb-1 uppercase">
-                General Internship Request
-              </h4>
-              <p className="text-sm text-muted-foreground">
-                Period: {request.internshipStartDate ? new Date(request.internshipStartDate).toLocaleDateString() : 'N/A'} - {request.internshipEndDate ? new Date(request.internshipEndDate).toLocaleDateString() : 'N/A'}
-              </p>
-            </div>
-            
-            <div className="flex items-center justify-end md:justify-start gap-2 pt-2 md:pt-0 shrink-0">
-              <Button variant="outline" size="sm" onClick={() => onView(request)}>
-                View Details
-              </Button>
-            </div>
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
 function getOrdinalSuffix(num: number | string | undefined) {
-  if (!num) return '';
-  const n = typeof num === 'string' ? parseInt(num) : num;
+  if (!num) return "";
+  const n = typeof num === "string" ? parseInt(num) : num;
   const j = n % 10;
   const k = n % 100;
-  if (j === 1 && k !== 11) return 'st';
-  if (j === 2 && k !== 12) return 'nd';
-  if (j === 3 && k !== 13) return 'rd';
-  return 'th';
+  if (j === 1 && k !== 11) return "st";
+  if (j === 2 && k !== 12) return "nd";
+  if (j === 3 && k !== 13) return "rd";
+  return "th";
 }

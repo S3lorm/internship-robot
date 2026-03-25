@@ -775,7 +775,7 @@ export default function EvaluationsManagementPage() {
 
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Edit Evaluation</DialogTitle>
             <DialogDescription>Update evaluation details</DialogDescription>
@@ -793,96 +793,43 @@ export default function EvaluationsManagementPage() {
               <Textarea
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                rows={3}
+                rows={2}
               />
             </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium">Evaluation Type</label>
-                <Select
-                  value={formData.evaluationType}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, evaluationType: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="initial">Initial</SelectItem>
-                    <SelectItem value="midterm">Midterm</SelectItem>
-                    <SelectItem value="final">Final</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Available From</label>
-                <Input
-                  type="date"
-                  value={formData.availableFrom}
-                  onChange={(e) => setFormData({ ...formData, availableFrom: e.target.value })}
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="editIsAvailable"
+                  checked={formData.isAvailable}
+                  onChange={(e) => setFormData({ ...formData, isAvailable: e.target.checked })}
+                  className="rounded"
                 />
+                <label htmlFor="editIsAvailable" className="text-sm font-medium">
+                  Available
+                </label>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium">Deadline</label>
-                <Input
-                  type="date"
-                  value={formData.deadline}
-                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Acknowledgment Deadline</label>
-                <Input
-                  type="date"
-                  value={formData.acknowledgmentDeadline}
+              <div className="flex items-center gap-2">
+                <input
+                  type="checkbox"
+                  id="editRequiresAcknowledgment"
+                  checked={formData.requiresAcknowledgment}
                   onChange={(e) =>
-                    setFormData({ ...formData, acknowledgmentDeadline: e.target.value })
+                    setFormData({ ...formData, requiresAcknowledgment: e.target.checked })
                   }
+                  className="rounded"
                 />
+                <label htmlFor="editRequiresAcknowledgment" className="text-sm font-medium">
+                  Requires Acknowledgment
+                </label>
               </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Submission URL</label>
-              <Input
-                value={formData.submissionUrl}
-                onChange={(e) => setFormData({ ...formData, submissionUrl: e.target.value })}
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="editIsAvailable"
-                checked={formData.isAvailable}
-                onChange={(e) => setFormData({ ...formData, isAvailable: e.target.checked })}
-                className="rounded"
-              />
-              <label htmlFor="editIsAvailable" className="text-sm font-medium">
-                Make available
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="editRequiresAcknowledgment"
-                checked={formData.requiresAcknowledgment}
-                onChange={(e) =>
-                  setFormData({ ...formData, requiresAcknowledgment: e.target.checked })
-                }
-                className="rounded"
-              />
-              <label htmlFor="editRequiresAcknowledgment" className="text-sm font-medium">
-                Require acknowledgment
-              </label>
             </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate}>Update Evaluation</Button>
+            <Button onClick={handleUpdate}>Save</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

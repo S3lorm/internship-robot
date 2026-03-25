@@ -52,6 +52,9 @@ export default function AnalyticsPage() {
   const [statusData, setStatusData] = useState<any[]>([])
   const [topInternships, setTopInternships] = useState<any[]>([])
   const [typeData, setTypeData] = useState<any[]>([])
+  const [monthlyData, setMonthlyData] = useState<any[]>([])
+  const [mostActiveCompany, setMostActiveCompany] = useState({ name: "N/A", count: 0 })
+  const [engagementRate, setEngagementRate] = useState(0)
 
   useEffect(() => {
     async function fetchAnalytics() {
@@ -101,6 +104,36 @@ export default function AnalyticsPage() {
           { type: "Remote", count: internshipsList.filter((i: any) => i.type === "remote").length },
         ])
 
+        // Monthly data from real applications
+        const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]
+        const monthly = months.map((month, idx) => {
+          const monthApps = applicationsList.filter((a: any) => {
+            const d = new Date(a.createdAt || a.appliedAt)
+            return d.getMonth() === idx
+          })
+          return {
+            month,
+            applications: monthApps.length,
+            approved: monthApps.filter((a: any) => a.status === "approved").length,
+          }
+        })
+        setMonthlyData(monthly)
+
+        // Most active company
+        const companyCounts: Record<string, number> = {}
+        internshipsList.forEach((i: any) => {
+          const name = i.company || "Unknown"
+          companyCounts[name] = (companyCounts[name] || 0) + 1
+        })
+        const topCompany = Object.entries(companyCounts).sort((a, b) => b[1] - a[1])[0]
+        if (topCompany) {
+          setMostActiveCompany({ name: topCompany[0], count: topCompany[1] })
+        }
+
+        // Student engagement rate
+        const studentsWithApps = new Set(applicationsList.map((a: any) => a.studentId)).size
+        setEngagementRate(usersList.length > 0 ? Math.round((studentsWithApps / usersList.length) * 100) : 0)
+
       } catch (error) {
         console.error(error)
       } finally {
@@ -111,17 +144,6 @@ export default function AnalyticsPage() {
     fetchAnalytics()
   }, [])
 
-
-
-  // Applications by month (simulated data)
-  const monthlyData = [
-    { month: "Jan", applications: 12, approved: 8 },
-    { month: "Feb", applications: 19, approved: 12 },
-    { month: "Mar", applications: 25, approved: 18 },
-    { month: "Apr", applications: 32, approved: 22 },
-    { month: "May", applications: 28, approved: 20 },
-    { month: "Jun", applications: 45, approved: 35 },
-  ]
 
 
 
@@ -177,56 +199,15 @@ export default function AnalyticsPage() {
       {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
-          {
-            title: "Total Students",
-            value: totalStudents,
-            change: "+12%",
-            trend: "up",
-            icon: Users,
-            color: "bg-blue-500",
-          },
-          {
-            title: "Active Internships",
-            value: totalInternships, // or filter active based on db
-            change: "+5",
-            trend: "up",
-            icon: Briefcase,
-            color: "bg-green-500",
-          },
-          {
-            title: "Total Applications",
-            value: totalApplications,
-            change: "+23%",
-            trend: "up",
-            icon: FileText,
-            color: "bg-purple-500",
-          },
-          {
-            title: "Approval Rate",
-            value: `${approvalRate}%`,
-            change: "+5%",
-            trend: "up",
-            icon: CheckCircle2,
-            color: "bg-emerald-500",
-          },
+          { title: "Total Students", value: totalStudents, icon: Users, color: "bg-blue-500" },
+          { title: "Active Internships", value: totalInternships, icon: Briefcase, color: "bg-green-500" },
+          { title: "Total Applications", value: totalApplications, icon: FileText, color: "bg-purple-500" },
+          { title: "Approval Rate", value: `${approvalRate}%`, icon: CheckCircle2, color: "bg-emerald-500" },
         ].map((metric) => (
           <Card key={metric.title} className="border-0 shadow-sm">
             <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div className={`w-12 h-12 rounded-lg ${metric.color} flex items-center justify-center`}>
-                  <metric.icon className="h-6 w-6 text-white" />
-                </div>
-                <div
-                  className={`flex items-center gap-1 text-sm ${metric.trend === "up" ? "text-green-600" : "text-red-600"
-                    }`}
-                >
-                  {metric.trend === "up" ? (
-                    <TrendingUp className="h-4 w-4" />
-                  ) : (
-                    <TrendingDown className="h-4 w-4" />
-                  )}
-                  {metric.change}
-                </div>
+              <div className={`w-12 h-12 rounded-lg ${metric.color} flex items-center justify-center`}>
+                <metric.icon className="h-6 w-6 text-white" />
               </div>
               <div className="mt-4">
                 <p className="text-3xl font-bold text-foreground">{metric.value}</p>
@@ -380,24 +361,14 @@ export default function AnalyticsPage() {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Average Processing Time</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-primary">3.2 days</p>
-            <p className="text-sm text-muted-foreground mt-1">From submission to decision</p>
-          </CardContent>
-        </Card>
-
+      <div className="grid gap-4 md:grid-cols-2">
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <CardTitle className="text-base">Most Active Company</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-bold text-foreground">Ghana Ports Authority</p>
-            <p className="text-sm text-muted-foreground mt-1">15 internship positions posted</p>
+            <p className="text-xl font-bold text-foreground">{mostActiveCompany.name}</p>
+            <p className="text-sm text-muted-foreground mt-1">{mostActiveCompany.count} internship position{mostActiveCompany.count !== 1 ? "s" : ""} posted</p>
           </CardContent>
         </Card>
 
@@ -406,7 +377,7 @@ export default function AnalyticsPage() {
             <CardTitle className="text-base">Student Engagement</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-3xl font-bold text-primary">78%</p>
+            <p className="text-3xl font-bold text-primary">{engagementRate}%</p>
             <p className="text-sm text-muted-foreground mt-1">Students with at least one application</p>
           </CardContent>
         </Card>

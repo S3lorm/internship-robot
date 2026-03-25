@@ -266,34 +266,45 @@ async function runAllReminders() {
   await sendLogbookDeadlineReminders();
   await sendReportDeadlineReminders();
   await sendAdministrativeActionReminders();
-  await checkMidpointEvaluations();
+  await checkEndOfInternshipEvaluations();
   await sendEvaluationReminders();
   console.log('Reminder checks completed.');
 }
 
 /**
- * Check for placements that have reached their midpoint date.
+ * Check for placements that are 2 weeks before their end date.
  * Sends evaluation email to supervisor and notifies student.
  */
-async function checkMidpointEvaluations() {
+async function checkEndOfInternshipEvaluations() {
   try {
     const { InternshipPlacement, EvaluationToken, User: UserModel } = require('../models');
     const transporter = require('../config/email');
 
-    const today = new Date().toISOString().split('T')[0];
+    const now = new Date();
+    // Start of today for exact comparisons
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Find approved placements where midpoint is today and eval hasn't been sent
+    // Find approved placements where eval hasn't been sent yet
     const placements = await InternshipPlacement.findAll({
       where: { status: 'approved', evaluationStatus: 'pending' },
     });
 
     for (const placement of placements) {
-      if (!placement.midpointDate || placement.midpointDate > today) continue;
+      if (!placement.internshipEndDate) continue;
+      
+      const endDate = new Date(placement.internshipEndDate);
+      // Ensure time represents start of day for accurate day-diffing
+      endDate.setHours(0, 0, 0, 0);
+      
+      const daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Send 14 days (2 weeks) before the end of the internship, or if the 14-day mark has just passed and we haven't sent it yet
+      if (daysUntilEnd > 14) continue;
 
-      // Get evaluation token
+      // Get evaluation token (or create one if token logic assumes it exists)
       const tokens = await EvaluationToken.findByPlacement(placement.id);
       const token = tokens.find(t => t.usedStatus === 'unused');
-      if (!token) continue;
+      if (!token) continue; // Note: Ensure tokens are generated upon placement approval
 
       // Get student info
       const student = await UserModel.findOne({ id: placement.studentId });
@@ -312,26 +323,26 @@ async function checkMidpointEvaluations() {
         await transporter.sendMail({
           from: emailFrom,
           to: recipientEmail,
-          subject: `Internship Midterm Evaluation Request for ${student.firstName} ${student.lastName}`,
+          subject: `Internship Final Evaluation Request for ${student.firstName} ${student.lastName}`,
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
               <div style="background: #1e3a5f; color: white; padding: 20px; text-align: center;">
-                <h2>Internship Midterm Evaluation</h2>
+                <h2>Internship Evaluation Form</h2>
                 <p>Regional Maritime University</p>
               </div>
               <div style="padding: 20px;">
                 <p>Dear ${placement.supervisorName || 'Supervisor'},</p>
-                <p>We hope this message finds you well. As we have reached the midpoint of the internship period, we kindly request your evaluation of our student's performance.</p>
+                <p>We hope this message finds you well. As the student is approaching exactly two weeks before the end of their internship period, we kindly request your evaluation of their performance.</p>
                 <div style="background: #f8f9fa; border-left: 4px solid #1e3a5f; padding: 15px; margin: 15px 0;">
                   <strong>Student:</strong> ${student.firstName} ${student.lastName}<br>
                   <strong>Organization:</strong> ${placement.organizationName}<br>
-                  <strong>Department:</strong> ${placement.departmentRole || 'N/A'}
+                  <strong>Department:</strong> ${placement.departmentRole || 'N/A'}<br>
+                  <strong>End Date:</strong> ${endDate.toLocaleDateString()}
                 </div>
-                <p>Please complete the evaluation form using the secure link below:</p>
+                <p>Please complete the official evaluation form using the secure link below. Your prompt feedback is essential for the student's final grading.</p>
                 <p style="text-align: center;">
                   <a href="${evaluationUrl}" style="display: inline-block; padding: 12px 30px; background: #28a745; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Evaluation Form</a>
                 </p>
-                <p><strong>Please note:</strong> This link is valid for 7 days and can only be used once.</p>
                 <p>Thank you for your partnership in developing the next generation of professionals.</p>
                 <p>Best regards,<br>Regional Maritime University<br>Internship Coordination Office</p>
               </div>
@@ -345,33 +356,24 @@ async function checkMidpointEvaluations() {
           evaluationSentAt: new Date().toISOString(),
         });
 
-        // Notify student
-        await createNotification({
-          userId: placement.studentId,
-          type: 'evaluation',
-          title: 'Midterm Evaluation Sent to Supervisor',
-          message: `The internship midterm evaluation form has been sent to your supervisor at ${placement.organizationName}. Please inform your supervisor and assist them if necessary.`,
-          relatedId: placement.id,
-        });
-
-        console.log(`📧 Midpoint evaluation email sent for placement ${placement.id}`);
+        console.log(`📧 Evaluation email sent to supervisor for placement ${placement.id} (2 weeks to end date)`);
       } catch (emailErr) {
-        console.error(`Failed to send midpoint eval email for placement ${placement.id}:`, emailErr.message);
+        console.error(`Failed to send eval email for placement ${placement.id}:`, emailErr.message);
       }
     }
   } catch (error) {
-    console.error('Error checking midpoint evaluations:', error);
+    console.error('Error checking end of internship evaluations:', error);
   }
 }
 
 /**
- * Send reminder emails for evaluations that haven't been submitted after 5 days.
- * Mark as overdue if the token has expired (7 days).
+ * Send reminder emails for evaluations that haven't been submitted.
+ * After 7 days, notify the student to remind the supervisor.
  */
 async function sendEvaluationReminders() {
   try {
-    const { InternshipPlacement, EvaluationToken, User: UserModel } = require('../models');
-    const transporter = require('../config/email');
+    const { InternshipPlacement, User: UserModel } = require('../models');
+    // Notification service automatically imported at top
 
     const placements = await InternshipPlacement.findAll({
       where: { evaluationStatus: 'sent' },
@@ -383,58 +385,28 @@ async function sendEvaluationReminders() {
       if (!placement.evaluationSentAt) continue;
 
       const sentAt = new Date(placement.evaluationSentAt);
-      const daysSinceSent = Math.floor((now - sentAt) / (1000 * 60 * 60 * 24));
+      const daysSinceSent = Math.floor((now.getTime() - sentAt.getTime()) / (1000 * 60 * 60 * 24));
 
-      // Send reminder at day 5
-      if (daysSinceSent === 5) {
-        const recipientEmail = placement.supervisorEmail || placement.organizationEmail;
-        if (!recipientEmail) continue;
-
-        const student = await UserModel.findOne({ id: placement.studentId });
-        const tokens = await EvaluationToken.findByPlacement(placement.id);
-        const token = tokens.find(t => t.usedStatus === 'unused');
-
-        if (!token) continue;
-
-        const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-        const evaluationUrl = `${frontendUrl}/evaluate/${token.tokenHash}`;
-        const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
-
-        try {
-          await transporter.sendMail({
-            from: emailFrom,
-            to: recipientEmail,
-            subject: `Reminder: Internship Evaluation Pending - ${student ? student.firstName + ' ' + student.lastName : 'Student'}`,
-            html: `
-              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                <div style="background: #dc3545; color: white; padding: 20px; text-align: center;">
-                  <h2>⏰ Evaluation Reminder</h2>
-                </div>
-                <div style="padding: 20px;">
-                  <p>Dear ${placement.supervisorName || 'Supervisor'},</p>
-                  <p>This is a friendly reminder that the midterm evaluation for <strong>${student ? student.firstName + ' ' + student.lastName : 'the intern'}</strong> at <strong>${placement.organizationName}</strong> is still pending.</p>
-                  <p><strong>The evaluation link will expire in 2 days.</strong> Please complete it at your earliest convenience:</p>
-                  <p style="text-align: center;">
-                    <a href="${evaluationUrl}" style="display: inline-block; padding: 12px 30px; background: #dc3545; color: white; text-decoration: none; border-radius: 5px; font-weight: bold;">Complete Evaluation Now</a>
-                  </p>
-                  <p>Thank you for your cooperation.</p>
-                  <p>Best regards,<br>Regional Maritime University</p>
-                </div>
-              </div>
-            `,
-          });
-          console.log(`📧 Evaluation reminder sent for placement ${placement.id}`);
-        } catch (emailErr) {
-          console.error(`Failed to send eval reminder for placement ${placement.id}:`, emailErr.message);
-        }
-      }
-
-      // Mark as overdue after 7 days
-      if (daysSinceSent >= 7) {
-        await InternshipPlacement.update(placement.id, {
-          evaluationStatus: 'overdue',
+      // After exactly 7 days, notify the STUDENT to remind their supervisor
+      if (daysSinceSent === 7) {
+        
+        // Notify student
+        await createNotification({
+          userId: placement.studentId,
+          type: 'evaluation',
+          title: 'Action Required: Remind Supervisor for Evaluation',
+          message: `The official evaluation form was sent to your supervisor at ${placement.organizationName} one week ago and has not been completed yet. Please follow up with them to ensure it is submitted before your internship ends.`,
+          relatedId: placement.id,
+          priority: 'urgent',
+          actionRequired: true,
         });
-        console.log(`⚠️ Placement ${placement.id} evaluation marked as overdue`);
+        
+        console.log(`🔔 Student notified to remind supervisor for placement ${placement.id} (7 days post-send)`);
+        
+        // Update status to indicated student has been reminded
+        await InternshipPlacement.update(placement.id, {
+          evaluationStatus: 'student_reminded',
+        });
       }
     }
   } catch (error) {
@@ -449,6 +421,6 @@ module.exports = {
   sendAdministrativeActionReminders,
   notifyRequestDecision,
   runAllReminders,
-  checkMidpointEvaluations,
+  checkEndOfInternshipEvaluations,
   sendEvaluationReminders,
 };
