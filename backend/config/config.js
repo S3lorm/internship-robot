@@ -21,7 +21,7 @@ const config = {
   // API URL — used when backend needs to reference itself
   apiUrl: process.env.API_URL || (isDev
     ? 'http://localhost:5000/api'
-    : 'https://internship-robot-4.onrender.com/api'),
+    : 'https://internship-robot-omlp.vercel.app/api'),
 
   // Supabase
   supabaseUrl: process.env.SUPABASE_URL,
