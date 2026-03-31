@@ -120,7 +120,7 @@ function generateLetterHTML(user, internship = null, letterRequest = null) {
       margin-bottom: 20px;
     }
     .logo {
-      width: 120px;
+      width: 100px;
       height: auto;
       margin-bottom: 10px;
     }
@@ -213,7 +213,7 @@ function generateLetterHTML(user, internship = null, letterRequest = null) {
   <button class="print-button no-print" onclick="window.print()">Print / Save as PDF</button>
   
   <div class="header">
-    <img src="/rmu-logo.png" alt="RMU Logo" class="logo" onerror="this.src='https://rmu.edu.gh/wp-content/uploads/2019/09/rmulogo-2.png'" />
+    <img src="/assets/rmu-crest.webp" alt="RMU Crest" class="logo" />
     <div class="university-name">Regional Maritime University</div>
     <div class="address" style="color: #000;">
       Post Office Box GP 1115, Accra, Ghana Tel: (+233 302) 712775 / 712343 / 718225. Fax: (+233 302) 712047. Registrar Tel/Fax: (+233 302) 714070
@@ -340,10 +340,10 @@ async function generatePDFBuffer(user, letterRequest) {
       const path = require('path');
       const fs = require('fs');
       
-      const logoPath = path.join(__dirname, '../public/rmu-logo.png');
+      const logoPath = path.join(__dirname, '../public/rmu-crest.png');
       if (fs.existsSync(logoPath)) {
-        doc.image(logoPath, (doc.page.width - 120) / 2, 40, { width: 120 });
-        doc.moveDown(4); // Adjust space after logo
+        doc.image(logoPath, (doc.page.width - 100) / 2, 40, { width: 100 });
+        doc.moveDown(5); // Adjust space after square logo
       } else {
         doc.moveDown(2);
       }
