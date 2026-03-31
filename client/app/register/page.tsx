@@ -157,9 +157,13 @@ export default function RegisterPage() {
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 px-4 py-12">
-      <Link href="/" className="mb-8 flex items-center gap-2 transition-transform hover:scale-105">
-        <div className="flex h-12 items-center justify-center rounded-xl bg-white shadow-lg p-2">
-          <Image src="/rmu-logo.png" alt="RMU Logo" width={160} height={40} className="object-contain" />
+      <Link href="/" className="mb-8 flex flex-col items-center gap-3 transition-transform hover:scale-105">
+        <div className="flex h-16 items-center justify-center rounded-xl bg-white shadow-lg p-3">
+          <Image src="/rmu-logo.png" alt="RMU Logo" width={200} height={50} className="object-contain" priority />
+        </div>
+        <div className="flex flex-col items-center text-center">
+          <span className="text-xl font-bold leading-none text-foreground">RMU</span>
+          <span className="text-sm text-muted-foreground">Internship Portal</span>
         </div>
       </Link>
 
