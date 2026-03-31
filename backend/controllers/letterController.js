@@ -1,5 +1,6 @@
 const { User } = require('../models');
 const auth = require('../middleware/auth');
+const PDFDocument = require('pdfkit');
 
 // Program-specific signatures
 const programSignatures = {
@@ -299,6 +300,166 @@ function getOrdinalSuffix(num) {
   return 'th';
 }
 
+// Generate a real PDF buffer of the formal letter using pdfkit
+async function generatePDFBuffer(user, letterRequest) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 50 });
+      const chunks = [];
+
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', (err) => reject(err));
+
+      const signature = programSignatures[user.program] || defaultSignature;
+      const currentDate = new Date().toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric'
+      });
+      const isGeneral = letterRequest && (letterRequest.requestType === 'general');
+
+      // --- Header ---
+      doc.fontSize(20).font('Helvetica-Bold').text('RMU', { align: 'center' });
+      doc.fontSize(14).text('REGIONAL MARITIME UNIVERSITY', { align: 'center' });
+      doc.fontSize(9).font('Helvetica')
+        .text('P.O. Box GP 1115, Accra, Ghana', { align: 'center' })
+        .text('Tel: +233 302 712 775 | Email: info@rmu.edu.gh', { align: 'center' })
+        .text('Website: www.rmu.edu.gh', { align: 'center' });
+      doc.moveDown(0.5);
+      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
+      doc.moveDown(1);
+
+      // --- Date ---
+      doc.fontSize(11).font('Helvetica').text(currentDate, { align: 'right' });
+      doc.moveDown(1.5);
+
+      // --- Recipient ---
+      if (isGeneral) {
+        doc.font('Helvetica').text('To Whom It May Concern,');
+      } else {
+        doc.font('Helvetica').text('The Human Resources Manager,');
+        if (letterRequest && letterRequest.companyName && letterRequest.companyName !== 'General Request') {
+          doc.text(letterRequest.companyName);
+        }
+        if (letterRequest && letterRequest.companyAddress) {
+          doc.text(letterRequest.companyAddress);
+        }
+      }
+      doc.moveDown(1.5);
+
+      // --- Subject ---
+      const subjectText = isGeneral
+        ? `SUBJECT: GENERAL INTERNSHIP INTRODUCTION - ${user.firstName.toUpperCase()} ${user.lastName.toUpperCase()}`
+        : `SUBJECT: RECOMMENDATION FOR INTERNSHIP PLACEMENT - ${user.firstName.toUpperCase()} ${user.lastName.toUpperCase()}`;
+      doc.font('Helvetica-Bold').text(subjectText, { underline: true });
+      doc.moveDown(1);
+
+      // --- Body ---
+      doc.font('Helvetica').fontSize(11);
+
+      doc.text(
+        `I am writing to recommend ${user.firstName} ${user.lastName}, ` +
+        `Student ID: ${user.studentId || 'N/A'}, a ${user.yearOfStudy || 'N/A'}${getOrdinalSuffix(user.yearOfStudy)} ` +
+        `year student enrolled in the ${user.program || 'N/A'} program at the Regional Maritime University.`,
+        { align: 'justify', indent: 30 }
+      );
+      doc.moveDown(0.5);
+
+      // Internship details
+      if (letterRequest) {
+        if (!isGeneral && letterRequest.companyName) {
+          doc.font('Helvetica-Bold').text(`Company/Organization: `, { continued: true }).font('Helvetica').text(letterRequest.companyName);
+        }
+        if (!isGeneral && letterRequest.companyAddress) {
+          doc.font('Helvetica-Bold').text(`Address: `, { continued: true }).font('Helvetica').text(letterRequest.companyAddress);
+        }
+        if (letterRequest.internshipDuration) {
+          doc.font('Helvetica-Bold').text(`Internship Duration: `, { continued: true }).font('Helvetica').text(letterRequest.internshipDuration);
+        }
+        if (letterRequest.internshipStartDate) {
+          doc.font('Helvetica-Bold').text(`Start Date: `, { continued: true }).font('Helvetica').text(new Date(letterRequest.internshipStartDate).toLocaleDateString('en-GB'));
+        }
+        if (letterRequest.internshipEndDate) {
+          doc.font('Helvetica-Bold').text(`End Date: `, { continued: true }).font('Helvetica').text(new Date(letterRequest.internshipEndDate).toLocaleDateString('en-GB'));
+        }
+        if (!isGeneral && letterRequest.purpose) {
+          doc.font('Helvetica-Bold').text(`Purpose: `, { continued: true }).font('Helvetica').text(letterRequest.purpose);
+        }
+        doc.moveDown(0.5);
+      }
+
+      doc.text(
+        `${user.firstName} ${user.lastName} has demonstrated exceptional academic performance and a strong commitment ` +
+        `to their studies. Throughout their time at the Regional Maritime University, they have shown dedication, ` +
+        `professionalism, and a genuine interest in gaining practical experience in the maritime industry.`,
+        { align: 'justify', indent: 30 }
+      );
+      doc.moveDown(0.5);
+
+      doc.text(
+        `We believe that ${user.firstName} would be an excellent candidate for this internship opportunity. ` +
+        `Their academic background, combined with their enthusiasm and willingness to learn, makes them well-suited ` +
+        `for this position. We are confident that they will contribute positively to your organization while ` +
+        `gaining valuable industry experience.`,
+        { align: 'justify', indent: 30 }
+      );
+      doc.moveDown(0.5);
+
+      doc.text(
+        `The Regional Maritime University fully supports this internship placement and will ensure that ` +
+        `${user.firstName} maintains the highest standards of professionalism and academic excellence ` +
+        `throughout the internship period.`,
+        { align: 'justify', indent: 30 }
+      );
+      doc.moveDown(0.5);
+
+      doc.text(
+        `We would be grateful if you could consider ${user.firstName}'s application for this internship ` +
+        `opportunity. Should you require any additional information, please do not hesitate to contact us.`,
+        { align: 'justify', indent: 30 }
+      );
+      doc.moveDown(0.5);
+
+      doc.text('Thank you for considering our student for this valuable learning opportunity.', { indent: 30 });
+      doc.moveDown(2);
+
+      // --- Signature ---
+      doc.text('Yours faithfully,');
+      doc.moveDown(3);
+      doc.moveTo(doc.x, doc.y).lineTo(doc.x + 200, doc.y).stroke();
+      doc.moveDown(0.3);
+      doc.font('Helvetica-Bold').text(signature.name);
+      doc.fontSize(10).font('Helvetica').text(signature.title);
+      doc.text(signature.department);
+      doc.text('Regional Maritime University');
+
+      // --- Reference / Verification ---
+      if (letterRequest && (letterRequest.referenceNumber || letterRequest.verificationCode)) {
+        doc.moveDown(1.5);
+        doc.fontSize(9);
+        if (letterRequest.referenceNumber) {
+          doc.font('Helvetica-Bold').text('Document Reference: ', { continued: true }).font('Helvetica').text(letterRequest.referenceNumber);
+        }
+        if (letterRequest.verificationCode) {
+          doc.font('Helvetica-Bold').text('Verification Code: ', { continued: true }).font('Helvetica').text(letterRequest.verificationCode);
+        }
+        doc.font('Helvetica-Oblique').text('This document can be verified by contacting the Regional Maritime University with the reference number above.');
+      }
+
+      // --- Footer ---
+      doc.moveDown(1);
+      doc.fontSize(8).font('Helvetica').fillColor('#666666')
+        .text('This is an official document from the Regional Maritime University', { align: 'center' })
+        .text('For verification, please contact: info@rmu.edu.gh', { align: 'center' });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
 async function generateLetter(req, res) {
   try {
     const user = req.user;
@@ -457,6 +618,10 @@ async function createRequest(req, res) {
           reviewedAt: new Date().toISOString()
         });
 
+        // Generate the actual PDF buffer for attachment
+        const fullUser = await User.findByPk(user.id);
+        const pdfBuffer = await generatePDFBuffer(fullUser || user, request);
+
         // Send email to company
         const transporter = require('../config/email');
         const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
@@ -510,11 +675,9 @@ async function createRequest(req, res) {
           `,
           attachments: [
             {
-              filename: pdfData.filename,
-              // Since generateLetterPDF just returns a URL to the API download endpoint currently (since there's no real PDF renderer)
-              // we can attach the HTML directly or simply provide the link. Let's provide the verification link.
-              content: `Please view the letter at ${process.env.FRONTEND_URL || 'http://localhost:3000'}${pdfData.url}`,
-              contentType: 'text/plain'
+              filename: `Internship_Letter_${user.firstName}_${user.lastName}.pdf`,
+              content: pdfBuffer,
+              contentType: 'application/pdf'
             }
           ]
         };
@@ -732,17 +895,88 @@ async function updateRequestStatus(req, res) {
       link: status === 'approved' ? `/dashboard/letter-requests?view=${request.id}` : undefined,
     });
 
-    // Send email notification if requested and approved
+    // Send email notification to student if requested and approved
     if (status === 'approved' && sendEmail !== false) {
       try {
         await sendLetterEmailNotification(request, updated);
-        await LetterRequest.update(id, {
-          emailSent: true,
-          emailSentAt: new Date().toISOString(),
-        });
       } catch (emailError) {
-        console.error('Error sending email notification:', emailError);
+        console.error('Error sending student email notification:', emailError);
         // Don't fail the request if email fails
+      }
+    }
+
+    // Send formal letter PDF to company email if approved and companyEmail exists
+    if (status === 'approved' && request.companyEmail) {
+      try {
+        const { User } = require('../models');
+        const student = await User.findOne({ id: request.studentId });
+        if (student) {
+          const pdfBuffer = await generatePDFBuffer(student, request);
+          const transporter = require('../config/email');
+          const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
+
+          await transporter.sendMail({
+            from: emailFrom,
+            to: request.companyEmail,
+            subject: `Internship Application - ${student.firstName} ${student.lastName}`,
+            html: `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <style>
+                  body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+                  .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+                  .header { background: #1e3a5f; color: white; padding: 20px; text-align: center; }
+                  .content { padding: 20px; background: #f9f9f9; }
+                  .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="header">
+                    <h1>Internship Application</h1>
+                  </div>
+                  <div class="content">
+                    <p>Dear Human Resources Manager,</p>
+                    <p>Please find attached the official internship recommendation letter for <strong>${student.firstName} ${student.lastName}</strong> from the Regional Maritime University.</p>
+                    <p>This student is highly recommended for an internship position at your reputable organization.</p>
+                    <p>The letter can be verified using the reference number and verification code provided within the document.</p>
+                    <p>Best regards,<br>Regional Maritime University</p>
+                  </div>
+                  <div class="footer">
+                    <p>This is an automated message. Please do not reply directly to this email.</p>
+                  </div>
+                </div>
+              </body>
+              </html>
+            `,
+            text: `Dear Human Resources Manager,\n\nPlease find attached the official internship recommendation letter for ${student.firstName} ${student.lastName} from the Regional Maritime University.\n\nBest regards,\nRegional Maritime University`,
+            attachments: [
+              {
+                filename: `Internship_Letter_${student.firstName}_${student.lastName}.pdf`,
+                content: pdfBuffer,
+                contentType: 'application/pdf'
+              }
+            ]
+          });
+
+          await LetterRequest.update(id, {
+            emailSent: true,
+            emailSentAt: new Date().toISOString(),
+          });
+
+          // Notify student that letter was sent to company
+          await createNotification({
+            userId: request.studentId,
+            type: 'letter_request',
+            title: 'Letter Sent to Company',
+            message: `Your approved internship letter has been sent to ${request.companyName} (${request.companyEmail}).`,
+            relatedId: request.id,
+          });
+        }
+      } catch (companyEmailError) {
+        console.error('Error sending letter to company:', companyEmailError);
+        // Don't fail the request if company email fails
       }
     }
 
@@ -798,7 +1032,7 @@ async function generateLetterPDF(request) {
   };
 }
 
-// Send email notification when letter is approved
+// Send email notification to student when letter is approved
 async function sendLetterEmailNotification(request, updatedRequest) {
   const transporter = require('../config/email');
   const { User } = require('../models');
