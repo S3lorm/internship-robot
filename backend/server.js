@@ -27,11 +27,26 @@ async function start() {
   // Database migrations should be run in Supabase dashboard
   // No need to sync here since we're using Supabase
 
+  // Initialize automated background jobs
+  const cron = require('node-cron');
+  const { runAllReminders } = require('./services/reminderService');
+
+  // Schedule reminders to run every day at midnight (00:00)
+  cron.schedule('0 0 * * *', async () => {
+    console.log('⏰ Scheduling Cron Job: Triggering daily reminders...');
+    try {
+      await runAllReminders();
+    } catch (err) {
+      console.error('❌ Scheduled cron job failed:', err);
+    }
+  });
+
   server.listen(PORT, '0.0.0.0', () => {
     console.log(`RMU Internship API running on port ${PORT}`);
     console.log(`Server accessible at http://localhost:${PORT}`);
     console.log(`API endpoints available at http://localhost:${PORT}/api`);
     console.log(`Using Supabase as database backend`);
+    console.log(`Background Cron Jobs: INITIALIZED`);
   });
 }
 
