@@ -1,6 +1,18 @@
 const { User } = require('../models');
 const auth = require('../middleware/auth');
 const PDFDocument = require('pdfkit');
+const fs = require('fs');
+const path = require('path');
+
+// Pre-load the logo as base64 for HTML embedding to prevent relative path breakage
+let crestBase64 = '';
+try {
+  const logoPath = path.join(__dirname, '../public/rmu-crest.png');
+  const bitmap = fs.readFileSync(logoPath);
+  crestBase64 = `data:image/png;base64,${bitmap.toString('base64')}`;
+} catch (e) {
+  console.error('Could not load crest logo for base64 HTML embedding:', e.message);
+}
 
 // Program-specific signatures
 const programSignatures = {
@@ -213,7 +225,7 @@ function generateLetterHTML(user, internship = null, letterRequest = null) {
   <button class="print-button no-print" onclick="window.print()">Print / Save as PDF</button>
   
   <div class="header">
-    <img src="/assets/rmu-crest.webp" alt="RMU Crest" class="logo" />
+    <img src="${crestBase64 || '/assets/rmu-crest.webp'}" alt="RMU Crest" class="logo" />
     <div class="university-name">Regional Maritime University</div>
     <div class="address" style="color: #000;">
       Post Office Box GP 1115, Accra, Ghana Tel: (+233 302) 712775 / 712343 / 718225. Fax: (+233 302) 712047. Registrar Tel/Fax: (+233 302) 714070
