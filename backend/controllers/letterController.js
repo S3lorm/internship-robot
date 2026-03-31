@@ -113,38 +113,55 @@ function generateLetterHTML(user, internship = null, letterRequest = null) {
       padding: 40px 20px;
       line-height: 1.6;
       color: #000;
+      background-color: #fcfbf5; /* Match paper color slightly */
     }
     .header {
       text-align: center;
-      margin-bottom: 30px;
-      border-bottom: 2px solid #000;
-      padding-bottom: 20px;
+      margin-bottom: 20px;
     }
     .logo {
-      font-size: 24px;
-      font-weight: bold;
+      width: 120px;
+      height: auto;
       margin-bottom: 10px;
     }
     .university-name {
-      font-size: 18px;
+      font-size: 22px;
       font-weight: bold;
+      color: #2b547e; /* RMU Blue */
       margin-bottom: 5px;
     }
     .address {
-      font-size: 12px;
-      margin-top: 10px;
+      font-size: 11px;
+      color: #000;
     }
-    .date {
-      text-align: right;
+    .meta-line {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 20px;
       margin-bottom: 30px;
+      font-size: 14px;
     }
-    .recipient {
-      margin-bottom: 30px;
+    .ref-col {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .ref-row {
+      display: flex;
+      align-items: center;
+      gap: 15px;
+    }
+    .dots {
+      border-bottom: 1px dotted #000;
+      width: 250px;
+      display: inline-block;
+      height: 15px;
     }
     .subject {
       font-weight: bold;
-      margin-bottom: 20px;
       text-decoration: underline;
+      margin-bottom: 20px;
+      margin-top: 20px;
     }
     .content {
       text-align: justify;
@@ -152,28 +169,31 @@ function generateLetterHTML(user, internship = null, letterRequest = null) {
     }
     .content p {
       margin-bottom: 15px;
-      text-indent: 30px;
     }
     .signature-section {
-      margin-top: 50px;
+      margin-top: 40px;
     }
-    .signature-line {
-      border-top: 1px solid #000;
-      width: 300px;
-      margin-top: 60px;
+    .signature-img {
+      height: 60px;
+      margin-top: 10px;
+      margin-bottom: 5px;
     }
     .signature-name {
-      margin-top: 5px;
       font-weight: bold;
+      text-transform: uppercase;
     }
     .signature-title {
-      font-size: 12px;
+      font-weight: bold;
     }
     .footer {
-      margin-top: 30px;
-      font-size: 10px;
+      margin-top: 50px;
+      font-size: 11px;
       text-align: center;
-      color: #666;
+      font-style: italic;
+    }
+    .member-states {
+      font-weight: bold;
+      font-style: normal;
     }
     .print-button {
       position: fixed;
@@ -187,104 +207,101 @@ function generateLetterHTML(user, internship = null, letterRequest = null) {
       cursor: pointer;
       font-size: 14px;
     }
-    .print-button:hover {
-      background: #1e3a8a;
-    }
   </style>
 </head>
 <body>
   <button class="print-button no-print" onclick="window.print()">Print / Save as PDF</button>
   
   <div class="header">
-    <div class="logo">RMU</div>
-    <div class="university-name">REGIONAL MARITIME UNIVERSITY</div>
-    <div class="address">
-      P.O. Box GP 1115, Accra, Ghana<br>
-      Tel: +233 302 712 775 | Email: info@rmu.edu.gh<br>
-      Website: www.rmu.edu.gh
+    <img src="/rmu-logo.png" alt="RMU Logo" class="logo" onerror="this.src='https://rmu.edu.gh/wp-content/uploads/2019/09/rmulogo-2.png'" />
+    <div class="university-name">Regional Maritime University</div>
+    <div class="address" style="color: #000;">
+      Post Office Box GP 1115, Accra, Ghana Tel: (+233 302) 712775 / 712343 / 718225. Fax: (+233 302) 712047. Registrar Tel/Fax: (+233 302) 714070
     </div>
   </div>
 
-  <div class="date">
-    ${currentDate}
+  <div class="meta-line">
+    <div class="ref-col">
+      <div class="ref-row">
+        <span>MY REF:</span>
+        <span style="font-weight: bold;">${letterRequest?.referenceNumber ? `RMU/${letterRequest.referenceNumber}` : 'RMU/50/57[852]/9'}</span>
+      </div>
+      <div class="ref-row mt-2">
+        <span>YOUR REF:</span>
+      </div>
+      <div class="ref-col" style="margin-top: 15px; margin-left: 70px;">
+        <span class="dots"></span>
+        <span class="dots"></span>
+        <span class="dots"></span>
+        <span class="dots"></span>
+      </div>
+    </div>
+    <div class="date-col" style="font-weight: bold;">
+      ${currentDate}
+    </div>
   </div>
 
   <div class="recipient">
-    ${isGeneral ? '<p>To Whom It May Concern,</p>' : `<p>The Human Resources Manager,</p>
-    ${internship ? `<p>${internship.company}</p>` : (letterRequest && letterRequest.companyName !== 'General Request' ? `<p>${letterRequest.companyName}</p>` : '<p>[Company Name]</p>')}
-    ${internship ? `<p>${internship.location}</p>` : (letterRequest && letterRequest.companyAddress ? `<p>${letterRequest.companyAddress}</p>` : '<p>[Company Address]</p>')}`}
+    <p>Dear Sir/Madam,</p>
   </div>
 
   <div class="subject">
-    SUBJECT: ${isGeneral ? 'GENERAL INTERNSHIP INTRODUCTION' : 'RECOMMENDATION FOR INTERNSHIP PLACEMENT'} - ${user.firstName.toUpperCase()} ${user.lastName.toUpperCase()}
+    ${isGeneral ? 'INDUSTRIAL ATTACHMENT' : 'RECOMMENDATION FOR INTERNSHIP PLACEMENT'}
   </div>
 
   <div class="content">
-    <p>
-      I am writing to recommend <strong>${user.firstName} ${user.lastName}</strong>, 
-      Student ID: <strong>${user.studentId || 'N/A'}</strong>, a ${user.yearOfStudy || 'N/A'}${getOrdinalSuffix(user.yearOfStudy)} 
-      year student enrolled in the <strong>${user.program || 'N/A'}</strong> program at the Regional Maritime University.
-    </p>
-
-    ${internshipDetails}
+    <p>The Regional Maritime University presents its compliments to you.</p>
 
     <p>
-      ${user.firstName} ${user.lastName} has demonstrated exceptional academic performance and a strong commitment 
-      to their studies. Throughout their time at the Regional Maritime University, they have shown dedication, 
-      professionalism, and a genuine interest in gaining practical experience in the maritime industry.
+      <strong>${user.firstName} ${user.lastName}</strong> is a ${user.yearOfStudy || 'N/A'}${getOrdinalSuffix(user.yearOfStudy)} year [Level ${user.yearOfStudy ? user.yearOfStudy * 100 : 'N/A'}] student of the University who is pursuing 
+      ${user.program || 'N/A'} programme in the ${signature.department} Department.
     </p>
 
     <p>
-      We believe that ${user.firstName} would be an excellent candidate for this internship opportunity. 
-      Their academic background, combined with their enthusiasm and willingness to learn, makes them well-suited 
-      for this position. We are confident that they will contribute positively to your organization while 
-      gaining valuable industry experience.
+      In fulfillment of the requirement for the programme, ${user.gender === 'female' ? 'she' : 'he'} has to undertake an industrial attachment.
     </p>
 
     <p>
-      The Regional Maritime University fully supports this internship placement and will ensure that 
-      ${user.firstName} maintains the highest standards of professionalism and academic excellence 
-      throughout the internship period.
+      We would therefore be grateful if you could offer the above-mentioned student placement in your establishment 
+      ${letterRequest?.internshipDuration ? `for a duration of ${letterRequest.internshipDuration}` : 'for the upcoming attachment period'}.
     </p>
 
+    ${!isGeneral ? `
     <p>
-      We would be grateful if you could consider ${user.firstName}'s application for this internship 
-      opportunity. Should you require any additional information, please do not hesitate to contact us.
+      ${user.gender === 'female' ? 'She' : 'He'} is specifically recommended to <strong>${letterRequest.companyName}</strong> 
+      ${letterRequest.purpose ? `for the purpose of ${letterRequest.purpose}` : ''}.
     </p>
+    ` : ''}
 
     <p>
-      Thank you for considering our student for this valuable learning opportunity.
+      The Regional Maritime University takes this opportunity to renew to you the assurance of its highest consideration.
     </p>
+
+    <p>Thank you.</p>
   </div>
 
   <div class="signature-section">
     <p>Yours faithfully,</p>
-    <div class="signature-line"></div>
+    <!-- <img src="${signature.signature}" alt="Signature" class="signature-img" onerror="this.style.display='none';" /> -->
+    <br><br>
     <div class="signature-name">${signature.name}</div>
-    <div class="signature-title">${signature.title}</div>
-    <div class="signature-title">${signature.department}</div>
-    <div class="signature-title">Regional Maritime University</div>
+    <div class="signature-title">[${signature.title.toUpperCase()} - ${signature.department}]</div>
   </div>
 
-  ${letterRequest && (letterRequest.referenceNumber || letterRequest.verificationCode) ? `
-  <div class="reference-info">
-    <p><strong>Document Reference:</strong> ${letterRequest.referenceNumber || 'N/A'}</p>
-    ${letterRequest.verificationCode ? `<p><strong>Verification Code:</strong> ${letterRequest.verificationCode}</p>` : ''}
-    <p><em>This document can be verified by contacting the Regional Maritime University with the reference number above.</em></p>
+  ${letterRequest && letterRequest.verificationCode ? `
+  <div style="margin-top: 40px; font-size: 11px;">
+    <strong>Verification Code:</strong> ${letterRequest.verificationCode}<br>
+    <em>This document can be verified online using the code above.</em>
   </div>
   ` : ''}
 
   <div class="footer">
-    <p>This is an official document from the Regional Maritime University</p>
-    <p>For verification, please contact: info@rmu.edu.gh</p>
+    <div class="member-states">Member States: Cameroon, The Gambia, Ghana, Liberia, Sierra Leone</div>
+    Email: university.registrar@rmu.edu.gh &nbsp;&nbsp;&nbsp; Website: www.rmu.edu.gh<br>
+    In case of reply the number and date of this letter should be quoted.
   </div>
-
-  <script>
-    // Auto-print on load (optional - can be removed)
-    // window.onload = function() {
-    //   setTimeout(() => window.print(), 500);
-    // };
-  </script>
+</body>
+</html>
 </body>
 </html>
   `;
@@ -320,138 +337,99 @@ async function generatePDFBuffer(user, letterRequest) {
       const isGeneral = letterRequest && (letterRequest.requestType === 'general');
 
       // --- Header ---
-      doc.fontSize(20).font('Helvetica-Bold').text('RMU', { align: 'center' });
-      doc.fontSize(14).text('REGIONAL MARITIME UNIVERSITY', { align: 'center' });
-      doc.fontSize(9).font('Helvetica')
-        .text('P.O. Box GP 1115, Accra, Ghana', { align: 'center' })
-        .text('Tel: +233 302 712 775 | Email: info@rmu.edu.gh', { align: 'center' })
-        .text('Website: www.rmu.edu.gh', { align: 'center' });
-      doc.moveDown(0.5);
-      doc.moveTo(50, doc.y).lineTo(545, doc.y).stroke();
-      doc.moveDown(1);
-
-      // --- Date ---
-      doc.fontSize(11).font('Helvetica').text(currentDate, { align: 'right' });
+      const path = require('path');
+      const fs = require('fs');
+      
+      const logoPath = path.join(__dirname, '../public/rmu-logo.png');
+      if (fs.existsSync(logoPath)) {
+        doc.image(logoPath, (doc.page.width - 120) / 2, 40, { width: 120 });
+        doc.moveDown(4); // Adjust space after logo
+      } else {
+        doc.moveDown(2);
+      }
+      
+      doc.fontSize(22).font('Helvetica-Bold').fillColor('#2b547e').text('Regional Maritime University', { align: 'center' });
+      doc.fontSize(9).font('Helvetica').fillColor('#000000')
+        .text('Post Office Box GP 1115, Accra, Ghana Tel: (+233 302) 712775 / 712343 / 718225. Fax: (+233 302) 712047. Registrar Tel/Fax: (+233 302) 714070', { align: 'center' });
       doc.moveDown(1.5);
 
+      // --- Meta Line (Refs and Date) ---
+      const refY = doc.y;
+      doc.fontSize(11).font('Helvetica').text('MY REF:', 50, refY);
+      const myRef = letterRequest?.referenceNumber ? `RMU/${letterRequest.referenceNumber}` : 'RMU/50/57[852]/9';
+      doc.font('Helvetica-Bold').text(myRef, 110, refY);
+      
+      doc.font('Helvetica-Bold').text(currentDate, 400, refY, { align: 'right', width: 145 });
+      
+      doc.font('Helvetica').text('YOUR REF:', 50, refY + 20);
+      doc.text('...........................................................................', 120, refY + 40);
+      doc.text('...........................................................................', 120, refY + 60);
+      doc.text('...........................................................................', 120, refY + 80);
+      doc.text('...........................................................................', 120, refY + 100);
+
+      doc.moveDown(9);
+      
       // --- Recipient ---
-      if (isGeneral) {
-        doc.font('Helvetica').text('To Whom It May Concern,');
-      } else {
-        doc.font('Helvetica').text('The Human Resources Manager,');
-        if (letterRequest && letterRequest.companyName && letterRequest.companyName !== 'General Request') {
-          doc.text(letterRequest.companyName);
-        }
-        if (letterRequest && letterRequest.companyAddress) {
-          doc.text(letterRequest.companyAddress);
-        }
-      }
+      doc.font('Helvetica').text('Dear Sir/Madam,', 50, doc.y);
       doc.moveDown(1.5);
 
       // --- Subject ---
-      const subjectText = isGeneral
-        ? `SUBJECT: GENERAL INTERNSHIP INTRODUCTION - ${user.firstName.toUpperCase()} ${user.lastName.toUpperCase()}`
-        : `SUBJECT: RECOMMENDATION FOR INTERNSHIP PLACEMENT - ${user.firstName.toUpperCase()} ${user.lastName.toUpperCase()}`;
+      const subjectText = isGeneral ? 'INDUSTRIAL ATTACHMENT' : 'RECOMMENDATION FOR INTERNSHIP PLACEMENT';
       doc.font('Helvetica-Bold').text(subjectText, { underline: true });
       doc.moveDown(1);
 
       // --- Body ---
       doc.font('Helvetica').fontSize(11);
 
-      doc.text(
-        `I am writing to recommend ${user.firstName} ${user.lastName}, ` +
-        `Student ID: ${user.studentId || 'N/A'}, a ${user.yearOfStudy || 'N/A'}${getOrdinalSuffix(user.yearOfStudy)} ` +
-        `year student enrolled in the ${user.program || 'N/A'} program at the Regional Maritime University.`,
-        { align: 'justify', indent: 30 }
-      );
-      doc.moveDown(0.5);
+      doc.text('The Regional Maritime University presents its compliments to you.', { align: 'justify' });
+      doc.moveDown(1);
+      
+      const genderPronoun = user.gender === 'female' ? 'she' : 'he';
+      const capitalizedPronoun = user.gender === 'female' ? 'She' : 'He';
+      const level = user.yearOfStudy ? user.yearOfStudy * 100 : 'N/A';
 
-      // Internship details
-      if (letterRequest) {
-        if (!isGeneral && letterRequest.companyName) {
-          doc.font('Helvetica-Bold').text(`Company/Organization: `, { continued: true }).font('Helvetica').text(letterRequest.companyName);
-        }
-        if (!isGeneral && letterRequest.companyAddress) {
-          doc.font('Helvetica-Bold').text(`Address: `, { continued: true }).font('Helvetica').text(letterRequest.companyAddress);
-        }
-        if (letterRequest.internshipDuration) {
-          doc.font('Helvetica-Bold').text(`Internship Duration: `, { continued: true }).font('Helvetica').text(letterRequest.internshipDuration);
-        }
-        if (letterRequest.internshipStartDate) {
-          doc.font('Helvetica-Bold').text(`Start Date: `, { continued: true }).font('Helvetica').text(new Date(letterRequest.internshipStartDate).toLocaleDateString('en-GB'));
-        }
-        if (letterRequest.internshipEndDate) {
-          doc.font('Helvetica-Bold').text(`End Date: `, { continued: true }).font('Helvetica').text(new Date(letterRequest.internshipEndDate).toLocaleDateString('en-GB'));
-        }
-        if (!isGeneral && letterRequest.purpose) {
-          doc.font('Helvetica-Bold').text(`Purpose: `, { continued: true }).font('Helvetica').text(letterRequest.purpose);
-        }
-        doc.moveDown(0.5);
+      doc.font('Helvetica-Bold').text(`${user.firstName} ${user.lastName}`, { continued: true })
+         .font('Helvetica').text(` is a ${user.yearOfStudy || 'N/A'}${getOrdinalSuffix(user.yearOfStudy)} year [Level ${level}] student of the University who is pursuing ${user.program || 'N/A'} programme in the ${signature.department} Department.`, { align: 'justify' });
+      doc.moveDown(1);
+
+      doc.text(`In fulfillment of the requirement for the programme, ${genderPronoun} has to undertake an industrial attachment.`, { align: 'justify' });
+      doc.moveDown(1);
+
+      const durationText = letterRequest?.internshipDuration ? `for a duration of ${letterRequest.internshipDuration}` : 'for the upcoming attachment period';
+      doc.text(`We would therefore be grateful if you could offer the above-mentioned student placement in your establishment ${durationText}.`, { align: 'justify' });
+      doc.moveDown(1);
+
+      if (!isGeneral && letterRequest) {
+         doc.text(`${capitalizedPronoun} is specifically recommended to `, { continued: true })
+            .font('Helvetica-Bold').text(`${letterRequest.companyName}`, { continued: true })
+            .font('Helvetica').text(` ${letterRequest.purpose ? `for the purpose of ${letterRequest.purpose}` : ''}.`, { align: 'justify' });
+         doc.moveDown(1);
       }
 
-      doc.text(
-        `${user.firstName} ${user.lastName} has demonstrated exceptional academic performance and a strong commitment ` +
-        `to their studies. Throughout their time at the Regional Maritime University, they have shown dedication, ` +
-        `professionalism, and a genuine interest in gaining practical experience in the maritime industry.`,
-        { align: 'justify', indent: 30 }
-      );
-      doc.moveDown(0.5);
+      doc.text('The Regional Maritime University takes this opportunity to renew to you the assurance of its highest consideration.', { align: 'justify' });
+      doc.moveDown(1);
 
-      doc.text(
-        `We believe that ${user.firstName} would be an excellent candidate for this internship opportunity. ` +
-        `Their academic background, combined with their enthusiasm and willingness to learn, makes them well-suited ` +
-        `for this position. We are confident that they will contribute positively to your organization while ` +
-        `gaining valuable industry experience.`,
-        { align: 'justify', indent: 30 }
-      );
-      doc.moveDown(0.5);
-
-      doc.text(
-        `The Regional Maritime University fully supports this internship placement and will ensure that ` +
-        `${user.firstName} maintains the highest standards of professionalism and academic excellence ` +
-        `throughout the internship period.`,
-        { align: 'justify', indent: 30 }
-      );
-      doc.moveDown(0.5);
-
-      doc.text(
-        `We would be grateful if you could consider ${user.firstName}'s application for this internship ` +
-        `opportunity. Should you require any additional information, please do not hesitate to contact us.`,
-        { align: 'justify', indent: 30 }
-      );
-      doc.moveDown(0.5);
-
-      doc.text('Thank you for considering our student for this valuable learning opportunity.', { indent: 30 });
+      doc.text('Thank you.');
       doc.moveDown(2);
 
       // --- Signature ---
       doc.text('Yours faithfully,');
-      doc.moveDown(3);
-      doc.moveTo(doc.x, doc.y).lineTo(doc.x + 200, doc.y).stroke();
-      doc.moveDown(0.3);
+      doc.moveDown(4);
       doc.font('Helvetica-Bold').text(signature.name);
-      doc.fontSize(10).font('Helvetica').text(signature.title);
-      doc.text(signature.department);
-      doc.text('Regional Maritime University');
+      doc.font('Helvetica-Bold').text(`[${signature.title.toUpperCase()} - ${signature.department.toUpperCase()}]`);
 
       // --- Reference / Verification ---
-      if (letterRequest && (letterRequest.referenceNumber || letterRequest.verificationCode)) {
-        doc.moveDown(1.5);
-        doc.fontSize(9);
-        if (letterRequest.referenceNumber) {
-          doc.font('Helvetica-Bold').text('Document Reference: ', { continued: true }).font('Helvetica').text(letterRequest.referenceNumber);
-        }
-        if (letterRequest.verificationCode) {
-          doc.font('Helvetica-Bold').text('Verification Code: ', { continued: true }).font('Helvetica').text(letterRequest.verificationCode);
-        }
-        doc.font('Helvetica-Oblique').text('This document can be verified by contacting the Regional Maritime University with the reference number above.');
+      if (letterRequest && letterRequest.verificationCode) {
+        doc.moveDown(2);
+        doc.fontSize(9).font('Helvetica-Bold').text('Verification Code: ', { continued: true }).font('Helvetica').text(letterRequest.verificationCode);
+        doc.font('Helvetica-Oblique').text('This document can be verified online using the code above.');
       }
 
       // --- Footer ---
-      doc.moveDown(1);
-      doc.fontSize(8).font('Helvetica').fillColor('#666666')
-        .text('This is an official document from the Regional Maritime University', { align: 'center' })
-        .text('For verification, please contact: info@rmu.edu.gh', { align: 'center' });
+      const pageHeight = doc.page.height;
+      doc.fontSize(9).font('Helvetica-Bold').text('Member States: Cameroon, The Gambia, Ghana, Liberia, Sierra Leone', 0, pageHeight - 80, { align: 'center', width: doc.page.width });
+      doc.font('Helvetica-Oblique').text('Email: university.registrar@rmu.edu.gh          Website: www.rmu.edu.gh', 0, pageHeight - 65, { align: 'center', width: doc.page.width });
+      doc.text('In case of reply the number and date of this letter should be quoted.', 0, pageHeight - 50, { align: 'center', width: doc.page.width });
 
       doc.end();
     } catch (err) {
@@ -605,112 +583,6 @@ async function createRequest(req, res) {
       status: 'pending',
     });
 
-    // If company request, send directly to company email
-    if (requestType === 'company') {
-      try {
-        // Generate PDF
-        const pdfData = await generateLetterPDF(request);
-        const { LetterRequest } = require('../models');
-        const updated = await LetterRequest.update(request.id, {
-          pdfUrl: pdfData.url,
-          pdfGeneratedAt: new Date().toISOString(),
-          reviewedBy: user.id, // Auto-reviewed by the system/student sending it
-          reviewedAt: new Date().toISOString()
-        });
-
-        // Generate the actual PDF buffer for attachment
-        const fullUser = await User.findByPk(user.id);
-        const pdfBuffer = await generatePDFBuffer(fullUser || user, request);
-
-        // Send email to company
-        const transporter = require('../config/email');
-        const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
-        const mailOptions = {
-          from: emailFrom,
-          to: companyEmail,
-          subject: `Internship Application - ${user.firstName} ${user.lastName}`,
-          html: `
-            <!DOCTYPE html>
-            <html>
-            <head>
-              <style>
-                body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-                .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                .header { background: #1e3a5f; color: white; padding: 20px; text-align: center; }
-                .content { padding: 20px; background: #f9f9f9; }
-                .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-              </style>
-            </head>
-            <body>
-              <div class="container">
-                <div class="header">
-                  <h1>Internship Application</h1>
-                </div>
-                <div class="content">
-                  <p>Dear Human Resources Manager,</p>
-                  
-                  <p>Please find attached the official internship recommendation letter for <strong>${user.firstName} ${user.lastName}</strong> from the Regional Maritime University.</p>
-                  
-                  <p>This student is highly recommended for an internship position at your reputable organization.</p>
-                  <p>The letter can be verified using the reference number and verification code provided within the document.</p>
-                  
-                  <p>Best regards,<br>Regional Maritime University</p>
-                </div>
-                <div class="footer">
-                  <p>This is an automated message. Please do not reply directly to this email.</p>
-                </div>
-              </div>
-            </body>
-            </html>
-          `,
-          text: `
-            Dear Human Resources Manager,
-
-            Please find attached the official internship recommendation letter for ${user.firstName} ${user.lastName} from the Regional Maritime University.
-
-            This student is highly recommended for an internship position at your organization.
-
-            Best regards,
-            Regional Maritime University
-          `,
-          attachments: [
-            {
-              filename: `Internship_Letter_${user.firstName}_${user.lastName}.pdf`,
-              content: pdfBuffer,
-              contentType: 'application/pdf'
-            }
-          ]
-        };
-
-        await transporter.sendMail(mailOptions);
-
-        await LetterRequest.update(request.id, {
-          emailSent: true,
-          emailSentAt: new Date().toISOString(),
-        });
-
-        // Notify student of successful send
-        const { createNotification } = require('../services/notificationService');
-        await createNotification({
-          userId: user.id,
-          type: 'letter_request',
-          title: 'Letter Sent Successfully',
-          message: `Your internship letter has been generated and successfully sent to ${companyName} (${companyEmail}).`,
-          relatedId: request.id,
-        });
-
-        return res.status(201).json({
-          message: 'Letter successfully generated and sent to company',
-          request: updated
-        });
-      } catch (err) {
-        console.error('Error auto-sending letter to company:', err);
-        return res.status(500).json({
-          message: 'Failed to send letter to company',
-          error: err.message
-        });
-      }
-    }
 
     // Create notification for admin
     const { createNotification } = require('../services/notificationService');

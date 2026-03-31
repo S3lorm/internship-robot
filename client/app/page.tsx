@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -33,8 +34,8 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
           <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary">
-              <Anchor className="h-5 w-5 text-primary-foreground" />
+            <div className="flex h-10 items-center justify-center rounded-lg bg-white p-1 shadow-sm">
+              <Image src="/rmu-logo.png" alt="RMU Logo" width={120} height={30} className="object-contain" />
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-semibold leading-none text-foreground">
@@ -352,8 +353,8 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-                <Anchor className="h-4 w-4 text-primary-foreground" />
+              <div className="flex h-10 items-center justify-center rounded-lg bg-white p-1 shadow-sm">
+                <Image src="/rmu-logo.png" alt="RMU Logo" width={100} height={25} className="object-contain" />
               </div>
               <span className="font-semibold text-foreground">
                 RMU Internship Portal
