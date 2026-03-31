@@ -137,8 +137,22 @@ export default function LetterRequestsPage() {
     (r) => r.status === "pending" || r.status === "approved"
   );
   const hasApprovedGeneral = generalRequests.some((r) => r.status === "approved");
+  
+  // Check if they have an active placement (approved/pending) whose end date hasn't passed
+  const activePlacement = placements.find(p => {
+    if (p.status === "rejected") return false;
+    if (!p.internshipEndDate) return true; // Safety fallback
+    const endDate = new Date(p.internshipEndDate);
+    const today = new Date();
+    // Reset times for date-only comparison
+    endDate.setHours(0, 0, 0, 0);
+    today.setHours(0, 0, 0, 0);
+    return endDate >= today;
+  });
+
   const stage1Locked = hasPendingOrApprovedGeneral;
-  const stage2Unlocked = hasApprovedGeneral;
+  const stage2LockedByPlacement = !!activePlacement;
+  const stage2Unlocked = hasApprovedGeneral && !stage2LockedByPlacement;
 
   const latestGeneralRequest = generalRequests.length > 0
     ? generalRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
@@ -453,30 +467,42 @@ export default function LetterRequestsPage() {
           ) : (
             <Badge variant="outline" className="ml-auto text-muted-foreground">
               <Lock className="h-3 w-3 mr-1" />
-              Locked — Stage 1 approval required
+              {stage2LockedByPlacement ? "Locked — Active Placement" : "Locked — Stage 1 approval required"}
             </Badge>
           )}
         </div>
 
-        {!stage2Unlocked ? (
-          /* Locked state */
-          <Card className="border-dashed border-2 border-muted">
-            <CardContent className="py-12 text-center">
-              <Lock className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
-              <h3 className="text-lg font-medium text-muted-foreground mb-2">
-                Stage 2 is Locked
-              </h3>
-              <p className="text-sm text-muted-foreground max-w-md mx-auto">
-                You need an approved Stage 1 general letter request before you can register an official placement. 
-                {!hasPendingOrApprovedGeneral && " Submit your Stage 1 request above to get started."}
-                {latestGeneralRequest?.status === "pending" && " Your Stage 1 request is currently pending approval."}
-              </p>
-            </CardContent>
-          </Card>
-        ) : (
-          /* Unlocked - show placement form and history */
-          <div className="space-y-6">
-            {/* Placement Form */}
+        <div className="space-y-6">
+          {!hasApprovedGeneral ? (
+            /* Locked state (needs Stage 1) */
+            <Card className="border-dashed border-2 border-muted">
+              <CardContent className="py-12 text-center">
+                <Lock className="mx-auto h-12 w-12 text-muted-foreground/30 mb-4" />
+                <h3 className="text-lg font-medium text-muted-foreground mb-2">
+                  Stage 2 is Locked
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-md mx-auto">
+                  You need an approved Stage 1 general letter request before you can register an official placement. 
+                  {!hasPendingOrApprovedGeneral && " Submit your Stage 1 request above to get started."}
+                  {latestGeneralRequest?.status === "pending" && " Your Stage 1 request is currently pending approval."}
+                </p>
+              </CardContent>
+            </Card>
+          ) : stage2LockedByPlacement ? (
+            /* Locked state (has active placement) */
+            <Card className="border-dashed border-2 border-muted bg-blue-50/30">
+              <CardContent className="py-12 text-center">
+                <Briefcase className="mx-auto h-12 w-12 text-blue-300 mb-4" />
+                <h3 className="text-lg font-medium text-blue-800 mb-2">
+                  Active Placement Ongoing
+                </h3>
+                <p className="text-sm text-blue-700 max-w-md mx-auto">
+                  You currently have an active internship placement registered. You cannot register a new placement until your current internship officially ends.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            /* Unlocked - show placement form */
             <Card className="border-muted shadow-sm">
               <CardHeader className="bg-muted/30 border-b pb-4">
                 <CardTitle className="text-base flex items-center gap-2">
@@ -674,8 +700,9 @@ export default function LetterRequestsPage() {
                 </form>
               </CardContent>
             </Card>
+          )}
 
-            {/* Existing Placements */}
+          {/* Existing Placements */}
             {placements.length > 0 && (
               <Card className="border-muted shadow-sm">
                 <CardHeader className="bg-muted/30 border-b">
@@ -721,8 +748,7 @@ export default function LetterRequestsPage() {
               </Card>
             )}
           </div>
-        )}
-      </div>
+        </div>
 
       {/* General Request Detail Dialog */}
       <Dialog open={!!selectedGeneralRequest} onOpenChange={() => setSelectedGeneralRequest(null)}>
@@ -748,11 +774,11 @@ export default function LetterRequestsPage() {
                     <div className="grid grid-cols-2 gap-4 text-sm">
                       <div>
                         <span className="text-muted-foreground block text-xs">Start Date</span>
-                        <span className="font-medium">{new Date(selectedGeneralRequest.internshipStartDate).toLocaleDateString()}</span>
+                        <span className="font-medium">{new Date(selectedGeneralRequest.internshipStartDate as string).toLocaleDateString()}</span>
                       </div>
                       <div>
                         <span className="text-muted-foreground block text-xs">End Date</span>
-                        <span className="font-medium">{new Date(selectedGeneralRequest.internshipEndDate).toLocaleDateString()}</span>
+                        <span className="font-medium">{new Date(selectedGeneralRequest.internshipEndDate as string).toLocaleDateString()}</span>
                       </div>
                     </div>
                   </div>
