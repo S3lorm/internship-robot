@@ -36,6 +36,31 @@ async function getEvaluationForm(req, res) {
     // Load student data
     const student = await User.findByPk(placement.studentId);
 
+    // Enforce 14-day lock
+    const now = new Date();
+    // Start of today for exact comparisons
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    let isLocked = false;
+    let daysUntilEnd = 0;
+    
+    if (placement.internshipEndDate) {
+      const endDate = new Date(placement.internshipEndDate);
+      endDate.setHours(0, 0, 0, 0);
+      daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Lock if more than 14 days remaining
+      if (daysUntilEnd > 14) {
+        isLocked = true;
+      }
+    }
+
+    if (isLocked) {
+      return res.status(403).json({ 
+        message: `This evaluation form will automatically open 2 weeks before the student's internship ends. (Currently ${daysUntilEnd} days remaining)` 
+      });
+    }
+
     res.json({
       placement: {
         organizationName: placement.organizationName,
@@ -105,6 +130,24 @@ async function submitEvaluation(req, res) {
     const placement = await InternshipPlacement.findByPk(evalToken.placementId);
     if (!placement) {
       return res.status(404).json({ message: 'Placement not found.' });
+    }
+
+    // Enforce 14-day lock on submission
+    const now = new Date();
+    // Start of today for exact comparisons
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+    if (placement.internshipEndDate) {
+      const endDate = new Date(placement.internshipEndDate);
+      endDate.setHours(0, 0, 0, 0);
+      const daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      
+      // Lock if more than 14 days remaining
+      if (daysUntilEnd > 14) {
+        return res.status(403).json({ 
+          message: `This evaluation form will automatically open 2 weeks before the student's internship ends. (Currently ${daysUntilEnd} days remaining)` 
+        });
+      }
     }
 
     // Create the evaluation record

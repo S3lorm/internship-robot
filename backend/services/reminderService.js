@@ -356,6 +356,19 @@ async function checkEndOfInternshipEvaluations() {
           evaluationSentAt: new Date().toISOString(),
         });
 
+        // Concurrently notify the student to remind their supervisor
+        const { createNotification } = require('./notificationService');
+        await createNotification({
+          userId: placement.studentId,
+          type: 'evaluation_available',
+          title: 'Final Evaluation Form Sent to Supervisor',
+          message: `Your internship concludes in two weeks. We have officially emailed the final evaluation link to your supervisor at ${placement.organizationName}. Please remind them to complete it.`,
+          link: `/dashboard/placements/${placement.id}`, // or wherever placement details are
+          priority: 'high',
+          actionRequired: true,
+          expiresAt: placement.internshipEndDate,
+        });
+
         console.log(`📧 Evaluation email sent to supervisor for placement ${placement.id} (2 weeks to end date)`);
       } catch (emailErr) {
         console.error(`Failed to send eval email for placement ${placement.id}:`, emailErr.message);
