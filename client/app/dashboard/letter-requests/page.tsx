@@ -680,7 +680,7 @@ export default function LetterRequestsPage() {
               <Card className="border-muted shadow-sm">
                 <CardHeader className="bg-muted/30 border-b">
                   <CardTitle className="text-base">My Placements ({placements.length})</CardTitle>
-                  <CardDescription>Track your official placements and send documents to companies.</CardDescription>
+                  <CardDescription>Track your registered placements.</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6">
                   <div className="space-y-4">
@@ -695,12 +695,6 @@ export default function LetterRequestsPage() {
                                 <StatusIcon className="h-3 w-3 mr-1.5" />
                                 {status.label}
                               </Badge>
-                              {placement.status === "approved" && placement.emailSent && (
-                                <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
-                                  <Check className="h-3 w-3 mr-1" />
-                                  Emails Sent
-                                </Badge>
-                              )}
                               <span className="text-xs text-muted-foreground ml-auto hidden md:inline-block">
                                 {new Date(placement.createdAt).toLocaleDateString()}
                               </span>
@@ -712,11 +706,11 @@ export default function LetterRequestsPage() {
                           </div>
                           <div className="flex items-center justify-end border-t md:border-t-0 pt-3 md:pt-0 shrink-0">
                             <Button
-                              variant={placement.status === "approved" && !placement.emailSent ? "default" : "outline"}
+                              variant="outline"
                               size="sm"
                               onClick={() => setSelectedPlacement(placement)}
                             >
-                              {placement.status === "approved" && !placement.emailSent ? "Send Emails" : "View Details"}
+                              View Details
                             </Button>
                           </div>
                         </div>
@@ -797,43 +791,6 @@ export default function LetterRequestsPage() {
                 </DialogDescription>
               </DialogHeader>
               <div className="space-y-6 mt-4">
-                {selectedPlacement.status === "approved" && !selectedPlacement.emailSent && (
-                  <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg">
-                    <h4 className="font-semibold flex items-center gap-2 mb-2">
-                      <CheckCircle2 className="h-5 w-5" />
-                      Approved — Ready to Send
-                    </h4>
-                    <p className="text-sm">
-                      Your placement has been approved. Send the official letter to <strong>{selectedPlacement.organizationEmail}</strong>.
-                    </p>
-                    <div className="mt-4 flex justify-end">
-                      <Button
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        disabled={isSendingEmail === selectedPlacement.id}
-                        onClick={() => handleSendEmail(selectedPlacement.id, selectedPlacement.organizationName)}
-                      >
-                        {isSendingEmail === selectedPlacement.id ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Sending...</>
-                        ) : (
-                          <><Mail className="h-4 w-4 mr-2" /> Send Official Documents</>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-
-                {selectedPlacement.status === "approved" && selectedPlacement.emailSent && (
-                  <div className="bg-blue-50 border border-blue-200 text-blue-800 p-4 rounded-lg">
-                    <h4 className="font-semibold flex items-center gap-2 mb-1">
-                      <Mail className="h-5 w-5" />
-                      Documents Sent
-                    </h4>
-                    <p className="text-sm">
-                      Official letter and evaluation link sent to {selectedPlacement.organizationEmail}.
-                    </p>
-                  </div>
-                )}
-
                 <div className="grid md:grid-cols-2 gap-6">
                   <div className="space-y-3">
                     <h3 className="font-semibold flex items-center gap-2 text-muted-foreground border-b pb-1">
