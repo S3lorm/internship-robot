@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { motion } from "framer-motion";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -105,22 +106,43 @@ export default function HomePage() {
         </div>
         <div className="container relative mx-auto px-4 py-24 md:py-36">
           <div className="mx-auto max-w-3xl text-center">
-            <Badge
-              variant="secondary"
-              className="mb-6 gap-1.5 bg-white/15 backdrop-blur-sm border-white/20 px-3 py-1 text-sm text-white"
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5 }}
             >
-              <Ship className="h-3.5 w-3.5" />
-              Regional Maritime University
-            </Badge>
-            <h1 className="mb-6 text-balance text-4xl font-bold tracking-tight text-white md:text-5xl lg:text-6xl drop-shadow-lg">
+              <Badge
+                variant="secondary"
+                className="mb-6 gap-1.5 bg-white/15 backdrop-blur-sm border-white/20 px-3 py-1 text-sm text-white"
+              >
+                <Ship className="h-3.5 w-3.5" />
+                Regional Maritime University
+              </Badge>
+            </motion.div>
+            <motion.h1
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="mb-6 text-balance text-4xl font-bold tracking-tight text-white md:text-5xl lg:text-6xl drop-shadow-lg"
+            >
               Launch Your Maritime Career with the Right Internship
-            </h1>
-            <p className="mb-8 text-pretty text-lg text-white/80 md:text-xl drop-shadow">
+            </motion.h1>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.4 }}
+              className="mb-8 text-pretty text-lg text-white/80 md:text-xl drop-shadow"
+            >
               Discover internship opportunities from leading maritime companies.
               Apply, track your progress, and take the first step towards your
               professional journey.
-            </p>
-            <div className="flex flex-col items-center justify-center gap-4 sm:flex-row">
+            </motion.p>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.5, delay: 0.6 }}
+              className="flex flex-col items-center justify-center gap-4 sm:flex-row"
+            >
               <Button size="lg" asChild className="w-full sm:w-auto">
                 <Link href="/register">
                   Get Started
@@ -135,7 +157,7 @@ export default function HomePage() {
               >
                 <Link href="#internships">Browse Internships</Link>
               </Button>
-            </div>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -149,8 +171,15 @@ export default function HomePage() {
               { label: "Partner Companies", value: "25+", icon: Users },
               { label: "Students Placed", value: "500+", icon: GraduationCap },
               { label: "Success Rate", value: "92%", icon: FileText },
-            ].map((stat) => (
-              <div key={stat.label} className="text-center">
+            ].map((stat, i) => (
+              <motion.div
+                key={stat.label}
+                initial={{ opacity: 0, scale: 0.9 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.1 }}
+                className="text-center"
+              >
                 <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
                   <stat.icon className="h-6 w-6 text-primary" />
                 </div>
@@ -158,7 +187,7 @@ export default function HomePage() {
                   {stat.value}
                 </div>
                 <div className="text-sm text-muted-foreground">{stat.label}</div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -177,10 +206,16 @@ export default function HomePage() {
               </div>
             </div>
             <div className="grid gap-4 md:grid-cols-2">
-              {latestNotices.map((notice) => (
-                <Card
+              {latestNotices.map((notice, i) => (
+                <motion.div
                   key={notice.id}
-                  className={`transition-shadow hover:shadow-md ${notice.isPinned ? "border-primary/50" : ""}`}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.15 }}
+                >
+                <Card
+                  className={`transition-shadow hover:shadow-md h-full ${notice.isPinned ? "border-primary/50" : ""}`}
                 >
                   <CardContent className="p-5">
                     <div className="mb-2 flex items-start justify-between gap-4">
@@ -206,6 +241,7 @@ export default function HomePage() {
                     </div>
                   </CardContent>
                 </Card>
+                </motion.div>
               ))}
             </div>
           </div>
@@ -226,10 +262,17 @@ export default function HomePage() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {featuredInternships.map((internship) => (
-              <Card
+            {featuredInternships.map((internship, i) => (
+              <motion.div
                 key={internship.id}
-                className="group transition-all hover:shadow-lg"
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                transition={{ duration: 0.5, delay: i * 0.15 }}
+                className="h-full"
+              >
+              <Card
+                className="group transition-all hover:shadow-lg h-full"
               >
                 <CardContent className="p-6">
                   <div className="mb-4 flex items-start justify-between">
@@ -275,6 +318,7 @@ export default function HomePage() {
                   </div>
                 </CardContent>
               </Card>
+              </motion.div>
             ))}
           </div>
 
@@ -293,15 +337,27 @@ export default function HomePage() {
       <section id="about" className="border-t border-border bg-secondary/20 py-16 md:py-20">
         <div className="container mx-auto px-4">
           <div className="mx-auto max-w-3xl text-center">
-            <h2 className="mb-4 text-3xl font-bold text-foreground">
+            <motion.h2
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5 }}
+              className="mb-4 text-3xl font-bold text-foreground"
+            >
               About the Portal
-            </h2>
-            <p className="mb-8 text-muted-foreground">
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              transition={{ duration: 0.5, delay: 0.2 }}
+              className="mb-8 text-muted-foreground"
+            >
               The RMU Internship Portal is designed to streamline the internship
               application process for students at Regional Maritime University.
               Our platform connects students with leading maritime companies,
               providing valuable opportunities for professional development.
-            </p>
+            </motion.p>
             <div className="grid gap-6 md:grid-cols-3">
               {[
                 {
@@ -319,15 +375,22 @@ export default function HomePage() {
                   description:
                     "Receive notifications about new opportunities and application updates.",
                 },
-              ].map((feature) => (
-                <div key={feature.title} className="text-left">
+              ].map((feature, i) => (
+                <motion.div
+                  key={feature.title}
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ duration: 0.5, delay: i * 0.2 }}
+                  className="text-left"
+                >
                   <h3 className="mb-2 font-semibold text-foreground">
                     {feature.title}
                   </h3>
                   <p className="text-sm text-muted-foreground">
                     {feature.description}
                   </p>
-                </div>
+                </motion.div>
               ))}
             </div>
           </div>
