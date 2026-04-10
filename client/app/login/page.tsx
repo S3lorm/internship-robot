@@ -72,7 +72,19 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 px-4 py-12">
+    <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-12">
+      {/* Background Image */}
+      <div className="absolute inset-0 -z-10">
+        <Image
+          src="/assets/rmu-campus.jpg"
+          alt="RMU Campus"
+          fill
+          className="object-cover"
+          priority
+        />
+        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px]" />
+      </div>
+
       <Link href="/" className="mb-8 flex items-center gap-2 transition-transform hover:scale-105">
         <div className="flex h-12 items-center justify-center rounded-xl bg-white shadow-lg p-2">
           <Image src="/rmu-logo.png" alt="RMU Logo" width={160} height={40} className="object-contain" />

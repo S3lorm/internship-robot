@@ -91,21 +91,31 @@ export default function HomePage() {
       </header>
 
       {/* Hero Section */}
-      <section className="relative overflow-hidden border-b border-border bg-secondary/30">
-        <div className="absolute inset-0 bg-[linear-gradient(to_right,#0001_1px,transparent_1px),linear-gradient(to_bottom,#0001_1px,transparent_1px)] bg-[size:4rem_4rem] [mask-image:radial-gradient(ellipse_60%_50%_at_50%_0%,#000_70%,transparent_100%)]" />
-        <div className="container relative mx-auto px-4 py-20 md:py-32">
+      <section className="relative overflow-hidden border-b border-border">
+        {/* Background Image */}
+        <div className="absolute inset-0">
+          <Image
+            src="/assets/rmu-campus.jpg"
+            alt="RMU Campus"
+            fill
+            className="object-cover"
+            priority
+          />
+          <div className="absolute inset-0 bg-gradient-to-b from-black/70 via-black/60 to-black/80" />
+        </div>
+        <div className="container relative mx-auto px-4 py-24 md:py-36">
           <div className="mx-auto max-w-3xl text-center">
             <Badge
               variant="secondary"
-              className="mb-6 gap-1.5 px-3 py-1 text-sm"
+              className="mb-6 gap-1.5 bg-white/15 backdrop-blur-sm border-white/20 px-3 py-1 text-sm text-white"
             >
               <Ship className="h-3.5 w-3.5" />
               Regional Maritime University
             </Badge>
-            <h1 className="mb-6 text-balance text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
+            <h1 className="mb-6 text-balance text-4xl font-bold tracking-tight text-white md:text-5xl lg:text-6xl drop-shadow-lg">
               Launch Your Maritime Career with the Right Internship
             </h1>
-            <p className="mb-8 text-pretty text-lg text-muted-foreground md:text-xl">
+            <p className="mb-8 text-pretty text-lg text-white/80 md:text-xl drop-shadow">
               Discover internship opportunities from leading maritime companies.
               Apply, track your progress, and take the first step towards your
               professional journey.
@@ -121,7 +131,7 @@ export default function HomePage() {
                 size="lg"
                 variant="outline"
                 asChild
-                className="w-full sm:w-auto bg-transparent"
+                className="w-full sm:w-auto bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20 hover:text-white"
               >
                 <Link href="#internships">Browse Internships</Link>
               </Button>
