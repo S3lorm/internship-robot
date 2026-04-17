@@ -43,7 +43,39 @@ import {
   FileDown,
   FileCheck2
 } from "lucide-react";
-import { DeadlinesWidget } from "@/components/deadlines-widget";
+
+const getStatusIcon = (status: string) => {
+  switch (status) {
+    case "approved":
+      return <CheckCircle2 className="h-4 w-4 text-green-600" />;
+    case "rejected":
+      return <XCircle className="h-4 w-4 text-red-600" />;
+    case "under_review":
+      return <Eye className="h-4 w-4 text-blue-600" />;
+    default:
+      return <Clock className="h-4 w-4 text-yellow-600" />;
+  }
+};
+
+const getStatusBadge = (status: string) => {
+  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+    pending: "secondary",
+    under_review: "default",
+    approved: "default",
+    rejected: "destructive",
+  };
+  const labels: Record<string, string> = {
+    pending: "Pending",
+    under_review: "Under Review",
+    approved: "Approved",
+    rejected: "Rejected",
+  };
+  return (
+    <Badge variant={variants[status] || "secondary"}>
+      {labels[status] || status}
+    </Badge>
+  );
+};
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -88,52 +120,18 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  const stats = {
+  const stats = useMemo(() => ({
     total: applications.length,
     pending: applications.filter((a) => a.status === "pending").length,
     underReview: applications.filter((a) => a.status === "under_review").length,
     approved: applications.filter((a) => a.status === "approved").length,
     rejected: applications.filter((a) => a.status === "rejected").length,
     lettersSentToCompany: letterRequests.filter((lr) => lr.requestType === "company").length,
-  };
+  }), [applications, letterRequests]);
 
-  const unreadNotifications = notifications.filter((n) => !n.isRead);
-  const activeNotices = notices.filter((n: any) => n.isActive && !n.isRead);
+  const unreadNotifications = useMemo(() => notifications.filter((n) => !n.isRead), [notifications]);
+  const activeNotices = useMemo(() => notices.filter((n: any) => n.isActive && !n.isRead), [notices]);
 
-
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "approved":
-        return <CheckCircle2 className="h-4 w-4 text-green-600" />;
-      case "rejected":
-        return <XCircle className="h-4 w-4 text-red-600" />;
-      case "under_review":
-        return <Eye className="h-4 w-4 text-blue-600" />;
-      default:
-        return <Clock className="h-4 w-4 text-yellow-600" />;
-    }
-  };
-
-  const getStatusBadge = (status: string) => {
-    const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-      pending: "secondary",
-      under_review: "default",
-      approved: "default",
-      rejected: "destructive",
-    };
-    const labels: Record<string, string> = {
-      pending: "Pending",
-      under_review: "Under Review",
-      approved: "Approved",
-      rejected: "Rejected",
-    };
-    return (
-      <Badge variant={variants[status] || "secondary"}>
-        {labels[status] || status}
-      </Badge>
-    );
-  };
 
   const handleDownloadLetter = async (id: string, ref?: string) => {
     try {
