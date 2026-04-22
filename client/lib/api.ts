@@ -11,6 +11,8 @@ const getApiBaseUrl = () => {
 
 export const API_BASE_URL = getApiBaseUrl();
 
+const DEBUG_API = process.env.NEXT_PUBLIC_DEBUG_API === 'true';
+
 // Helper function to make API requests
 async function fetchApi<T = any>(
   endpoint: string,
@@ -27,13 +29,12 @@ async function fetchApi<T = any>(
 
     const fullUrl = `${API_BASE_URL}${endpoint}`;
 
-    // Debug logging - always log in browser to help troubleshoot
-    if (typeof window !== 'undefined') {
+    if (typeof window !== 'undefined' && DEBUG_API) {
       console.log(`[API] ${options.method || 'GET'} ${fullUrl}`, {
         API_BASE_URL,
         endpoint,
         envVar: process.env.NEXT_PUBLIC_API_URL,
-        fullUrl
+        fullUrl,
       });
     }
 

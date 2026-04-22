@@ -76,12 +76,22 @@ const getStatusBadge = (status: string) => {
   );
 };
 
+type ApplicationStats = {
+  total: number;
+  pending: number;
+  underReview: number;
+  approved: number;
+  rejected: number;
+  companyLettersCount: number;
+};
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [letterRequests, setLetterRequests] = useState<LetterRequest[]>([]);
+  const [applicationStats, setApplicationStats] = useState<ApplicationStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -101,6 +111,12 @@ export default function DashboardPage() {
 
         // Backend returns an assembled object matching the previous separate responses
         setApplications(Array.isArray(data?.applications) ? data.applications : []);
+        setApplicationStats(
+          data?.applicationStats &&
+            typeof (data.applicationStats as ApplicationStats).total === 'number'
+            ? (data.applicationStats as ApplicationStats)
+            : null
+        );
         setNotices(Array.isArray(data?.notices) ? data.notices : []);
         setNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
         setLetterRequests(Array.isArray(data?.letterRequests) ? data.letterRequests : []);
@@ -117,14 +133,26 @@ export default function DashboardPage() {
     }
   }, [user]);
 
-  const stats = useMemo(() => ({
-    total: applications.length,
-    pending: applications.filter((a) => a.status === "pending").length,
-    underReview: applications.filter((a) => a.status === "under_review").length,
-    approved: applications.filter((a) => a.status === "approved").length,
-    rejected: applications.filter((a) => a.status === "rejected").length,
-    lettersSentToCompany: letterRequests.filter((lr) => lr.requestType === "company").length,
-  }), [applications, letterRequests]);
+  const stats = useMemo(() => {
+    if (applicationStats) {
+      return {
+        total: applicationStats.total,
+        pending: applicationStats.pending,
+        underReview: applicationStats.underReview,
+        approved: applicationStats.approved,
+        rejected: applicationStats.rejected,
+        lettersSentToCompany: applicationStats.companyLettersCount,
+      };
+    }
+    return {
+      total: applications.length,
+      pending: applications.filter((a) => a.status === "pending").length,
+      underReview: applications.filter((a) => a.status === "under_review").length,
+      approved: applications.filter((a) => a.status === "approved").length,
+      rejected: applications.filter((a) => a.status === "rejected").length,
+      lettersSentToCompany: letterRequests.filter((lr) => lr.requestType === "company").length,
+    };
+  }, [applicationStats, applications, letterRequests]);
 
   const unreadNotifications = useMemo(() => notifications.filter((n) => !n.isRead), [notifications]);
   const activeNotices = useMemo(() => notices.filter((n: any) => n.isActive && !n.isRead), [notices]);

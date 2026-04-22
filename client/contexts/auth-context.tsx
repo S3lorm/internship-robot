@@ -1,6 +1,13 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+} from 'react';
 import type { User, AuthState, LoginFormData, RegisterFormData } from '@/types';
 import { authApi } from '@/lib/api';
 
@@ -16,12 +23,33 @@ interface AuthContextType extends AuthState {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const useIsomorphicLayoutEffect =
+  typeof window !== 'undefined' ? useLayoutEffect : useEffect;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [state, setState] = useState<AuthState>({
     user: null,
     isLoading: true,
     isAuthenticated: false,
   });
+
+  // Hydrate from localStorage before paint so protected layouts unblock quickly
+  useIsomorphicLayoutEffect(() => {
+    if (typeof window === 'undefined') return;
+    const token = localStorage.getItem('rmu_token');
+    if (!token) {
+      setState({ user: null, isLoading: false, isAuthenticated: false });
+      return;
+    }
+    const raw = localStorage.getItem('rmu_user');
+    if (!raw) return;
+    try {
+      const user = JSON.parse(raw) as User;
+      setState({ user, isLoading: false, isAuthenticated: true });
+    } catch {
+      // Wait for getProfile in init to reconcile or clear bad cache
+    }
+  }, []);
 
   // Check for existing session on mount (token + user)
   useEffect(() => {
@@ -30,7 +58,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const token = typeof window !== 'undefined' ? localStorage.getItem('rmu_token') : null;
 
       if (!token) {
-        setState(prev => ({ ...prev, isLoading: false }));
+        setState({ user: null, isLoading: false, isAuthenticated: false });
         return;
       }
 

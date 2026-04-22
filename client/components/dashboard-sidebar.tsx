@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
@@ -105,8 +105,7 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
   const { user, logout } = useAuth();
   const [unreadCount, setUnreadCount] = useState(0);
 
-  useEffect(() => {
-    const fetchUnreadCount = async () => {
+  const fetchUnreadCount = useCallback(async () => {
       try {
         const result = await notificationsApi.getAll();
         if (result.data) {
@@ -152,18 +151,28 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
       } catch {
         // ignore
       }
-    };
+  }, []);
 
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, 30000);
-    const handleUpdate = () => fetchUnreadCount();
+  useEffect(() => {
+    void fetchUnreadCount();
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void fetchUnreadCount();
+    }, 120000);
+    const handleUpdate = () => void fetchUnreadCount();
     window.addEventListener("notifications-updated", handleUpdate);
+
+    const onVisible = () => {
+      if (!document.hidden) void fetchUnreadCount();
+    };
+    document.addEventListener("visibilitychange", onVisible);
 
     return () => {
       clearInterval(interval);
       window.removeEventListener("notifications-updated", handleUpdate);
+      document.removeEventListener("visibilitychange", onVisible);
     };
-  }, []);
+  }, [fetchUnreadCount]);
 
   const handleLogout = () => {
     logout();

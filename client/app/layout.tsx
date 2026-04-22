@@ -6,10 +6,11 @@ import { AuthProvider } from '@/contexts/auth-context'
 import { AnalyticsClient } from '@/components/analytics-client'
 import './globals.css'
 
-const quicksand = Quicksand({ 
-  subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700"],
-  variable: "--font-quicksand" 
+const quicksand = Quicksand({
+  subsets: ['latin'],
+  weight: ['400', '500', '600', '700'],
+  variable: '--font-quicksand',
+  display: 'swap',
 });
 
 export const metadata: Metadata = {

@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -57,7 +57,7 @@ export default function NotificationsPage() {
         : notices.filter((n) => n.isRead);
 
   // Load notifications and notices
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
     try {
       const result = await notificationsApi.getAll();
       if (result.error) {
@@ -108,14 +108,23 @@ export default function NotificationsPage() {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  // Real-time polling every 30 seconds
-  useEffect(() => {
-    loadNotifications();
-    const interval = setInterval(loadNotifications, 30000); // Poll every 30 seconds
-    return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    void loadNotifications();
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.hidden) return;
+      void loadNotifications();
+    }, 120000);
+    const onVisible = () => {
+      if (!document.hidden) void loadNotifications();
+    };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisible);
+    };
+  }, [loadNotifications]);
 
 
 
