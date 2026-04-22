@@ -27,8 +27,35 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
-import { departments, programs } from "@/lib/mock-data";
+import { programs } from "@/lib/mock-data";
 import type { RegisterFormData } from "@/types";
+
+const registrationDepartments = [
+  "Nautical Science",
+  "Marine Engineering",
+  "Computer Science",
+  "Information Technology",
+];
+
+const departmentIdPrefixes: Record<string, string[]> = {
+  "Nautical Science": ["DNS", "BNS"],
+  "Marine Engineering": ["DMS", "BMS"],
+  "Computer Science": ["DCS", "BCS"],
+  "Information Technology": ["BIT", "DIT"],
+};
+
+function validateStudentIdByDepartment(department: string, studentId: string): string | null {
+  const prefixes = departmentIdPrefixes[department];
+  if (!department || !studentId.trim() || !prefixes) return null;
+
+  const normalizedId = studentId.toUpperCase().replace(/\s+/g, "");
+  const hasValidFormat = prefixes.some((prefix) =>
+    new RegExp(`^${prefix}(?:[-/]?)\\d{7}$`).test(normalizedId)
+  );
+
+  if (hasValidFormat) return null;
+  return `Invalid Student ID for ${department}. Use ${prefixes.join("/")} followed by 7 digits (e.g. ${prefixes[0]}1234567).`;
+}
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -48,6 +75,10 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const studentIdError = validateStudentIdByDepartment(
+    formData.department,
+    formData.studentId
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -71,6 +102,11 @@ export default function RegisterPage() {
       return;
     }
 
+    if (studentIdError) {
+      setError(studentIdError);
+      return;
+    }
+
     const result = await register(formData);
 
     if (result.success) {
@@ -87,9 +123,11 @@ export default function RegisterPage() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement>
   ) => {
+    const { name, value } = e.target;
+    const normalizedValue = name === "studentId" ? value.toUpperCase() : value;
     setFormData((prev) => ({
       ...prev,
-      [e.target.name]: e.target.value,
+      [name]: normalizedValue,
     }));
   };
 
@@ -102,15 +140,25 @@ export default function RegisterPage() {
 
   const nextStep = () => {
     if (step === 1) {
-      if (!formData.firstName?.trim() || !formData.lastName?.trim() || !formData.studentId?.trim() || !formData.phone?.trim()) {
+      if (
+        !formData.firstName?.trim() ||
+        !formData.lastName?.trim() ||
+        !formData.department ||
+        !formData.studentId?.trim() ||
+        !formData.phone?.trim()
+      ) {
         setError("Please fill in all personal information fields");
+        return;
+      }
+      if (studentIdError) {
+        setError(studentIdError);
         return;
       }
       setError(null);
     }
     if (step === 2) {
-      if (!formData.department || !formData.program) {
-        setError("Please select your department and program");
+      if (!formData.program) {
+        setError("Please select your program");
         return;
       }
       setError(null);
@@ -249,15 +297,41 @@ export default function RegisterPage() {
                 </div>
 
                 <div className="space-y-2">
+                  <Label htmlFor="department">Department</Label>
+                  <Select
+                    value={formData.department}
+                    onValueChange={(value) =>
+                      handleSelectChange("department", value)
+                    }
+                  >
+                    <SelectTrigger id="department">
+                      <SelectValue placeholder="Select your department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {registrationDepartments.map((dept) => (
+                        <SelectItem key={dept} value={dept}>
+                          {dept}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="studentId">Student ID</Label>
                   <Input
                     id="studentId"
                     name="studentId"
-                    placeholder="RMU/2024/001"
+                    placeholder="e.g. BMS1234567"
                     value={formData.studentId}
                     onChange={handleChange}
                     required
                   />
+                  {studentIdError && (
+                    <p className="text-xs font-medium text-destructive">
+                      {studentIdError}
+                    </p>
+                  )}
                 </div>
 
                 <div className="space-y-2">
@@ -278,27 +352,6 @@ export default function RegisterPage() {
             {/* Step 2: Academic Information */}
             {step === 2 && (
               <>
-                <div className="space-y-2">
-                  <Label htmlFor="department">Department</Label>
-                  <Select
-                    value={formData.department}
-                    onValueChange={(value) =>
-                      handleSelectChange("department", value)
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select your department" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {departments.map((dept) => (
-                        <SelectItem key={dept} value={dept}>
-                          {dept}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
                 <div className="space-y-2">
                   <Label htmlFor="program">Program</Label>
                   <Select
