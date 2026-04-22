@@ -21,13 +21,23 @@ const registerValidators = [
 async function register(req, res) {
   const { email, password, firstName, lastName, studentId, phone, department, program, yearOfStudy } = req.body;
 
-  if (!validateStudentEmail(email)) {
+  const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+
+  if (!validateStudentEmail(normalizedEmail)) {
     return res.status(400).json({ message: 'Only @st.rmu.edu.gh email addresses are allowed' });
   }
 
-  const existing = await User.findOne({ where: { email } });
+  const existing = await User.findOne({ where: { email: normalizedEmail } });
   if (existing) {
     return res.status(400).json({ message: 'Email already in use' });
+  }
+
+  const normalizedStudentId = studentId != null ? String(studentId).trim() : '';
+  if (normalizedStudentId) {
+    const existingStudent = await User.findOne({ where: { studentId: normalizedStudentId } });
+    if (existingStudent) {
+      return res.status(400).json({ message: 'Student ID already registered' });
+    }
   }
 
   const hashed = await bcrypt.hash(password, 10);
@@ -37,11 +47,11 @@ async function register(req, res) {
   let user;
   try {
     user = await User.create({
-      email,
+      email: normalizedEmail,
       password: hashed,
       firstName,
       lastName,
-      studentId,
+      studentId: normalizedStudentId || undefined,
       phone,
       department,
       program,
@@ -53,7 +63,25 @@ async function register(req, res) {
     });
   } catch (err) {
     console.error('[Register] Error creating user:', err);
-    return res.status(500).json({ message: 'Server error during registration' });
+    const code = err && err.code;
+    const msg = (err && err.message) || String(err);
+    const details = (err && err.details) || '';
+
+    if (code === '23505' || /duplicate key|unique constraint/i.test(msg + details)) {
+      if (/email|user_profiles_email/i.test(msg + details)) {
+        return res.status(400).json({ message: 'Email already in use' });
+      }
+      if (/student_id|student id/i.test(msg + details)) {
+        return res.status(400).json({ message: 'Student ID already registered' });
+      }
+      return res.status(400).json({ message: 'This email or student ID is already registered.' });
+    }
+
+    const devHint =
+      process.env.NODE_ENV === 'development'
+        ? ` (${msg})`
+        : '';
+    return res.status(500).json({ message: `Server error during registration${devHint}` });
   }
 
   let emailSent = false;

@@ -5,8 +5,10 @@ function randomToken(bytes = 32) {
 }
 
 function validateStudentEmail(email) {
-  const studentEmailRegex = /^[a-zA-Z0-9._%+-]+@st\.rmu\.edu\.gh$/;
-  return studentEmailRegex.test(email);
+  if (!email || typeof email !== 'string') return false;
+  const normalized = email.trim().toLowerCase();
+  const studentEmailRegex = /^[a-z0-9._%+-]+@st\.rmu\.edu\.gh$/;
+  return studentEmailRegex.test(normalized);
 }
 
 module.exports = { randomToken, validateStudentEmail };

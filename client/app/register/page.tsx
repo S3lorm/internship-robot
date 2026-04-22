@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import { programs } from "@/lib/mock-data";
 import type { RegisterFormData } from "@/types";
@@ -111,6 +111,8 @@ export default function RegisterPage() {
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const studentIdError = validateStudentIdByDepartment(
     formData.department,
     formData.studentId
@@ -136,8 +138,8 @@ export default function RegisterPage() {
       return;
     }
 
-    // Validate email domain
-    if (!formData.email.toLowerCase().endsWith("@st.rmu.edu.gh")) {
+    const emailTrimmed = formData.email.trim().toLowerCase();
+    if (!emailTrimmed.endsWith("@st.rmu.edu.gh")) {
       setError("Please use your RMU student email (@st.rmu.edu.gh)");
       return;
     }
@@ -147,7 +149,7 @@ export default function RegisterPage() {
       return;
     }
 
-    const result = await register(formData);
+    const result = await register({ ...formData, email: emailTrimmed });
 
     if (result.success) {
       setSuccess(true);
@@ -450,21 +452,39 @@ export default function RegisterPage() {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Only @st.rmu.edu.gh emails are allowed
+                    Must be your official student address ending in{" "}
+                    <span className="font-mono">@st.rmu.edu.gh</span> (spaces are trimmed automatically).
                   </p>
                 </div>
 
                 <div className="space-y-2">
                   <Label htmlFor="password">Password</Label>
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    placeholder="Create a strong password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      name="password"
+                      type={showPassword ? "text" : "password"}
+                      placeholder="Create a strong password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      className="pr-10"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowPassword((v) => !v)}
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                   <p className="text-xs text-muted-foreground">
                     Use at least 8 characters with uppercase, lowercase, and one symbol.
                   </p>
@@ -505,15 +525,32 @@ export default function RegisterPage() {
 
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm Password</Label>
-                  <Input
-                    id="confirmPassword"
-                    name="confirmPassword"
-                    type="password"
-                    placeholder="Confirm your password"
-                    value={formData.confirmPassword}
-                    onChange={handleChange}
-                    required
-                  />
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      name="confirmPassword"
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Confirm your password"
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      className="pr-10"
+                      required
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="absolute right-1 top-1/2 h-8 w-8 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      onClick={() => setShowConfirmPassword((v) => !v)}
+                      aria-label={showConfirmPassword ? "Hide confirm password" : "Show confirm password"}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-4 w-4" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
+                    </Button>
+                  </div>
                 </div>
               </>
             )}
