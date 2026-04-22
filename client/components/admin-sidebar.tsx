@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard,
   Users,
@@ -22,7 +23,16 @@ import {
   ClipboardCheck,
 } from "lucide-react";
 
-const adminNavItems = [
+type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
+
+const hodNavItems: NavItem[] = [
+  { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/letter-requests", label: "Letter Requests", icon: FileCheck },
+  { href: "/admin/notifications", label: "Notifications", icon: Bell },
+  { href: "/admin/internships", label: "Post Internship", icon: Briefcase },
+];
+
+const systemAdminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "User Management", icon: Users },
   { href: "/admin/internships", label: "Internships", icon: Briefcase },
@@ -43,6 +53,8 @@ interface AdminSidebarProps {
 export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  const isHod = user?.role === "hod";
+  const items = isHod ? hodNavItems : systemAdminNav;
 
   const handleLogout = () => {
     logout();
@@ -51,27 +63,35 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
 
   return (
     <div className={cn("flex h-full flex-col bg-sidebar border-r border-sidebar-border", className)}>
-      {/* Logo Section */}
       <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-lg">
           <Anchor className="h-5 w-5 text-primary-foreground" />
         </div>
-        <div className="flex flex-col">
-          <span className="text-sm font-bold leading-none text-sidebar-foreground">
-            RMU Admin
+        <div className="flex flex-col min-w-0">
+          <span className="text-sm font-bold leading-none text-sidebar-foreground truncate">
+            {isHod ? "HOD Portal" : "System Admin"}
           </span>
-          <span className="text-xs leading-none text-sidebar-foreground/70 mt-0.5">
-            Control Panel
+          <span className="text-xs leading-none text-sidebar-foreground/70 mt-0.5 truncate">
+            {isHod ? "Department tools" : "Full monitoring"}
           </span>
         </div>
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
-        {adminNavItems.map((item) => {
-          const isActive = pathname === item.href || 
-            (item.href !== "/admin" && pathname.startsWith(item.href));
-          
+        {!isHod && (
+          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+            Administration
+          </p>
+        )}
+        {isHod && (
+          <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
+            Department
+          </p>
+        )}
+        {items.map((item) => {
+          const isActive =
+            pathname === item.href || (item.href !== "/admin" && pathname.startsWith(item.href));
+
           return (
             <Link
               key={item.href}
@@ -84,47 +104,59 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
                   : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
               )}
             >
-              <item.icon className={cn(
-                "h-5 w-5 shrink-0",
-                isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/60"
-              )} />
+              <item.icon
+                className={cn(
+                  "h-5 w-5 shrink-0",
+                  isActive ? "text-sidebar-primary-foreground" : "text-sidebar-foreground/60"
+                )}
+              />
               <span className="truncate">{item.label}</span>
             </Link>
           );
         })}
       </nav>
 
-      {/* User Section */}
       <div className="border-t border-sidebar-border p-4 space-y-2">
+        {isHod && user?.department && (
+          <div className="rounded-md border border-sidebar-border bg-sidebar-accent/30 px-3 py-2 text-xs text-sidebar-foreground/80">
+            <span className="font-medium text-sidebar-foreground">Department: </span>
+            {user.department}
+          </div>
+        )}
         <div className="flex items-center gap-3 rounded-lg bg-sidebar-accent/50 p-3">
-          <Avatar className="h-10 w-10 border-2 border-sidebar-border">
+          <Avatar className="h-10 w-10 border-2 border-sidebar-border shrink-0">
             <AvatarImage src={user?.avatar || "/placeholder-user.jpg"} alt={user?.firstName} />
             <AvatarFallback className="bg-sidebar-primary text-sidebar-primary-foreground text-sm font-semibold">
-              {user?.firstName?.[0]}{user?.lastName?.[0]}
+              {user?.firstName?.[0]}
+              {user?.lastName?.[0]}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 min-w-0">
             <p className="text-sm font-semibold text-sidebar-foreground truncate">
               {user?.firstName} {user?.lastName}
             </p>
-            <p className="text-xs text-sidebar-foreground/60 truncate">
-              Administrator
-            </p>
+            <Badge variant="outline" className="mt-1 text-xs">
+              {isHod ? "Head of Department" : "System Administrator"}
+            </Badge>
           </div>
         </div>
-        
+
+        <Separator className="bg-sidebar-border" />
+
         <div className="space-y-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-            asChild
-          >
-            <Link href="/admin/settings">
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </Link>
-          </Button>
+          {!isHod && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+              asChild
+            >
+              <Link href="/admin/settings">
+                <Settings className="mr-2 h-4 w-4" />
+                Settings
+              </Link>
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -139,4 +171,3 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
     </div>
   );
 }
-

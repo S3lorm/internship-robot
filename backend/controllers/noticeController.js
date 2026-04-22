@@ -21,6 +21,9 @@ async function list(req, res) {
   if (!audience && req.user && req.user.role === 'admin') {
     where.targetAudience = { in: ['all', 'admins'] };
   }
+  if (req.user && req.user.role === 'hod') {
+    where.targetDepartment = req.user.department;
+  }
 
   const { rows, count } = await Notice.findAndCountAll({
     where,
@@ -30,12 +33,21 @@ async function list(req, res) {
     order: [['created_at', 'DESC']],
   });
 
+  const now = new Date();
+  let filteredRows = rows.filter((n) => {
+    if (n.expiresAt && new Date(n.expiresAt) <= now) return false;
+    if (req.user && req.user.role === 'student') {
+      if (n.targetDepartment && n.targetDepartment !== req.user.department) return false;
+    }
+    return true;
+  });
+
   // Attach isRead status for the current user
   try {
     const { supabase } = require('../models/supabase');
     const userId = req.user && req.user.id;
-    if (userId && rows.length > 0) {
-      const noticeIds = rows.map(n => n.id);
+    if (userId && filteredRows.length > 0 && req.user.role !== 'hod') {
+      const noticeIds = filteredRows.map(n => n.id);
       const { data: readRecords } = await supabase
         .from('user_notice_reads')
         .select('notice_id')
@@ -43,7 +55,7 @@ async function list(req, res) {
         .in('notice_id', noticeIds);
 
       const readSet = new Set((readRecords || []).map(r => r.notice_id));
-      for (const notice of rows) {
+      for (const notice of filteredRows) {
         notice.isRead = readSet.has(notice.id);
       }
     }
@@ -52,7 +64,7 @@ async function list(req, res) {
     // Continue without isRead — notices will default to unread
   }
 
-  return res.json({ data: rows, meta: { page, limit, total: count } });
+  return res.json({ data: filteredRows, meta: { page, limit, total: filteredRows.length } });
 }
 
 async function getById(req, res) {
@@ -60,27 +72,48 @@ async function getById(req, res) {
     include: [{ model: User, as: 'creator', attributes: ['id', 'firstName', 'lastName', 'email'] }],
   });
   if (!notice) return res.status(404).json({ message: 'Notice not found' });
+  if (
+    req.user &&
+    req.user.role === 'hod' &&
+    notice.targetDepartment &&
+    notice.targetDepartment !== req.user.department
+  ) {
+    return res.status(403).json({ message: 'Access denied' });
+  }
   return res.json({ notice });
 }
 
 async function create(req, res) {
+  let targetAudience = req.body.targetAudience || 'students';
+  let targetDepartment = req.body.targetDepartment ?? null;
+  let createdBy = req.user.id;
+
+  if (req.user.role === 'hod') {
+    targetAudience = 'students';
+    targetDepartment = req.user.department;
+    createdBy = null;
+  }
+
   const notice = await Notice.create({
     title: req.body.title,
     content: req.body.content,
     priority: req.body.priority,
-    targetAudience: req.body.targetAudience,
+    targetAudience,
+    targetDepartment,
     isActive: req.body.isActive ?? true,
     expiresAt: req.body.expiresAt,
-    createdBy: req.user.id,
+    createdBy,
   });
 
-  await createNotification({
-    userId: req.user.id,
-    type: 'notice',
-    title: 'Notice created',
-    message: `You created notice: ${notice.title}`,
-    relatedId: notice.id,
-  });
+  if (req.user.role !== 'hod') {
+    await createNotification({
+      userId: req.user.id,
+      type: 'notice',
+      title: 'Notice created',
+      message: `You created notice: ${notice.title}`,
+      relatedId: notice.id,
+    });
+  }
 
   return res.status(201).json({ message: 'Notice created', notice });
 }
@@ -89,7 +122,7 @@ async function update(req, res) {
   const notice = await Notice.findByPk(req.params.id);
   if (!notice) return res.status(404).json({ message: 'Notice not found' });
 
-  const allowed = ['title', 'content', 'priority', 'targetAudience', 'isActive', 'expiresAt'];
+  const allowed = ['title', 'content', 'priority', 'targetAudience', 'targetDepartment', 'isActive', 'expiresAt'];
   for (const k of allowed) {
     if (req.body[k] !== undefined) notice[k] = req.body[k];
   }
@@ -106,6 +139,9 @@ async function remove(req, res) {
 
 async function markAsRead(req, res) {
   try {
+    if (req.user.role === 'hod') {
+      return res.json({ message: 'Notice marked as read', isRead: true });
+    }
     const { supabase } = require('../models/supabase');
     const noticeId = req.params.id;
     const userId = req.user.id;
@@ -133,6 +169,9 @@ async function markAsRead(req, res) {
 
 async function markAllAsRead(req, res) {
   try {
+    if (req.user.role === 'hod') {
+      return res.json({ message: 'All notices marked as read' });
+    }
     const { supabase } = require('../models/supabase');
     const userId = req.user.id;
 
@@ -174,5 +213,13 @@ async function markAllAsRead(req, res) {
   }
 }
 
-module.exports = { list, getById, create, update, remove, markAsRead, markAllAsRead };
+module.exports = {
+  list,
+  getById,
+  create,
+  update,
+  remove,
+  markAsRead,
+  markAllAsRead,
+};
 

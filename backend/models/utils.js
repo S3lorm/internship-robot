@@ -34,6 +34,7 @@ function mapKeyToSupabase(key) {
     
     // Notice/Notification specific
     targetAudience: 'target_audience',
+    targetDepartment: 'target_department',
     isActive: 'is_active',
     expiresAt: 'expires_at',
     isRead: 'is_read',

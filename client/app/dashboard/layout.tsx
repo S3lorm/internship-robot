@@ -25,7 +25,7 @@ export default function DashboardLayout({
     if (!isLoading && !isAuthenticated) {
       router.push("/login");
     }
-    if (!isLoading && isAuthenticated && user?.role === "admin") {
+    if (!isLoading && isAuthenticated && (user?.role === "admin" || user?.role === "hod")) {
       router.push("/admin");
     }
   }, [isLoading, isAuthenticated, user, router]);

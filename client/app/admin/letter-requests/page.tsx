@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
+import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -52,7 +53,16 @@ const statusConfig = {
   rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
 };
 
+function letterStudentPrefix(r: LetterRequest): string {
+  const sid = r.student?.studentId || "";
+  const u = sid.toUpperCase().replace(/\s/g, "");
+  const m = u.match(/^([A-Z]{2,4})/);
+  return m ? m[1] : "Other";
+}
+
 export default function AdminLetterRequestsPage() {
+  const { user } = useAuth();
+  const [bulkBusy, setBulkBusy] = useState(false);
   const [requests, setRequests] = useState<LetterRequest[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<LetterRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -196,6 +206,12 @@ export default function AdminLetterRequestsPage() {
     rejected: requests.filter((r) => r.status === "rejected").length,
   };
 
+  const hodPrefixes = useMemo(() => {
+    const pending = filteredRequests.filter((r) => r.status === "pending");
+    const set = new Set(pending.map(letterStudentPrefix));
+    return Array.from(set).filter((p) => p !== "Other").sort();
+  }, [filteredRequests]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -258,6 +274,102 @@ export default function AdminLetterRequestsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {user?.role === "hod" && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Bulk review (pending)</CardTitle>
+            <CardDescription>
+              Approve or reject every pending request in your department, or only those whose student ID starts
+              with a programme prefix (e.g. BIT, DIT).
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                disabled={bulkBusy || stats.pending === 0}
+                onClick={async () => {
+                  setBulkBusy(true);
+                  try {
+                    const result = await lettersApi.bulkUpdateRequestStatus({ status: "approved" });
+                    if (result.error) toast.error(result.error);
+                    else {
+                      const ok = (result.data as { ok?: number })?.ok ?? 0;
+                      toast.success(`Approved ${ok} request(s)`);
+                      loadRequests();
+                    }
+                  } finally {
+                    setBulkBusy(false);
+                  }
+                }}
+              >
+                Approve all pending
+              </Button>
+              <Button
+                type="button"
+                variant="destructive"
+                size="sm"
+                disabled={bulkBusy || stats.pending === 0}
+                onClick={async () => {
+                  setBulkBusy(true);
+                  try {
+                    const result = await lettersApi.bulkUpdateRequestStatus({ status: "rejected" });
+                    if (result.error) toast.error(result.error);
+                    else {
+                      const ok = (result.data as { ok?: number })?.ok ?? 0;
+                      toast.success(`Rejected ${ok} request(s)`);
+                      loadRequests();
+                    }
+                  } finally {
+                    setBulkBusy(false);
+                  }
+                }}
+              >
+                Reject all pending
+              </Button>
+            </div>
+            {hodPrefixes.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                  By ID prefix
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {hodPrefixes.map((pfx) => (
+                    <Button
+                      key={pfx}
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      disabled={bulkBusy}
+                      onClick={async () => {
+                        setBulkBusy(true);
+                        try {
+                          const result = await lettersApi.bulkUpdateRequestStatus({
+                            status: "approved",
+                            studentIdPrefix: pfx,
+                          });
+                          if (result.error) toast.error(result.error);
+                          else {
+                            const ok = (result.data as { ok?: number })?.ok ?? 0;
+                            toast.success(`Approved ${ok} request(s) for prefix ${pfx}`);
+                            loadRequests();
+                          }
+                        } finally {
+                          setBulkBusy(false);
+                        }
+                      }}
+                    >
+                      Approve pending ({pfx})
+                    </Button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Filters */}
       <Card>
@@ -417,7 +529,7 @@ export default function AdminLetterRequestsPage() {
                     <Badge variant="outline" className={statusConfig[selectedRequest.status].color}>
                       {statusConfig[selectedRequest.status].label}
                     </Badge>
-                    {selectedRequest.status === "pending" && !isEditing && (
+                    {selectedRequest.status === "pending" && !isEditing && user?.role !== "hod" && (
                       <Button
                         variant="outline"
                         size="sm"

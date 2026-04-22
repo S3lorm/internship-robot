@@ -24,12 +24,27 @@ async function getStudentDashboard(req, res) {
             LetterRequest.findAndCountAll({ where: { studentId }, order: [['createdAt', 'DESC']] })
         ]);
 
+        const now = Date.now();
+        const noticesRaw = noticesResult.rows || noticesResult || [];
+        const notices = noticesRaw.filter((n) => {
+            if (n.expiresAt && new Date(n.expiresAt).getTime() <= now) return false;
+            if (n.targetDepartment && n.targetDepartment !== req.user.department) return false;
+            return true;
+        });
+
+        const notificationsRaw = notificationsResult.rows || notificationsResult || [];
+        const notifications = notificationsRaw.filter((n) => {
+            if (!n.expiresAt) return true;
+            const t = new Date(n.expiresAt).getTime();
+            return !Number.isNaN(t) && t > now;
+        });
+
         return res.json({
             data: {
                 applications: applicationsResult.rows || applicationsResult || [],
                 internships: internshipsResult.rows || internshipsResult || [],
-                notices: noticesResult.rows || noticesResult || [],
-                notifications: notificationsResult.rows || notificationsResult || [],
+                notices,
+                notifications,
                 letterRequests: letterRequestsResult.rows || letterRequestsResult || []
             }
         });

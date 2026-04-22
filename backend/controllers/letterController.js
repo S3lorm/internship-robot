@@ -600,10 +600,21 @@ async function createRequest(req, res) {
     const { createNotification } = require('../services/notificationService');
     const { User } = require('../models');
     const admins = await User.findAll({ where: { role: 'admin' } });
+    const deptHods = user.department
+      ? await User.findAll({ where: { role: 'hod', department: user.department } })
+      : [];
 
+    const notifyIds = new Set();
     for (const admin of admins) {
+      if (admin.id) notifyIds.add(admin.id);
+    }
+    for (const h of deptHods) {
+      if (h.id) notifyIds.add(h.id);
+    }
+
+    for (const uid of notifyIds) {
       await createNotification({
-        userId: admin.id,
+        userId: uid,
         type: 'letter_request',
         title: 'New Letter Request',
         message: `${user.firstName} ${user.lastName} has requested an internship letter for ${companyName}`,
@@ -637,14 +648,13 @@ async function getRequests(req, res) {
       where.studentId = user.id;
     }
 
-    // Admins can filter by status
-    if (status && user.role === 'admin') {
+    if ((user.role === 'admin' || user.role === 'hod') && status) {
       where.status = status;
     }
 
     const requests = await LetterRequest.findAll({
       where,
-      order: [['createdAt', 'DESC']],
+      order: [['created_at', 'DESC']],
     });
 
     // Load related student and reviewer data
@@ -660,7 +670,12 @@ async function getRequests(req, res) {
       }
     }
 
-    res.json({ requests });
+    let out = requests;
+    if (user.role === 'hod') {
+      out = requests.filter((r) => r.student && r.student.department === user.department);
+    }
+
+    res.json({ requests: out });
   } catch (error) {
     console.error('Error fetching letter requests:', error);
     res.status(500).json({
@@ -673,14 +688,13 @@ async function getRequests(req, res) {
 async function getRequestById(req, res) {
   try {
     const user = req.user;
-    const { LetterRequest } = require('../models');
+    const { LetterRequest, User } = require('../models');
     const { id } = req.params;
 
     const request = await LetterRequest.findByPk(id);
 
     // Load related student and reviewer data
     if (request) {
-      const { User } = require('../models');
       if (request.studentId) {
         const student = await User.findOne({ id: request.studentId });
         if (student) request.student = student;
@@ -700,6 +714,13 @@ async function getRequestById(req, res) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    if (user.role === 'hod') {
+      const st = await User.findOne({ id: request.studentId });
+      if (!st || st.department !== user.department) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
     res.json({ request });
   } catch (error) {
     console.error('Error fetching letter request:', error);
@@ -717,8 +738,8 @@ async function updateRequestStatus(req, res) {
     const { id } = req.params;
     const { status, adminNotes, sendEmail } = req.body;
 
-    if (user.role !== 'admin') {
-      return res.status(403).json({ message: 'Admin access required' });
+    if (user.role !== 'admin' && user.role !== 'hod') {
+      return res.status(403).json({ message: 'Access denied' });
     }
 
     if (!['pending', 'approved', 'rejected'].includes(status)) {
@@ -730,10 +751,22 @@ async function updateRequestStatus(req, res) {
       return res.status(404).json({ message: 'Letter request not found' });
     }
 
+    if (user.role === 'hod') {
+      const { User } = require('../models');
+      const st = await User.findOne({ id: request.studentId });
+      if (!st || st.department !== user.department) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
+    const hodNote =
+      user.role === 'hod' ? `\n[Reviewed by HOD (${user.department})]` : '';
+    const mergedNotes = [adminNotes, hodNote].filter((s) => s && String(s).trim()).join('');
+
     const updateData = {
       status,
-      adminNotes,
-      reviewedBy: user.id,
+      adminNotes: mergedNotes || adminNotes,
+      reviewedBy: user.role === 'hod' ? null : user.id,
       reviewedAt: new Date().toISOString(),
     };
 
@@ -1007,7 +1040,7 @@ async function sendLetterEmailNotification(request, updatedRequest) {
 async function downloadLetterPDF(req, res) {
   try {
     const user = req.user;
-    const { LetterRequest } = require('../models');
+    const { LetterRequest, User } = require('../models');
     const { id } = req.params;
 
     const request = await LetterRequest.findByPk(id);
@@ -1020,13 +1053,19 @@ async function downloadLetterPDF(req, res) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    if (user.role === 'hod') {
+      const st = await User.findOne({ id: request.studentId });
+      if (!st || st.department !== user.department) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
     // Only approved requests can be downloaded
     if (request.status !== 'approved') {
       return res.status(400).json({ message: 'Letter not yet approved' });
     }
 
     // Generate letter HTML
-    const { User } = require('../models');
     const student = await User.findOne({ id: request.studentId });
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
@@ -1090,7 +1129,7 @@ async function downloadLetterPDF(req, res) {
 async function viewLetterHTML(req, res) {
   try {
     const user = req.user;
-    const { LetterRequest } = require('../models');
+    const { LetterRequest, User } = require('../models');
     const { id } = req.params;
 
     const request = await LetterRequest.findByPk(id);
@@ -1103,13 +1142,19 @@ async function viewLetterHTML(req, res) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
+    if (user.role === 'hod') {
+      const st = await User.findOne({ id: request.studentId });
+      if (!st || st.department !== user.department) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
     // Only approved requests can be viewed
     if (request.status !== 'approved') {
       return res.status(400).json({ message: 'Letter not yet approved' });
     }
 
     // Generate letter HTML
-    const { User } = require('../models');
     const student = await User.findOne({ id: request.studentId });
     if (!student) {
       return res.status(404).json({ message: 'Student not found' });
@@ -1260,6 +1305,83 @@ async function checkGeneralApproval(req, res) {
   }
 }
 
+async function bulkUpdateRequestStatus(req, res) {
+  try {
+    const user = req.user;
+    const { status, studentIdPrefix, ids, adminNotes, sendEmail } = req.body;
+
+    if (user.role !== 'admin' && user.role !== 'hod') {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    if (!['approved', 'rejected'].includes(status)) {
+      return res.status(400).json({ message: 'Invalid status' });
+    }
+
+    const { LetterRequest, User } = require('../models');
+
+    let requests = await LetterRequest.findAll({
+      where: { status: 'pending' },
+      order: [['created_at', 'DESC']],
+    });
+
+    for (const request of requests) {
+      if (request.studentId) {
+        const student = await User.findOne({ id: request.studentId });
+        if (student) request.student = student;
+      }
+    }
+
+    if (user.role === 'hod') {
+      requests = requests.filter((r) => r.student && r.student.department === user.department);
+    }
+
+    if (studentIdPrefix && String(studentIdPrefix).trim()) {
+      const p = String(studentIdPrefix).trim().toUpperCase();
+      requests = requests.filter(
+        (r) => r.student && r.student.studentId && r.student.studentId.toUpperCase().startsWith(p)
+      );
+    }
+
+    if (Array.isArray(ids) && ids.length) {
+      const idset = new Set(ids);
+      requests = requests.filter((r) => idset.has(r.id));
+    }
+
+    let ok = 0;
+    const failed = [];
+
+    for (const r of requests) {
+      const fakeReq = {
+        ...req,
+        params: { id: r.id },
+        body: { status, adminNotes, sendEmail },
+      };
+      const fakeRes = {
+        statusCode: 200,
+        status(c) {
+          this.statusCode = c;
+          return this;
+        },
+        json(b) {
+          this.body = b;
+        },
+      };
+      await updateRequestStatus(fakeReq, fakeRes);
+      if (fakeRes.statusCode === 200) ok += 1;
+      else failed.push({ id: r.id, message: fakeRes.body && fakeRes.body.message });
+    }
+
+    return res.json({ message: `Updated ${ok} request(s)`, ok, failed });
+  } catch (error) {
+    console.error('Error bulk updating letter requests:', error);
+    res.status(500).json({
+      message: 'Failed to bulk update letter requests',
+      error: error.message,
+    });
+  }
+}
+
 module.exports = {
   generateLetter,
   downloadLetter,
@@ -1269,6 +1391,7 @@ module.exports = {
   getRequestById,
   updateRequest,
   updateRequestStatus,
+  bulkUpdateRequestStatus,
   downloadLetterPDF,
   viewLetterHTML,
   markEmailSent,

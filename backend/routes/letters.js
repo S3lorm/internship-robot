@@ -1,5 +1,6 @@
 const express = require('express');
 const auth = require('../middleware/auth');
+const checkRole = require('../middleware/roleCheck');
 const letterController = require('../controllers/letterController');
 
 const router = express.Router();
@@ -15,7 +16,7 @@ router.get('/download', letterController.downloadLetter);
 
 // Get available signatures (for admin to manage)
 router.get('/signatures', (req, res) => {
-  if (req.user.role !== 'admin') {
+  if (req.user.role !== 'admin' && req.user.role !== 'hod') {
     return res.status(403).json({ message: 'Admin access required' });
   }
   res.json({ signatures: letterController.programSignatures });
@@ -33,8 +34,9 @@ router.get('/requests/general-approval-status', letterController.checkGeneralApp
 
 // Get a specific request
 router.get('/requests/:id', letterController.getRequestById);
-router.patch('/requests/:id', letterController.updateRequest); // Update request details (Admin only)
-router.patch('/requests/:id/status', letterController.updateRequestStatus);
+router.patch('/requests/:id', checkRole('admin'), letterController.updateRequest);
+router.post('/requests/bulk-status', checkRole('admin', 'hod'), letterController.bulkUpdateRequestStatus);
+router.patch('/requests/:id/status', checkRole('admin', 'hod'), letterController.updateRequestStatus);
 router.get('/requests/:id/view', letterController.viewLetterHTML);
 router.get('/requests/:id/download', letterController.downloadLetterPDF);
 router.patch('/requests/:id/mark-email-sent', letterController.markEmailSent);

@@ -13,7 +13,7 @@ router.get('/', auth, noticeController.list);
 router.patch('/read-all', auth, noticeController.markAllAsRead);
 
 router.get('/:id', auth, noticeController.getById);
-router.post('/', auth, checkRole('admin'), noticeController.create);
+router.post('/', auth, checkRole('admin', 'hod'), noticeController.create);
 router.patch('/:id', auth, checkRole('admin'), noticeController.update);
 router.delete('/:id', auth, checkRole('admin'), noticeController.remove);
 

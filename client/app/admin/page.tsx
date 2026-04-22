@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import Link from "next/link"
+import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -24,6 +25,7 @@ import { applicationsApi, internshipsApi, usersApi } from "@/lib/api"
 import type { Application, Internship, User } from "@/types"
 
 export default function AdminDashboard() {
+  const { user } = useAuth()
   const [stats, setStats] = useState({
     totalStudents: 0,
     totalInternships: 0,
@@ -40,6 +42,10 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
+    if (user?.role === "hod") {
+      setIsLoading(false)
+      return
+    }
     async function fetchDashboardData() {
       try {
         setIsLoading(true)
@@ -85,7 +91,7 @@ export default function AdminDashboard() {
     }
 
     fetchDashboardData()
-  }, [])
+  }, [user?.role])
 
   const statCards = [
     {
@@ -113,6 +119,30 @@ export default function AdminDashboard() {
       color: "bg-amber-500",
     },
   ]
+
+  if (user?.role === "hod") {
+    return (
+      <div className="space-y-6">
+        <Card className="border-0 shadow-sm">
+          <CardHeader>
+            <CardTitle>Head of Department</CardTitle>
+            <CardDescription>
+              {user.department} — review internship letter requests and publish notices for students in your
+              department.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button asChild>
+              <Link href="/admin/letter-requests">Letter requests</Link>
+            </Button>
+            <Button asChild variant="secondary">
+              <Link href="/admin/notifications">Department notices</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   if (isLoading) {
     return (

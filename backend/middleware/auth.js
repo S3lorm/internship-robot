@@ -12,6 +12,24 @@ module.exports = async function auth(req, res, next) {
     }
 
     const decoded = jwt.verify(token, jwtConfig.secret);
+
+    if (decoded.hod && decoded.hodDepartment) {
+      const now = new Date().toISOString();
+      req.user = {
+        id: decoded.id,
+        email: 'hod.portal@rmu.internal',
+        firstName: 'Head of Department',
+        lastName: decoded.hodDepartment,
+        role: 'hod',
+        department: decoded.hodDepartment,
+        isEmailVerified: true,
+        isActive: true,
+        createdAt: now,
+        updatedAt: now,
+      };
+      return next();
+    }
+
     const user = await User.findOne({ id: decoded.id });
     if (!user) {
       return res.status(401).json({ message: 'Invalid token' });

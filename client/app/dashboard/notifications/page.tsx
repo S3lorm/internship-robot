@@ -72,7 +72,14 @@ export default function NotificationsPage() {
         } else if (result.data.notifications && Array.isArray(result.data.notifications)) {
           notificationsData = result.data.notifications;
         }
-        setNotifications(notificationsData);
+        const now = Date.now();
+        setNotifications(
+          notificationsData.filter((n: Notification) => {
+            if (!n.expiresAt) return true;
+            const t = new Date(n.expiresAt).getTime();
+            return !Number.isNaN(t) && t > now;
+          })
+        );
       }
 
       // Also fetch active notices
@@ -84,7 +91,14 @@ export default function NotificationsPage() {
             : Array.isArray(noticesResult.data)
               ? noticesResult.data
               : [];
-          setNotices(noticesData.filter((n: Notice) => n.isActive));
+          setNotices(
+            noticesData.filter((n: Notice) => {
+              if (!n.isActive) return false;
+              const exp = (n as Notice & { expiresAt?: string }).expiresAt || n.expiryDate;
+              if (!exp) return true;
+              return new Date(exp).getTime() > Date.now();
+            })
+          );
         }
       } catch {
         // Silently fail for notices
@@ -150,9 +164,20 @@ export default function NotificationsPage() {
     }
   };
 
-  const deleteNotification = (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-    toast.success("Notification removed");
+  const deleteNotification = async (id: string) => {
+    try {
+      const result = await notificationsApi.remove(id);
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      setNotifications((prev) => prev.filter((n) => n.id !== id));
+      toast.success("Notification removed");
+      window.dispatchEvent(new Event("notifications-updated"));
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Failed to delete";
+      toast.error(msg);
+    }
   };
 
   const deleteNotice = (id: string) => {
@@ -160,10 +185,16 @@ export default function NotificationsPage() {
     toast.success("Notice dismissed");
   };
 
-  const clearAll = () => {
-    setNotifications([]);
-    setNotices([]);
-    toast.success("All items cleared");
+  const clearAll = async () => {
+    try {
+      await Promise.all(notifications.map((n) => notificationsApi.remove(n.id)));
+      setNotifications([]);
+      setNotices([]);
+      toast.success("All items cleared");
+      window.dispatchEvent(new Event("notifications-updated"));
+    } catch {
+      toast.error("Could not clear all notifications");
+    }
   };
 
   const getNotificationIcon = (type: string) => {

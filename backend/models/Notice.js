@@ -8,6 +8,7 @@ function mapNoticeFromSupabase(row) {
     content: row.content,
     priority: row.priority,
     targetAudience: row.target_audience,
+    targetDepartment: row.target_department || null,
     isActive: row.is_active,
     isRead: row.isRead || false,
     expiresAt: row.expires_at,
@@ -38,6 +39,7 @@ function mapNoticeToSupabase(notice) {
   if (notice.content !== undefined) mapped.content = notice.content;
   if (notice.priority !== undefined) mapped.priority = notice.priority;
   if (notice.targetAudience !== undefined) mapped.target_audience = notice.targetAudience;
+  if (notice.targetDepartment !== undefined) mapped.target_department = notice.targetDepartment;
   if (notice.isActive !== undefined) mapped.is_active = notice.isActive;
   if (notice.expiresAt !== undefined) mapped.expires_at = notice.expiresAt;
   if (notice.createdBy !== undefined) mapped.created_by = notice.createdBy;

@@ -44,7 +44,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   // Fetch notifications
   useEffect(() => {
-    if (!user || user.role !== "admin") return;
+    if (!user || (user.role !== "admin" && user.role !== "hod")) return;
 
     const fetchNotifications = async () => {
       try {
@@ -114,7 +114,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   };
 
   useEffect(() => {
-    if (!isLoading && (!user || user.role !== "admin")) {
+    if (!isLoading && (!user || (user.role !== "admin" && user.role !== "hod"))) {
       router.push("/login");
     }
   }, [user, isLoading, router]);
@@ -127,7 +127,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
-  if (!user || user.role !== "admin") {
+  if (!user || (user.role !== "admin" && user.role !== "hod")) {
     return null;
   }
 
@@ -166,9 +166,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                pathname.includes("/internships") ? "Internships" :
                pathname.includes("/applications") ? "Applications" :
                pathname.includes("/notices") ? "Notices" :
+               pathname.includes("/notifications") ? "Notifications" :
                pathname.includes("/evaluations") ? "Evaluations" :
                pathname.includes("/letter") ? "Letter Requests" :
-               pathname.includes("/analytics") ? "Analytics" : "Admin"}
+               pathname.includes("/analytics") ? "Analytics" : user.role === "hod" ? "HOD" : "Admin"}
             </h1>
           </div>
 
@@ -264,7 +265,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                       size="sm"
                       className="w-full text-xs text-muted-foreground hover:text-foreground"
                       onClick={() => {
-                        router.push("/admin/notices");
+                        router.push(user?.role === "hod" ? "/admin/notifications" : "/admin/notices");
                         setNotifOpen(false);
                       }}
                     >

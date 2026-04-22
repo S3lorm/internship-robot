@@ -103,6 +103,12 @@ export const authApi = {
       body: JSON.stringify({ email, password }),
     }),
 
+  loginHod: (department: string, password: string) =>
+    fetchApi('/auth/login-hod', {
+      method: 'POST',
+      body: JSON.stringify({ department, password }),
+    }),
+
   register: (userData: Record<string, unknown>) =>
     fetchApi('/auth/register', {
       method: 'POST',
@@ -306,6 +312,11 @@ export const notificationsApi = {
     fetchApi('/notifications/read-all', {
       method: 'PATCH',
     }),
+
+  remove: (id: string) =>
+    fetchApi(`/notifications/${id}`, {
+      method: 'DELETE',
+    }),
 };
 
 // Letters API
@@ -381,6 +392,18 @@ export const lettersApi = {
     fetchApi(`/letters/requests/${id}/status`, {
       method: 'PATCH',
       body: JSON.stringify({ status, adminNotes, sendEmail }),
+    }),
+
+  bulkUpdateRequestStatus: (payload: {
+    status: 'approved' | 'rejected';
+    studentIdPrefix?: string;
+    ids?: string[];
+    adminNotes?: string;
+    sendEmail?: boolean;
+  }) =>
+    fetchApi('/letters/requests/bulk-status', {
+      method: 'POST',
+      body: JSON.stringify(payload),
     }),
 
   downloadLetterPDF: (id: string) => {

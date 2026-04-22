@@ -1,14 +1,46 @@
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const jwt = require('jsonwebtoken');
 const { body } = require('express-validator');
 
 const jwtConfig = require('../config/jwt');
 const { User } = require('../models');
+const { normalizeDepartmentName } = require('../constants/departments');
 const { randomToken, validateStudentEmail } = require('../utils/helpers');
 const { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetOtp } = require('../services/emailService');
 
 function signToken(user) {
   return jwt.sign({ id: user.id }, jwtConfig.secret, { expiresIn: jwtConfig.expiresIn });
+}
+
+function hodPlaceholderId(department) {
+  const h = crypto.createHash('sha256').update(department).digest('hex').slice(0, 12);
+  return `00000000-0000-4000-8000-${h}`;
+}
+
+function signHodToken(department) {
+  const id = hodPlaceholderId(department);
+  return jwt.sign(
+    { id, hod: true, hodDepartment: department },
+    jwtConfig.secret,
+    { expiresIn: jwtConfig.expiresIn }
+  );
+}
+
+function buildHodUser(department) {
+  const now = new Date().toISOString();
+  return {
+    id: hodPlaceholderId(department),
+    email: 'hod.portal@rmu.internal',
+    firstName: 'Head of Department',
+    lastName: department,
+    role: 'hod',
+    department,
+    isEmailVerified: true,
+    isActive: true,
+    createdAt: now,
+    updatedAt: now,
+  };
 }
 
 const registerValidators = [
@@ -132,6 +164,24 @@ async function login(req, res) {
   delete safeUser.password;
 
   return res.json({ token, user: safeUser });
+}
+
+const loginHodValidators = [body('department').notEmpty(), body('password').notEmpty()];
+
+async function loginHod(req, res) {
+  const department = normalizeDepartmentName(req.body.department);
+  if (!department) {
+    return res.status(400).json({ message: 'Unknown or invalid department name.' });
+  }
+
+  const expectedPassword = process.env.HOD_DEFAULT_PASSWORD || '123456789@10';
+  if (req.body.password !== expectedPassword) {
+    return res.status(401).json({ message: 'Invalid credentials' });
+  }
+
+  const token = signHodToken(department);
+  const user = buildHodUser(department);
+  return res.json({ token, user });
 }
 
 async function me(req, res) {
@@ -262,6 +312,8 @@ module.exports = {
   register,
   loginValidators,
   login,
+  loginHodValidators,
+  loginHod,
   verifyEmailValidators,
   verifyEmail,
   resendVerificationValidators,

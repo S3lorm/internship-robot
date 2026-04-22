@@ -6,6 +6,7 @@ import { authApi } from '@/lib/api';
 
 interface AuthContextType extends AuthState {
   login: (data: LoginFormData) => Promise<{ success: boolean; error?: string; requiresVerification?: boolean }>;
+  loginHod: (department: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (data: RegisterFormData) => Promise<{ success: boolean; error?: string; requiresVerification?: boolean }>;
   logout: () => void;
   updateUser: (user: Partial<User>) => void;
@@ -131,6 +132,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     []
   );
 
+  const loginHod = useCallback(
+    async (department: string, password: string): Promise<{ success: boolean; error?: string }> => {
+      setState(prev => ({ ...prev, isLoading: true }));
+
+      const result = await authApi.loginHod(department, password);
+      if (result.error || !result.data) {
+        setState(prev => ({ ...prev, isLoading: false }));
+        return { success: false, error: result.error || 'Invalid department or password' };
+      }
+
+      const { token, user } = result.data as any;
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('rmu_token', token);
+        localStorage.setItem('rmu_user', JSON.stringify(user));
+      }
+
+      setState({
+        user,
+        isLoading: false,
+        isAuthenticated: true,
+      });
+
+      return { success: true };
+    },
+    []
+  );
+
   const register = useCallback(
     async (data: RegisterFormData): Promise<{ success: boolean; error?: string; requiresVerification?: boolean }> => {
       setState(prev => ({ ...prev, isLoading: true }));
@@ -208,6 +237,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       value={{
         ...state,
         login,
+        loginHod,
         register,
         logout,
         updateUser,

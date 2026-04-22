@@ -5,7 +5,13 @@ async function list(req, res) {
     where: { userId: req.user.id },
     order: [['createdAt', 'DESC']],
   });
-  return res.json({ data: notifications });
+  const now = Date.now();
+  const active = notifications.filter((n) => {
+    if (!n.expiresAt) return true;
+    const t = new Date(n.expiresAt).getTime();
+    return !Number.isNaN(t) && t > now;
+  });
+  return res.json({ data: active });
 }
 
 async function markRead(req, res) {

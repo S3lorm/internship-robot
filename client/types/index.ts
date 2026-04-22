@@ -1,5 +1,5 @@
 // User types
-export type UserRole = 'student' | 'admin';
+export type UserRole = 'student' | 'hod' | 'admin';
 
 export interface User {
   id: string;
@@ -106,6 +106,8 @@ export interface Notice {
   type: NoticeType;
   priority: NoticePriority;
   targetAudience: 'all' | 'students' | 'admins';
+  /** When set, only students in this department see the notice on the dashboard. */
+  targetDepartment?: string | null;
   publishDate: string;
   expiryDate?: string;
   isPinned: boolean;

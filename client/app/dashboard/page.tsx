@@ -190,12 +190,6 @@ export default function DashboardPage() {
             Here&apos;s an overview of your internship applications and opportunities.
           </p>
         </div>
-        <Button asChild size="lg" className="shadow-md">
-          <Link href="/dashboard/internships">
-            Browse Internships
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Link>
-        </Button>
       </div>
       {/* Available Documents */}
       {!loading && letterRequests.some(r => r.status === 'approved' && r.requestType === 'general') && (
@@ -409,7 +403,7 @@ export default function DashboardPage() {
                 <FileText className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
                 <p className="text-muted-foreground">No applications yet</p>
                 <Button variant="link" asChild className="mt-2">
-                  <Link href="/dashboard/internships">Browse available internships</Link>
+                  <Link href="/dashboard/internships">Internships directory (preview)</Link>
                 </Button>
               </div>
             ) : (
