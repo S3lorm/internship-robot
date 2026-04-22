@@ -1,5 +1,6 @@
 const express = require('express');
 const auth = require('../middleware/auth');
+const checkRole = require('../middleware/roleCheck');
 const evaluationController = require('../controllers/evaluationController');
 
 const router = express.Router();
@@ -19,10 +20,10 @@ router.patch('/:id/view', evaluationController.markEvaluationViewed);
 // Acknowledge evaluation feedback
 router.patch('/:id/acknowledge', evaluationController.acknowledgeEvaluationFeedback);
 
-// Create evaluation (Admin only)
-router.post('/', evaluationController.createEvaluation);
+// Create evaluation (system admin only)
+router.post('/', checkRole('admin'), evaluationController.createEvaluation);
 
-// Update evaluation (Admin only)
+// Update evaluation (admin or HOD in same department as student)
 router.patch('/:id', evaluationController.updateEvaluation);
 
 module.exports = router;

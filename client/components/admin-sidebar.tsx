@@ -19,20 +19,16 @@ import {
   Settings,
   LogOut,
   Anchor,
-  BarChart3,
   ClipboardCheck,
-  MapPinned,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 
 const hodNavItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/admin/analytics", label: "Analytics", icon: BarChart3 },
   { href: "/admin/letter-requests", label: "Letter Requests", icon: FileCheck },
-  { href: "/admin/internship-tracking", label: "Internship Tracking", icon: MapPinned },
-  { href: "/admin/evaluations", label: "Evaluations", icon: ClipboardCheck },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
+  { href: "/admin/evaluations", label: "Evaluations", icon: ClipboardCheck },
   { href: "/admin/internships", label: "Post Internship", icon: Briefcase },
 ];
 

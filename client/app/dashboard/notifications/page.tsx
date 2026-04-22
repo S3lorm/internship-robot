@@ -431,7 +431,7 @@ export default function NotificationsPage() {
                                 </Badge>
                               )}
                             </div>
-                            <div className="flex shrink-0 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <div className="flex shrink-0 gap-1 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
                               {!notice.isRead && (
                                 <Button
                                   variant="ghost"
@@ -530,7 +530,7 @@ export default function NotificationsPage() {
                             </Button>
                           )}
                         </div>
-                        <div className="flex shrink-0 gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="flex shrink-0 gap-1 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
                           {!notification.isRead && (
                             <Button
                               variant="ghost"
@@ -546,7 +546,7 @@ export default function NotificationsPage() {
                             variant="ghost"
                             size="icon"
                             className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                            onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }}
+                            onClick={(e) => { e.stopPropagation(); void deleteNotification(notification.id); }}
                             title="Delete"
                           >
                             <Trash2 className="h-4 w-4" />

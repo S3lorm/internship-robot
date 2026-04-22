@@ -33,7 +33,6 @@ import {
 } from "@/components/ui/table";
 import {
   ClipboardCheck,
-  Plus,
   Search,
   Eye,
   Edit,
@@ -107,7 +106,6 @@ export default function EvaluationsManagementPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [recommendationFilter, setRecommendationFilter] = useState<string>("all");
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null);
@@ -178,26 +176,6 @@ export default function EvaluationsManagementPage() {
   };
 
   // Removed filteredEvaluations from here, moved to line 348 to prevent ReferenceError (getStudentName used before initialization)
-
-  const handleCreate = async () => {
-    try {
-      const payload = { ...formData };
-      // Sanitize empty strings to pass Postgres constraints (UUIDs and Dates)
-      if (!payload.internshipId) (payload as any).internshipId = null;
-      if (!payload.availableFrom) (payload as any).availableFrom = null;
-      if (!payload.deadline) (payload as any).deadline = null;
-      if (!payload.acknowledgmentDeadline) (payload as any).acknowledgmentDeadline = null;
-
-      const result = await evaluationsApi.create(payload);
-      if (result.error) throw new Error(result.error);
-      toast.success("Evaluation created successfully");
-      setIsCreateDialogOpen(false);
-      resetForm();
-      fetchData();
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : "Failed to create evaluation");
-    }
-  };
 
   const handleUpdate = async () => {
     if (!selectedEvaluation) return;
@@ -379,19 +357,14 @@ export default function EvaluationsManagementPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground md:text-3xl">
-            Evaluations Management
-          </h1>
-          <p className="text-muted-foreground">
-            Create and manage student evaluations from supervisors
-          </p>
-        </div>
-        <Button onClick={() => setIsCreateDialogOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          Create Evaluation
-        </Button>
+      <div>
+        <h1 className="text-2xl font-bold text-foreground md:text-3xl">
+          Evaluations
+        </h1>
+        <p className="text-muted-foreground mt-1 max-w-2xl">
+          Evaluations are submitted by host organizations via the links sent to the company email captured during
+          placement. Use this list to review outcomes and update availability when needed.
+        </p>
       </div>
 
       {/* Filters */}
@@ -703,162 +676,6 @@ export default function EvaluationsManagementPage() {
             <Button variant="outline" onClick={() => setIsReviewDialogOpen(false)}>
               Close
             </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Create Dialog */}
-      <Dialog open={isCreateDialogOpen} onOpenChange={setIsCreateDialogOpen}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Create New Evaluation</DialogTitle>
-            <DialogDescription>
-              Create a new evaluation for a student from a company
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Student</label>
-              <Select
-                value={formData.studentId}
-                onValueChange={(value) => setFormData({ ...formData, studentId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select student" />
-                </SelectTrigger>
-                <SelectContent>
-                  {students.map((student) => (
-                    <SelectItem key={student.id} value={student.id}>
-                      {student.firstName} {student.lastName} ({student.studentId || student.email})
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Internship (Optional)</label>
-              <Select
-                value={formData.internshipId}
-                onValueChange={(value) => setFormData({ ...formData, internshipId: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select internship" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="">None</SelectItem>
-                  {internships.map((internship) => (
-                    <SelectItem key={internship.id} value={internship.id}>
-                      {internship.title} - {internship.company}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Title</label>
-              <Input
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                placeholder="Evaluation title"
-              />
-            </div>
-            <div>
-              <label className="text-sm font-medium">Description</label>
-              <Textarea
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                placeholder="Evaluation description"
-                rows={3}
-              />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium">Evaluation Type</label>
-                <Select
-                  value={formData.evaluationType}
-                  onValueChange={(value) =>
-                    setFormData({ ...formData, evaluationType: value })
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="initial">Initial</SelectItem>
-                    <SelectItem value="midterm">Midterm</SelectItem>
-                    <SelectItem value="final">Final</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium">Available From</label>
-                <Input
-                  type="date"
-                  value={formData.availableFrom}
-                  onChange={(e) => setFormData({ ...formData, availableFrom: e.target.value })}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-sm font-medium">Deadline</label>
-                <Input
-                  type="date"
-                  value={formData.deadline}
-                  onChange={(e) => setFormData({ ...formData, deadline: e.target.value })}
-                />
-              </div>
-              <div>
-                <label className="text-sm font-medium">Acknowledgment Deadline</label>
-                <Input
-                  type="date"
-                  value={formData.acknowledgmentDeadline}
-                  onChange={(e) =>
-                    setFormData({ ...formData, acknowledgmentDeadline: e.target.value })
-                  }
-                />
-              </div>
-            </div>
-            <div>
-              <label className="text-sm font-medium">Submission URL (Optional)</label>
-              <Input
-                value={formData.submissionUrl}
-                onChange={(e) => setFormData({ ...formData, submissionUrl: e.target.value })}
-                placeholder="https://..."
-              />
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="isAvailable"
-                checked={formData.isAvailable}
-                onChange={(e) => setFormData({ ...formData, isAvailable: e.target.checked })}
-                className="rounded"
-              />
-              <label htmlFor="isAvailable" className="text-sm font-medium">
-                Make available immediately
-              </label>
-            </div>
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                id="requiresAcknowledgment"
-                checked={formData.requiresAcknowledgment}
-                onChange={(e) =>
-                  setFormData({ ...formData, requiresAcknowledgment: e.target.checked })
-                }
-                className="rounded"
-              />
-              <label htmlFor="requiresAcknowledgment" className="text-sm font-medium">
-                Require acknowledgment
-              </label>
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreate}>Create Evaluation</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

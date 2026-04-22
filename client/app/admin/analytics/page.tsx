@@ -28,8 +28,6 @@ import {
   Legend,
 } from "recharts"
 import {
-  TrendingUp,
-  TrendingDown,
   Users,
   Briefcase,
   FileText,
@@ -81,8 +79,6 @@ export default function AnalyticsPage() {
   const [topInternships, setTopInternships] = useState<any[]>([])
   const [typeData, setTypeData] = useState<any[]>([])
   const [monthlyData, setMonthlyData] = useState<any[]>([])
-  const [mostActiveCompany, setMostActiveCompany] = useState({ name: "N/A", count: 0 })
-  const [engagementRate, setEngagementRate] = useState(0)
 
   useEffect(() => {
     if (!user) return
@@ -158,21 +154,6 @@ export default function AnalyticsPage() {
           }
         })
         setMonthlyData(monthly)
-
-        // Most active company
-        const companyCounts: Record<string, number> = {}
-        internshipsList.forEach((i: any) => {
-          const name = i.company || "Unknown"
-          companyCounts[name] = (companyCounts[name] || 0) + 1
-        })
-        const topCompany = Object.entries(companyCounts).sort((a, b) => b[1] - a[1])[0]
-        if (topCompany) {
-          setMostActiveCompany({ name: topCompany[0], count: topCompany[1] })
-        }
-
-        // Student engagement rate (share of department applicants who applied at least once)
-        const studentsWithApps = new Set(applicationsList.map((a: any) => a.studentId)).size
-        setEngagementRate(studentIds.size > 0 ? Math.round((studentsWithApps / studentIds.size) * 100) : 0)
 
       } catch (error) {
         console.error(error)
@@ -411,29 +392,6 @@ export default function AnalyticsPage() {
                 </BarChart>
               </ResponsiveContainer>
             </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Summary Cards */}
-      <div className="grid gap-4 md:grid-cols-2">
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Most Active Company</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-xl font-bold text-foreground">{mostActiveCompany.name}</p>
-            <p className="text-sm text-muted-foreground mt-1">{mostActiveCompany.count} internship position{mostActiveCompany.count !== 1 ? "s" : ""} posted</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-0 shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base">Student Engagement</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-3xl font-bold text-primary">{engagementRate}%</p>
-            <p className="text-sm text-muted-foreground mt-1">Students with at least one application</p>
           </CardContent>
         </Card>
       </div>

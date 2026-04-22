@@ -159,12 +159,17 @@ async function acknowledgeEvaluationFeedback(req, res) {
   }
 }
 
-// Create evaluation (Admin only)
+// Create evaluation (system admin only — HOD/org flow uses company email links)
 async function createEvaluation(req, res) {
   try {
     const user = req.user;
-    if (user.role !== 'admin' && user.role !== 'hod') {
-      return res.status(403).json({ message: 'Access denied' });
+    if (user.role !== 'admin') {
+      return res.status(403).json({
+        message:
+          user.role === 'hod'
+            ? 'Evaluations are created when the host organization submits via the link sent to the company email; manual creation is not available here.'
+            : 'Access denied',
+      });
     }
 
     const {
@@ -181,13 +186,6 @@ async function createEvaluation(req, res) {
       acknowledgmentDeadline,
     } = req.body;
 
-    if (user.role === 'hod') {
-      const st = await User.findByPk(studentId);
-      if (!st || st.department !== user.department) {
-        return res.status(403).json({ message: 'Access denied' });
-      }
-    }
-
     const evaluation = await Evaluation.create({
       studentId,
       internshipId,
@@ -200,7 +198,7 @@ async function createEvaluation(req, res) {
       submissionUrl,
       requiresAcknowledgment: requiresAcknowledgment !== false, // Default true
       acknowledgmentDeadline,
-      createdBy: user.role === 'hod' ? null : user.id,
+      createdBy: user.id,
     });
 
     // Send notification if evaluation is immediately available

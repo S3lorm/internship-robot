@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,10 +8,39 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
 import { noticesApi, notificationsApi } from "@/lib/api";
 import type { Notice } from "@/types";
 import { toast } from "sonner";
-import { Bell, Megaphone, Loader2 } from "lucide-react";
+import {
+  Bell,
+  Megaphone,
+  Loader2,
+  CheckCircle2,
+  Trash2,
+  CheckCheck,
+  Clock,
+} from "lucide-react";
+
+type InboxItem = {
+  id: string;
+  title?: string;
+  message?: string;
+  isRead?: boolean;
+  createdAt?: string;
+};
+
+function parseInboxPayload(raw: unknown): InboxItem[] {
+  if (Array.isArray(raw)) return raw as InboxItem[];
+  if (raw && typeof raw === "object" && Array.isArray((raw as { data?: unknown }).data)) {
+    return (raw as { data: InboxItem[] }).data;
+  }
+  if (raw && typeof raw === "object" && Array.isArray((raw as { notifications?: unknown }).notifications)) {
+    return (raw as { notifications: InboxItem[] }).notifications;
+  }
+  return [];
+}
 
 export default function AdminNotificationsPage() {
   const { user } = useAuth();
@@ -21,7 +50,10 @@ export default function AdminNotificationsPage() {
   const [content, setContent] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [posting, setPosting] = useState(false);
-  const [inbox, setInbox] = useState<any[]>([]);
+  const [inbox, setInbox] = useState<InboxItem[]>([]);
+  const [inboxBusyId, setInboxBusyId] = useState<string | null>(null);
+
+  const unreadInbox = useMemo(() => inbox.filter((n) => !n.isRead).length, [inbox]);
 
   const load = async () => {
     setLoading(true);
@@ -33,15 +65,15 @@ export default function AdminNotificationsPage() {
           ? res.data
           : [];
       setNotices(rows);
-      if (user?.role === "admin") {
+
+      let list: InboxItem[] = [];
+      if (user?.role === "admin" || user?.role === "hod") {
         const n = await notificationsApi.getAll();
-        let list: any[] = [];
-        if (Array.isArray(n.data)) list = n.data;
-        else if (n.data && typeof n.data === "object" && Array.isArray((n.data as any).data)) {
-          list = (n.data as any).data;
+        if (!n.error && n.data) {
+          list = parseInboxPayload(n.data);
         }
-        setInbox(list);
       }
+      setInbox(list);
     } catch {
       toast.error("Failed to load");
     } finally {
@@ -80,6 +112,50 @@ export default function AdminNotificationsPage() {
       await load();
     } finally {
       setPosting(false);
+    }
+  };
+
+  const markInboxRead = async (id: string) => {
+    setInboxBusyId(id);
+    try {
+      const res = await notificationsApi.markAsRead(id);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setInbox((prev) => prev.map((n) => (n.id === id ? { ...n, isRead: true } : n)));
+      toast.success("Marked as read");
+    } finally {
+      setInboxBusyId(null);
+    }
+  };
+
+  const markAllInboxRead = async () => {
+    try {
+      const res = await notificationsApi.markAllAsRead();
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setInbox((prev) => prev.map((n) => ({ ...n, isRead: true })));
+      toast.success("All notifications marked as read");
+    } catch {
+      toast.error("Failed to mark all as read");
+    }
+  };
+
+  const deleteInboxItem = async (id: string) => {
+    setInboxBusyId(id);
+    try {
+      const res = await notificationsApi.remove(id);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      setInbox((prev) => prev.filter((n) => n.id !== id));
+      toast.success("Notification removed");
+    } finally {
+      setInboxBusyId(null);
     }
   };
 
@@ -129,16 +205,8 @@ export default function AdminNotificationsPage() {
     );
   }
 
-  return (
+  const noticesSection = (
     <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold tracking-tight">Department notices</h1>
-        <p className="text-muted-foreground mt-1">
-          Announcements shown here are scoped to <span className="font-medium text-foreground">{user.department}</span>{" "}
-          students only. Set an expiry so items disappear from student dashboards when intended.
-        </p>
-      </div>
-
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -200,10 +268,12 @@ export default function AdminNotificationsPage() {
                 <li key={n.id} className="rounded-lg border p-4">
                   <p className="font-semibold">{n.title}</p>
                   <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">{n.content}</p>
-                  {(n as any).expiresAt || n.expiryDate ? (
+                  {(n as Notice & { expiresAt?: string }).expiresAt || n.expiryDate ? (
                     <p className="text-xs text-muted-foreground mt-2">
                       Expires:{" "}
-                      {new Date((n as any).expiresAt || n.expiryDate).toLocaleString()}
+                      {new Date(
+                        (n as Notice & { expiresAt?: string }).expiresAt || n.expiryDate || ""
+                      ).toLocaleString()}
                     </p>
                   ) : null}
                 </li>
@@ -212,6 +282,130 @@ export default function AdminNotificationsPage() {
           )}
         </CardContent>
       </Card>
+    </div>
+  );
+
+  const inboxSection = (
+    <Card>
+      <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <CardTitle className="flex items-center gap-2">
+            <Bell className="h-5 w-5" />
+            Incoming notifications
+          </CardTitle>
+          <CardDescription>
+            Alerts for your HOD account (e.g. system messages). Mark as read or remove when you are done.
+          </CardDescription>
+        </div>
+        {unreadInbox > 0 && (
+          <Button type="button" variant="outline" size="sm" onClick={() => void markAllInboxRead()}>
+            <CheckCheck className="mr-2 h-4 w-4" />
+            Mark all read
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {loading ? (
+          <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        ) : inbox.length === 0 ? (
+          <p className="text-sm text-muted-foreground">No notifications in your inbox.</p>
+        ) : (
+          <ul className="space-y-3">
+            {inbox.map((n) => (
+              <li
+                key={n.id}
+                className={`rounded-lg border p-4 text-sm ${n.isRead ? "bg-background" : "border-primary/25 bg-primary/5"}`}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-medium">{n.title}</p>
+                      {!n.isRead && (
+                        <Badge variant="secondary" className="text-xs">
+                          Unread
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-muted-foreground mt-1 whitespace-pre-wrap">{n.message}</p>
+                    {n.createdAt && (
+                      <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
+                        <Clock className="h-3 w-3 shrink-0" />
+                        {new Date(n.createdAt).toLocaleString()}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex shrink-0 gap-2">
+                    {!n.isRead && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={inboxBusyId === n.id}
+                        onClick={() => void markInboxRead(n.id)}
+                      >
+                        {inboxBusyId === n.id ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <>
+                            <CheckCircle2 className="mr-1 h-4 w-4" />
+                            Read
+                          </>
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="text-destructive hover:bg-destructive/10"
+                      disabled={inboxBusyId === n.id}
+                      onClick={() => void deleteInboxItem(n.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </CardContent>
+    </Card>
+  );
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
+        <p className="text-muted-foreground mt-1">
+          Inbox for your HOD account, and department notices for{" "}
+          <span className="font-medium text-foreground">{user.department}</span> students — on one page.
+        </p>
+      </div>
+
+      <Tabs defaultValue="inbox" className="space-y-6">
+        <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsTrigger value="inbox" className="gap-2">
+            <Bell className="h-4 w-4" />
+            Inbox
+            {unreadInbox > 0 && (
+              <Badge variant="secondary" className="ml-1 rounded-full px-2 py-0 text-xs">
+                {unreadInbox}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="notices" className="gap-2">
+            <Megaphone className="h-4 w-4" />
+            Department notices
+          </TabsTrigger>
+        </TabsList>
+        <TabsContent value="inbox" className="mt-0">
+          {inboxSection}
+        </TabsContent>
+        <TabsContent value="notices" className="mt-0">
+          {noticesSection}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

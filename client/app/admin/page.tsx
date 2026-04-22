@@ -10,13 +10,11 @@ import {
   Briefcase,
   FileText,
   CheckCircle2,
-  BarChart3,
-  ClipboardCheck,
   Bell,
   Loader2,
   ArrowRight,
 } from "lucide-react";
-import { lettersApi, placementsApi, evaluationsApi } from "@/lib/api";
+import { lettersApi, placementsApi } from "@/lib/api";
 import type { LetterRequest } from "@/types";
 import { toast } from "sonner";
 
@@ -32,7 +30,6 @@ export default function AdminDashboard() {
   const [hodLoading, setHodLoading] = useState(false);
   const [letterRequests, setLetterRequests] = useState<LetterRequest[]>([]);
   const [placementRows, setPlacementRows] = useState<any[]>([]);
-  const [evaluationCount, setEvaluationCount] = useState(0);
 
   useEffect(() => {
     if (user?.role !== "hod" || !user.department) return;
@@ -40,10 +37,9 @@ export default function AdminDashboard() {
     async function loadHod() {
       setHodLoading(true);
       try {
-        const [lrRes, trRes, evRes] = await Promise.all([
+        const [lrRes, trRes] = await Promise.all([
           lettersApi.getRequests(),
           placementsApi.getTrackingData(),
-          evaluationsApi.getAll(),
         ]);
 
         const reqs = (lrRes as any).data?.requests || (lrRes as any).requests || [];
@@ -51,9 +47,6 @@ export default function AdminDashboard() {
 
         const track = (trRes as any).data?.trackingData || [];
         setPlacementRows(Array.isArray(track) ? track : []);
-
-        const evs = (evRes as any).data?.evaluations || [];
-        setEvaluationCount(Array.isArray(evs) ? evs.length : 0);
       } catch {
         toast.error("Failed to load department dashboard");
       } finally {
@@ -104,7 +97,7 @@ export default function AdminDashboard() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Department overview</h1>
           <p className="text-muted-foreground mt-1">
-            {user.department} — analytics, letter requests, placements, and evaluations for your department only.
+            {user.department} — letter requests and placement activity for your department.
           </p>
         </div>
 
@@ -231,33 +224,6 @@ export default function AdminDashboard() {
                   )}
                 </CardContent>
               </Card>
-            </div>
-
-            <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline">
-                <Link href="/admin/analytics">
-                  <BarChart3 className="mr-2 h-4 w-4" />
-                  Detailed analytics
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/admin/internship-tracking">
-                  <Briefcase className="mr-2 h-4 w-4" />
-                  Internship tracking
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/admin/evaluations">
-                  <ClipboardCheck className="mr-2 h-4 w-4" />
-                  Evaluations ({evaluationCount})
-                </Link>
-              </Button>
-              <Button asChild variant="outline">
-                <Link href="/admin/notifications">
-                  <Bell className="mr-2 h-4 w-4" />
-                  Department notices
-                </Link>
-              </Button>
             </div>
           </>
         )}
