@@ -20,6 +20,7 @@ import {
   LogOut,
   Anchor,
   ClipboardCheck,
+  MapPinned,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
@@ -27,6 +28,7 @@ type NavItem = { href: string; label: string; icon: React.ComponentType<{ classN
 const hodNavItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/letter-requests", label: "Letter Requests", icon: FileCheck },
+  { href: "/admin/internship-tracking", label: "Official placements", icon: MapPinned },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/evaluations", label: "Evaluations", icon: ClipboardCheck },
   { href: "/admin/internships", label: "Post Internship", icon: Briefcase },
@@ -36,6 +38,7 @@ const systemAdminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "User Management", icon: Users },
   { href: "/admin/applications", label: "Applications", icon: FileText },
+  { href: "/admin/internship-tracking", label: "Official placements", icon: MapPinned },
   { href: "/admin/notices", label: "Notices", icon: Bell },
 ];
 

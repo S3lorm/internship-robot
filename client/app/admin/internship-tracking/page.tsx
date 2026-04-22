@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -56,7 +55,6 @@ const statusConfig = {
 
 export default function InternshipTrackingPage() {
   const { user } = useAuth();
-  const router = useRouter();
   const [placements, setPlacements] = useState<InternshipPlacement[]>([]);
   const [filteredPlacements, setFilteredPlacements] = useState<InternshipPlacement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -72,13 +70,9 @@ export default function InternshipTrackingPage() {
 
   useEffect(() => {
     if (!user) return;
-    if (user.role === "admin") {
-      router.replace("/admin");
-      return;
-    }
-    if (user.role !== "hod") return;
+    if (user.role !== "admin" && user.role !== "hod") return;
     void loadPlacements();
-  }, [user, router]);
+  }, [user]);
 
   useEffect(() => {
     let filtered = placements;
@@ -126,9 +120,14 @@ export default function InternshipTrackingPage() {
 
   const handleUpdateStatus = async (status: InternshipPlacement['status']) => {
     if (!selectedPlacement) return;
-    
-    if (status === 'modification_requested' && !adminNotes) {
-      toast.error("Notes are required when requesting modifications.");
+
+    const notes = adminNotes.trim();
+    if (status === "rejected" && !notes) {
+      toast.error("A written reason is required when denying a placement request.");
+      return;
+    }
+    if (status === "modification_requested" && !notes) {
+      toast.error("Explain what the student must change before requesting modifications.");
       return;
     }
 
@@ -137,13 +136,25 @@ export default function InternshipTrackingPage() {
       const result = await placementsApi.updateStatus(
         selectedPlacement.id,
         status,
-        adminNotes || undefined
+        notes || undefined
       );
       
       if (result.error) {
         toast.error(result.error);
       } else {
-        toast.success(`Placement ${status.replace('_', ' ')} successfully`);
+        if (status === "approved") {
+          const sent = (result.data as { organizationEmailSent?: boolean })?.organizationEmailSent;
+          const err = (result.data as { organizationEmailError?: string })?.organizationEmailError;
+          if (sent) {
+            toast.success("Approved. Official letter (PDF) and evaluation link were emailed to the organization.");
+          } else if (err) {
+            toast.success(`Approved, but the organization email could not be sent: ${err}`);
+          } else {
+            toast.success("Placement approved.");
+          }
+        } else {
+          toast.success(`Placement ${status.replace("_", " ")} successfully`);
+        }
         setSelectedPlacement(null);
         setAdminNotes("");
         loadPlacements();
@@ -186,17 +197,11 @@ export default function InternshipTrackingPage() {
     emailsSent: placements.filter((p) => p.emailSent).length,
   };
 
-  if (!user || user.role === "admin") {
-    return (
-      <div className="flex min-h-[320px] items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
-
-  if (user.role !== "hod") {
+  if (!user || (user.role !== "admin" && user.role !== "hod")) {
     return null;
   }
+
+  const isHodView = user.role === "hod";
 
   return (
     <div className="space-y-6">
@@ -207,7 +212,9 @@ export default function InternshipTrackingPage() {
           Stage 2: Official Internship Tracking
         </h1>
         <p className="text-muted-foreground mt-1">
-          Review, approve, and track official placements representing confirmed internship locations. Upon approval, official letters and unique evaluation tokens are generated.
+          {isHodView
+            ? "Review official placement requests from students in your department. When you approve, the official letter (PDF) and supervisor evaluation link are emailed to the host organization automatically."
+            : "Review, approve, and track official placements across the institution. Upon approval, official letters and unique evaluation tokens are generated and can be emailed to organizations."}
         </p>
       </div>
 
@@ -604,14 +611,16 @@ export default function InternshipTrackingPage() {
                     <div className="border-t pt-4 space-y-4">
                       <div>
                         <Label htmlFor="adminFeedback" className="text-sm font-semibold flex items-center gap-1">
-                          Action Feedback / Notes
-                          <span className="text-xs font-normal text-muted-foreground">(Required for modifications, optional for others)</span>
+                          Decision notes / reason
+                          <span className="text-xs font-normal text-muted-foreground">
+                            (Required to deny or request changes; optional when approving)
+                          </span>
                         </Label>
                         <Textarea
                           id="adminFeedback"
                           value={adminNotes}
                           onChange={(e) => setAdminNotes(e.target.value)}
-                          placeholder="Provide feedback on why it's rejected, or what needs modification..."
+                          placeholder="If denying or requesting changes, state the reason clearly for the student."
                           className="mt-2 min-h-[100px]"
                         />
                       </div>
@@ -639,7 +648,7 @@ export default function InternshipTrackingPage() {
                         variant="outline"
                         className="bg-red-50 text-red-700 hover:bg-red-100 border-red-200"
                         onClick={() => handleUpdateStatus("rejected")}
-                        disabled={isUpdating}
+                        disabled={isUpdating || !adminNotes.trim()}
                       >
                         {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
                         Reject
@@ -649,7 +658,7 @@ export default function InternshipTrackingPage() {
                         variant="outline"
                         className="bg-indigo-50 text-indigo-700 hover:bg-indigo-100 border-indigo-200"
                         onClick={() => handleUpdateStatus("modification_requested")}
-                        disabled={isUpdating || (!adminNotes && selectedPlacement.status !== 'modification_requested')}
+                        disabled={isUpdating || !adminNotes.trim()}
                       >
                          {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <AlertCircle className="mr-2 h-4 w-4" />}
                         Request Mod

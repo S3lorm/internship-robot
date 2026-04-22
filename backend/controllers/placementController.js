@@ -1,4 +1,12 @@
 const crypto = require('crypto');
+const { normalizeDepartmentName } = require('../constants/departments');
+
+function departmentMatch(a, b) {
+  const na = normalizeDepartmentName(a) || (a && String(a).trim()) || '';
+  const nb = normalizeDepartmentName(b) || (b && String(b).trim()) || '';
+  if (!na || !nb) return false;
+  return na.toLowerCase() === nb.toLowerCase();
+}
 
 // Create a new internship placement (Stage 2 - after general request approved)
 async function createPlacement(req, res) {
@@ -66,9 +74,23 @@ async function createPlacement(req, res) {
       await createNotification({
         userId: admin.id,
         type: 'letter_request',
-        title: 'New Official Placement Request',
-        message: `${user.firstName} ${user.lastName} has submitted an official internship placement request for ${organizationName}`,
+        title: 'New official placement request',
+        message: `${user.firstName} ${user.lastName} (${user.studentId || 'student'}) submitted an official placement for ${organizationName}. The department HOD is notified first; if they deny, ignore the request, or you need to step in, you have the same tools in Official placements — approve or deny with a reason, and on approval the official letter and evaluation link are emailed to the organization.`,
         relatedId: placement.id,
+        link: '/admin/internship-tracking',
+      });
+    }
+
+    const hods = await User.findAll({ where: { role: 'hod' } });
+    for (const hod of hods) {
+      if (!departmentMatch(hod.department, user.department)) continue;
+      await createNotification({
+        userId: hod.id,
+        type: 'letter_request',
+        title: 'Official placement request — your department',
+        message: `${user.firstName} ${user.lastName} (${user.studentId || 'student'}) submitted an official placement for ${organizationName}. Approve or deny with a reason; if approved, the official letter and evaluation link are emailed to the organization.`,
+        relatedId: placement.id,
+        link: '/admin/internship-tracking',
       });
     }
 
@@ -110,7 +132,7 @@ async function getPlacements(req, res) {
 
     if (user.role === 'hod') {
       placements = placements.filter(
-        (p) => p.student && p.student.department === user.department
+        (p) => p.student && departmentMatch(p.student.department, user.department)
       );
     }
 
@@ -142,7 +164,7 @@ async function getPlacementById(req, res) {
     if (placement.studentId) {
       const student = await User.findOne({ id: placement.studentId });
       if (student) placement.student = student;
-      if (user.role === 'hod' && (!student || student.department !== user.department)) {
+      if (user.role === 'hod' && (!student || !departmentMatch(student.department, user.department))) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -186,14 +208,31 @@ async function updatePlacementStatus(req, res) {
     if (user.role === 'hod') {
       const { User: UserModel } = require('../models');
       const st = await UserModel.findOne({ id: placement.studentId });
-      if (!st || st.department !== user.department) {
+      if (!st || !departmentMatch(st.department, user.department)) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
 
+    const notesTrim = adminNotes != null ? String(adminNotes).trim() : '';
+    if (status === 'rejected' && !notesTrim) {
+      return res.status(400).json({
+        message: 'A written reason is required when denying an official placement request.',
+      });
+    }
+    if (status === 'modification_requested' && !notesTrim) {
+      return res.status(400).json({
+        message: 'Please explain what must be corrected before requesting modifications.',
+      });
+    }
+
     const updateData = {
       status,
-      adminNotes,
+      adminNotes:
+        notesTrim.length > 0
+          ? notesTrim
+          : status === 'approved'
+            ? placement.adminNotes ?? null
+            : notesTrim,
       reviewedBy: user.role === 'hod' ? null : user.id,
       reviewedAt: new Date().toISOString(),
     };
@@ -267,8 +306,12 @@ async function updatePlacementStatus(req, res) {
 
     const statusMsg = {
       approved: approvedMsg,
-      rejected: `Your official placement request for ${placement.organizationName} has been rejected.`,
-      modification_requested: `Your official placement request for ${placement.organizationName} requires modifications. Please review the admin notes.`,
+      rejected: notesTrim
+        ? `Your official placement request for ${placement.organizationName} was not approved. Reason: ${notesTrim}`
+        : `Your official placement request for ${placement.organizationName} has been rejected.`,
+      modification_requested: notesTrim
+        ? `Your official placement for ${placement.organizationName} needs updates before it can be approved. Instructions: ${notesTrim}`
+        : `Your official placement request for ${placement.organizationName} requires modifications. Please review the notes in the portal.`,
     };
 
     await createNotification({
@@ -285,6 +328,26 @@ async function updatePlacementStatus(req, res) {
       relatedId: id,
       link: `/dashboard/letter-requests/official?view=${id}`,
     });
+
+    if (user.role === 'hod' && (status === 'rejected' || status === 'modification_requested')) {
+      const { User: UserModel } = require('../models');
+      const adminsForEscalation = await UserModel.findAll({ where: { role: 'admin' } });
+      const stu = await UserModel.findOne({ id: placement.studentId });
+      const stLabel = stu ? `${stu.firstName} ${stu.lastName}` : 'A student';
+      const actionLabel = status === 'rejected' ? 'denied' : 'returned for changes';
+      const reasonSnippet =
+        notesTrim.length > 220 ? `${notesTrim.slice(0, 217)}…` : notesTrim;
+      for (const admin of adminsForEscalation) {
+        await createNotification({
+          userId: admin.id,
+          type: 'letter_request',
+          title: 'Official placement — HOD decision (you may take over)',
+          message: `${stLabel}'s official placement for ${placement.organizationName} was ${actionLabel} by the department HOD.${reasonSnippet ? ` Reason: ${reasonSnippet}` : ''} If the student resubmits or you need to decide instead, open Official placements — you have the same approval, denial, and organisation email options as the HOD.`,
+          relatedId: id,
+          link: '/admin/internship-tracking',
+        });
+      }
+    }
 
     res.json({
       message: 'Placement status updated successfully',
@@ -317,6 +380,14 @@ async function sendToOrganization(req, res) {
 
     if (placement.status !== 'approved') {
       return res.status(400).json({ message: 'Placement must be approved before sending to organization' });
+    }
+
+    if (user.role === 'hod') {
+      const { User: UserModel } = require('../models');
+      const st = await UserModel.findOne({ id: placement.studentId });
+      if (!st || !departmentMatch(st.department, user.department)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
     }
 
     const { sendOfficialLetterAndEvaluationToOrganization } = require('../services/placementOrganizationEmail');
@@ -370,7 +441,7 @@ async function downloadOfficialLetter(req, res) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    if (user.role === 'hod' && student.department !== user.department) {
+    if (user.role === 'hod' && !departmentMatch(student.department, user.department)) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -409,7 +480,7 @@ async function getTrackingData(req, res) {
       // Get student info
       const student = await UserModel.findOne({ id: placement.studentId });
 
-      if (user.role === 'hod' && (!student || student.department !== user.department)) {
+      if (user.role === 'hod' && (!student || !departmentMatch(student.department, user.department))) {
         continue;
       }
       
