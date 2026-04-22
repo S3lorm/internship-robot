@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +98,8 @@ interface Internship {
 }
 
 export default function EvaluationsManagementPage() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [students, setStudents] = useState<User[]>([]);
   const [internships, setInternships] = useState<Internship[]>([]);
@@ -123,8 +127,14 @@ export default function EvaluationsManagementPage() {
   });
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (!user) return;
+    if (user.role === "admin") {
+      router.replace("/admin");
+      return;
+    }
+    if (user.role !== "hod") return;
+    void fetchData();
+  }, [user, router]);
 
   const fetchData = async () => {
     try {
@@ -346,6 +356,18 @@ export default function EvaluationsManagementPage() {
 
     return matchesSearch && matchesType && matchesRecommendation;
   });
+
+  if (!user || user.role === "admin") {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (user.role !== "hod") {
+    return null;
+  }
 
   if (loading) {
     return (

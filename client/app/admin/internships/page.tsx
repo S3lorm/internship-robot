@@ -46,11 +46,12 @@ import {
   XCircle,
   Briefcase,
   Construction,
+  Loader2,
 } from "lucide-react"
 import { Internship } from "@/types"
 import { applicationsApi, internshipsApi } from "@/lib/api"
 import { toast } from "sonner"
-import { useSearchParams } from "next/navigation"
+import { useSearchParams, useRouter } from "next/navigation"
 import Loading from "./loading"
 import { useAuth } from "@/contexts/auth-context"
 
@@ -76,6 +77,7 @@ const emptyInternship = {
 
 export default function InternshipsManagementPage() {
   const { user } = useAuth()
+  const router = useRouter()
   const searchParams = useSearchParams()
   const [internships, setInternships] = useState<Internship[]>([])
   const [filteredInternships, setFilteredInternships] = useState<Internship[]>([])
@@ -97,7 +99,12 @@ export default function InternshipsManagementPage() {
   const [responsibilitiesInput, setResponsibilitiesInput] = useState("")
 
   useEffect(() => {
-    if (user?.role === "hod") {
+    if (!user) return
+    if (user.role === "admin") {
+      router.replace("/admin")
+      return
+    }
+    if (user.role === "hod") {
       setIsLoading(false)
       return
     }
@@ -123,7 +130,7 @@ export default function InternshipsManagementPage() {
     }
 
     fetchInternships()
-  }, [user?.role])
+  }, [user?.role, router])
 
   useEffect(() => {
     let filtered = internships
@@ -361,6 +368,14 @@ export default function InternshipsManagementPage() {
       </div>
     </div>
   )
+
+  if (user?.role === "admin") {
+    return (
+      <div className="flex justify-center py-16">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    )
+  }
 
   if (user?.role === "hod") {
     return (

@@ -1,4 +1,4 @@
-const { Evaluation } = require('../models');
+const { Evaluation, User } = require('../models');
 
 // Get all evaluations for current user
 async function getEvaluations(req, res) {
@@ -11,10 +11,21 @@ async function getEvaluations(req, res) {
       where.studentId = user.id;
     }
 
-    const evaluations = await Evaluation.findAll({
+    let evaluations = await Evaluation.findAll({
       where,
       order: [['createdAt', 'DESC']],
     });
+
+    if (user.role === 'hod') {
+      const filtered = [];
+      for (const ev of evaluations) {
+        const st = await User.findByPk(ev.studentId);
+        if (st && st.department === user.department) {
+          filtered.push(ev);
+        }
+      }
+      evaluations = filtered;
+    }
 
     res.json({ evaluations });
   } catch (error) {
@@ -40,6 +51,13 @@ async function getEvaluationById(req, res) {
     // Students can only view their own evaluations
     if (user.role === 'student' && evaluation.studentId !== user.id) {
       return res.status(403).json({ message: 'Access denied' });
+    }
+
+    if (user.role === 'hod') {
+      const st = await User.findByPk(evaluation.studentId);
+      if (!st || st.department !== user.department) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
     }
 
     res.json({ evaluation });
@@ -145,8 +163,8 @@ async function acknowledgeEvaluationFeedback(req, res) {
 async function createEvaluation(req, res) {
   try {
     const user = req.user;
-    if (user.role !== 'admin') {
-      return res.status(403).json({ message: 'Admin access required' });
+    if (user.role !== 'admin' && user.role !== 'hod') {
+      return res.status(403).json({ message: 'Access denied' });
     }
 
     const {
@@ -163,6 +181,13 @@ async function createEvaluation(req, res) {
       acknowledgmentDeadline,
     } = req.body;
 
+    if (user.role === 'hod') {
+      const st = await User.findByPk(studentId);
+      if (!st || st.department !== user.department) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
     const evaluation = await Evaluation.create({
       studentId,
       internshipId,
@@ -175,7 +200,7 @@ async function createEvaluation(req, res) {
       submissionUrl,
       requiresAcknowledgment: requiresAcknowledgment !== false, // Default true
       acknowledgmentDeadline,
-      createdBy: user.id,
+      createdBy: user.role === 'hod' ? null : user.id,
     });
 
     // Send notification if evaluation is immediately available
@@ -205,14 +230,21 @@ async function createEvaluation(req, res) {
 async function updateEvaluation(req, res) {
   try {
     const user = req.user;
-    if (user.role !== 'admin') {
-      return res.status(403).json({ message: 'Admin access required' });
+    if (user.role !== 'admin' && user.role !== 'hod') {
+      return res.status(403).json({ message: 'Access denied' });
     }
 
     const { id } = req.params;
     const evaluation = await Evaluation.findOne({ id });
     if (!evaluation) {
       return res.status(404).json({ message: 'Evaluation not found' });
+    }
+
+    if (user.role === 'hod') {
+      const st = await User.findByPk(evaluation.studentId);
+      if (!st || st.department !== user.department) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
     }
 
     const updates = req.body;

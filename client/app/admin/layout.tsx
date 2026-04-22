@@ -161,14 +161,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
           <div className="flex-1">
             <h1 className="text-lg font-semibold text-foreground">
-              {pathname === "/admin" ? "Dashboard" : 
+              {pathname === "/admin" ? "Dashboard" :
                pathname.includes("/users") ? "User Management" :
+               pathname.includes("/internship-tracking") ? "Internship Tracking" :
                pathname.includes("/internships") ? "Internships" :
                pathname.includes("/applications") ? "Applications" :
                pathname.includes("/notices") ? "Notices" :
                pathname.includes("/notifications") ? "Notifications" :
                pathname.includes("/evaluations") ? "Evaluations" :
-               pathname.includes("/letter") ? "Letter Requests" :
+               pathname.includes("/letter-requests") ? "Letter Requests" :
+               pathname.includes("/letter") ? "Application Letter" :
                pathname.includes("/analytics") ? "Analytics" : user.role === "hod" ? "HOD" : "Admin"}
             </h1>
           </div>

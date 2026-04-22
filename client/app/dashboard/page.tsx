@@ -31,7 +31,6 @@ import {
   XCircle,
   ArrowRight,
   Bell,
-  TrendingUp,
   Eye,
   MapPin,
   Mail,
@@ -80,7 +79,6 @@ const getStatusBadge = (status: string) => {
 export default function DashboardPage() {
   const { user } = useAuth();
   const [applications, setApplications] = useState<Application[]>([]);
-  const [internships, setInternships] = useState<Internship[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [letterRequests, setLetterRequests] = useState<LetterRequest[]>([]);
@@ -103,7 +101,6 @@ export default function DashboardPage() {
 
         // Backend returns an assembled object matching the previous separate responses
         setApplications(Array.isArray(data?.applications) ? data.applications : []);
-        setInternships(Array.isArray(data?.internships) ? data.internships : []);
         setNotices(Array.isArray(data?.notices) ? data.notices : []);
         setNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
         setLetterRequests(Array.isArray(data?.letterRequests) ? data.letterRequests : []);
@@ -240,25 +237,7 @@ export default function DashboardPage() {
       )}
 
       {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-              <FileText className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              {loading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              ) : (
-                <>
-                  <p className="text-2xl font-bold">{stats.total}</p>
-                  <p className="text-sm text-muted-foreground">Total Applications</p>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Card>
           <CardContent className="flex items-center gap-4 p-6">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-yellow-100">
@@ -289,24 +268,6 @@ export default function DashboardPage() {
                 <>
                   <p className="text-2xl font-bold">{stats.approved}</p>
                   <p className="text-sm text-muted-foreground">Approved</p>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
-              <TrendingUp className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              {loading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              ) : (
-                <>
-                  <p className="text-2xl font-bold">{internships.length}</p>
-                  <p className="text-sm text-muted-foreground">Open Positions</p>
                 </>
               )}
             </div>

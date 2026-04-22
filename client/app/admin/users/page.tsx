@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
@@ -59,6 +59,8 @@ export default function UserManagementPage() {
   const [filteredUsers, setFilteredUsers] = useState<User[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
+  const [departmentFilter, setDepartmentFilter] = useState<string>("all")
+  const [roleFilter, setRoleFilter] = useState<string>("all")
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; user: User | null }>({
@@ -70,10 +72,20 @@ export default function UserManagementPage() {
   const fetchUsers = async () => {
     try {
       setIsLoading(true)
-      const res = await usersApi.getAll()
-      const fetchedUsers = (res as any).data?.data || (res as any).data?.users || (res as any).users || []
-      // Only show student users — admins should not appear in the manage users list
-      setUsers(fetchedUsers.filter((u: User) => u.role !== "admin"))
+      const all: User[] = []
+      let page = 1
+      const limit = 100
+      for (;;) {
+        const res = await usersApi.getAll({ page: String(page), limit: String(limit) })
+        const body = (res as any).data
+        const fetchedUsers = body?.data || (res as any).data?.users || (res as any).users || []
+        const total = body?.meta?.total ?? fetchedUsers.length
+        all.push(...fetchedUsers)
+        if (all.length >= total || fetchedUsers.length === 0) break
+        page += 1
+        if (page > 100) break
+      }
+      setUsers(all.filter((u: User) => u.role !== "admin"))
     } catch (error) {
       toast.error("Failed to fetch users")
       console.error(error)
@@ -86,15 +98,25 @@ export default function UserManagementPage() {
     fetchUsers()
   }, [])
 
+  const departmentOptions = useMemo(() => {
+    const set = new Set<string>()
+    for (const u of users) {
+      if (u.department?.trim()) set.add(u.department.trim())
+    }
+    return Array.from(set).sort((a, b) => a.localeCompare(b))
+  }, [users])
+
   useEffect(() => {
     let filtered = users
 
     if (searchQuery) {
+      const q = searchQuery.toLowerCase()
       filtered = filtered.filter(
         (user) =>
-          user.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          `${user.firstName} ${user.lastName}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          user.studentId?.toLowerCase().includes(searchQuery.toLowerCase())
+          user.email.toLowerCase().includes(q) ||
+          `${user.firstName} ${user.lastName}`.toLowerCase().includes(q) ||
+          user.studentId?.toLowerCase().includes(q) ||
+          user.department?.toLowerCase().includes(q)
       )
     }
 
@@ -103,8 +125,16 @@ export default function UserManagementPage() {
       filtered = filtered.filter((user) => user.isActive === isActive)
     }
 
+    if (departmentFilter !== "all") {
+      filtered = filtered.filter((user) => (user.department || "").trim() === departmentFilter)
+    }
+
+    if (roleFilter !== "all") {
+      filtered = filtered.filter((user) => user.role === roleFilter)
+    }
+
     setFilteredUsers(filtered)
-  }, [searchQuery, statusFilter, users])
+  }, [searchQuery, statusFilter, departmentFilter, roleFilter, users])
 
   const handleToggleStatus = async (userId: string, currentStatus: boolean) => {
     try {
@@ -173,13 +203,14 @@ export default function UserManagementPage() {
 
   const handleExport = () => {
     const csvContent = [
-      ["ID", "Name", "Email", "Student ID", "Role", "Status", "Created At"].join(","),
+      ["ID", "Name", "Email", "Student ID", "Department", "Role", "Status", "Created At"].join(","),
       ...filteredUsers.map((user) =>
         [
           user.id,
           `${user.firstName} ${user.lastName}`,
           user.email,
           user.studentId || "N/A",
+          user.department || "N/A",
           user.role,
           user.isActive ? "Active" : "Inactive",
           new Date((user as any).createdAt || new Date()).toLocaleDateString(),
@@ -200,6 +231,8 @@ export default function UserManagementPage() {
     total: users.length,
     active: users.filter((u) => u.isActive).length,
     inactive: users.filter((u) => !u.isActive).length,
+    students: users.filter((u) => u.role === "student").length,
+    hods: users.filter((u) => u.role === "hod").length,
   }
 
   if (isLoading) {
@@ -221,9 +254,9 @@ export default function UserManagementPage() {
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-3">
           {[
-            { label: "Total Students", value: stats.total, icon: Users, color: "bg-blue-500" },
-            { label: "Active Students", value: stats.active, icon: UserCheck, color: "bg-emerald-500" },
-            { label: "Inactive Students", value: stats.inactive, icon: UserX, color: "bg-red-500" },
+            { label: "Students & HODs", value: stats.total, icon: Users, color: "bg-blue-500" },
+            { label: "Active accounts", value: stats.active, icon: UserCheck, color: "bg-emerald-500" },
+            { label: "Inactive accounts", value: stats.inactive, icon: UserX, color: "bg-red-500" },
           ].map((stat) => (
             <Card key={stat.label} className="border-0 shadow-sm">
               <CardContent className="p-4">
@@ -240,6 +273,9 @@ export default function UserManagementPage() {
             </Card>
           ))}
         </div>
+        <p className="text-sm text-muted-foreground">
+          {stats.students} students · {stats.hods} heads of department (excludes system administrators)
+        </p>
 
         {/* Filters & Actions */}
         <Card className="border-0 shadow-sm">
@@ -248,14 +284,36 @@ export default function UserManagementPage() {
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Search by name, email, or student ID..."
+                  placeholder="Search by name, email, student ID, or department..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10"
                 />
               </div>
               <div className="flex flex-wrap gap-2">
-
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                  <SelectTrigger className="w-[200px]">
+                    <SelectValue placeholder="Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All departments</SelectItem>
+                    {departmentOptions.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={roleFilter} onValueChange={setRoleFilter}>
+                  <SelectTrigger className="w-36">
+                    <SelectValue placeholder="Role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All roles</SelectItem>
+                    <SelectItem value="student">Students</SelectItem>
+                    <SelectItem value="hod">HODs</SelectItem>
+                  </SelectContent>
+                </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-36">
                     <SelectValue placeholder="Status" />
@@ -301,9 +359,10 @@ export default function UserManagementPage() {
         {/* Users Table */}
         <Card className="border-0 shadow-sm">
           <CardHeader>
-            <CardTitle>All Users</CardTitle>
+            <CardTitle>Users by department</CardTitle>
             <CardDescription>
-              Manage user accounts and permissions
+              Manage students and heads of department. Filter by department to align accounts with your org
+              structure.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -326,6 +385,8 @@ export default function UserManagementPage() {
                       />
                     </TableHead>
                     <TableHead>User</TableHead>
+                    <TableHead>Role</TableHead>
+                    <TableHead>Department</TableHead>
                     <TableHead>Student ID</TableHead>
                     <TableHead>Status</TableHead>
                     <TableHead>Joined</TableHead>
@@ -335,7 +396,7 @@ export default function UserManagementPage() {
                 <TableBody>
                   {filteredUsers.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={7} className="text-center py-12">
+                      <TableCell colSpan={8} className="text-center py-12">
                         <Users className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
                         <p className="text-muted-foreground">No users found</p>
                       </TableCell>
@@ -373,6 +434,14 @@ export default function UserManagementPage() {
                               <p className="text-sm text-muted-foreground">{user.email}</p>
                             </div>
                           </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" className="capitalize">
+                            {user.role === "hod" ? "HOD" : user.role}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground max-w-[160px] truncate">
+                          {user.department || "—"}
                         </TableCell>
                         <TableCell className="text-muted-foreground">
                           {user.studentId || "-"}

@@ -16,6 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 import { lettersApi } from "@/lib/api";
 import type { LetterRequest } from "@/types";
 import {
@@ -62,6 +63,7 @@ function letterStudentPrefix(r: LetterRequest): string {
 
 export default function AdminLetterRequestsPage() {
   const { user } = useAuth();
+  const router = useRouter();
   const [bulkBusy, setBulkBusy] = useState(false);
   const [requests, setRequests] = useState<LetterRequest[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<LetterRequest[]>([]);
@@ -77,8 +79,14 @@ export default function AdminLetterRequestsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    loadRequests();
-  }, []);
+    if (!user) return;
+    if (user.role === "admin") {
+      router.replace("/admin");
+      return;
+    }
+    if (user.role !== "hod") return;
+    void loadRequests();
+  }, [user, router]);
 
   useEffect(() => {
     let filtered = requests;
@@ -211,6 +219,18 @@ export default function AdminLetterRequestsPage() {
     const set = new Set(pending.map(letterStudentPrefix));
     return Array.from(set).filter((p) => p !== "Other").sort();
   }, [filteredRequests]);
+
+  if (!user || user.role === "admin") {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (user.role !== "hod") {
+    return null;
+  }
 
   return (
     <div className="space-y-6">

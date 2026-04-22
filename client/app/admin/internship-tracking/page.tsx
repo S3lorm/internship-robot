@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -53,6 +55,8 @@ const statusConfig = {
 };
 
 export default function InternshipTrackingPage() {
+  const { user } = useAuth();
+  const router = useRouter();
   const [placements, setPlacements] = useState<InternshipPlacement[]>([]);
   const [filteredPlacements, setFilteredPlacements] = useState<InternshipPlacement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -67,8 +71,14 @@ export default function InternshipTrackingPage() {
   const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    loadPlacements();
-  }, []);
+    if (!user) return;
+    if (user.role === "admin") {
+      router.replace("/admin");
+      return;
+    }
+    if (user.role !== "hod") return;
+    void loadPlacements();
+  }, [user, router]);
 
   useEffect(() => {
     let filtered = placements;
@@ -175,6 +185,18 @@ export default function InternshipTrackingPage() {
     approved: placements.filter((p) => p.status === "approved").length,
     emailsSent: placements.filter((p) => p.emailSent).length,
   };
+
+  if (!user || user.role === "admin") {
+    return (
+      <div className="flex min-h-[320px] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (user.role !== "hod") {
+    return null;
+  }
 
   return (
     <div className="space-y-6">

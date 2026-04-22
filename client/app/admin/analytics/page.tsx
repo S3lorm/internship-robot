@@ -1,6 +1,8 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useAuth } from "@/contexts/auth-context"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import {
@@ -35,12 +37,38 @@ import {
   Download,
   Calendar,
 } from "lucide-react"
-import { analyticsApi, internshipsApi, applicationsApi, usersApi } from "@/lib/api"
+import { internshipsApi, applicationsApi } from "@/lib/api"
 import { toast } from "sonner"
 
 const COLORS = ["#1e3a5f", "#2563eb", "#16a34a", "#dc2626", "#f59e0b"]
 
+async function fetchAllApplicationsPages() {
+  const all: any[] = []
+  let page = 1
+  const limit = 100
+  for (;;) {
+    const applicationsRes = await applicationsApi.getAll({
+      page: String(page),
+      limit: String(limit),
+    })
+    if ((applicationsRes as any).error) {
+      toast.error(String((applicationsRes as any).error))
+      break
+    }
+    const body = (applicationsRes as any).data as { data?: any[]; meta?: { total?: number } }
+    const rows = body?.data || []
+    const total = body?.meta?.total ?? rows.length
+    all.push(...rows)
+    if (all.length >= total || rows.length === 0) break
+    page += 1
+    if (page > 100) break
+  }
+  return all
+}
+
 export default function AnalyticsPage() {
+  const { user } = useAuth()
+  const router = useRouter()
   const [isLoading, setIsLoading] = useState(true)
   const [dateRange, setDateRange] = useState("all")
 
@@ -57,24 +85,36 @@ export default function AnalyticsPage() {
   const [engagementRate, setEngagementRate] = useState(0)
 
   useEffect(() => {
+    if (!user) return
+    if (user.role === "admin") {
+      router.replace("/admin")
+      return
+    }
+    if (user.role !== "hod") {
+      router.replace("/dashboard")
+      return
+    }
+
     async function fetchAnalytics() {
       try {
         setIsLoading(true)
 
-        // The dashboard expects some counts and objects.
-        // Easiest is to just fetch the root objects and map them manually
-        // just like the mock data did since the backend endpoints don't match 1:1 format.
-        const [usersRes, internshipsRes, applicationsRes] = await Promise.all([
-          usersApi.getAll({ role: "student" }),
+        const [internshipsRes, applicationsList] = await Promise.all([
           internshipsApi.getAll(),
-          applicationsApi.getAll()
-        ]);
+          fetchAllApplicationsPages(),
+        ])
 
-        const usersList = (usersRes as any).data?.data || (usersRes as any).data?.users || (usersRes as any).users || []
-        const internshipsList = (internshipsRes as any).data?.data || (internshipsRes as any).data?.internships || (internshipsRes as any).internships || []
-        const applicationsList = (applicationsRes as any).data?.data || (applicationsRes as any).data?.applications || (applicationsRes as any).applications || []
+        const internshipsList =
+          (internshipsRes as any).data?.data ||
+          (internshipsRes as any).data?.internships ||
+          (internshipsRes as any).internships ||
+          []
 
-        setTotalStudents(usersList.length)
+        const studentIds = new Set(
+          applicationsList.map((a: any) => a.studentId).filter(Boolean)
+        )
+
+        setTotalStudents(studentIds.size)
         setTotalInternships(internshipsList.length)
         setTotalApplications(applicationsList.length)
 
@@ -130,9 +170,9 @@ export default function AnalyticsPage() {
           setMostActiveCompany({ name: topCompany[0], count: topCompany[1] })
         }
 
-        // Student engagement rate
+        // Student engagement rate (share of department applicants who applied at least once)
         const studentsWithApps = new Set(applicationsList.map((a: any) => a.studentId)).size
-        setEngagementRate(usersList.length > 0 ? Math.round((studentsWithApps / usersList.length) * 100) : 0)
+        setEngagementRate(studentIds.size > 0 ? Math.round((studentsWithApps / studentIds.size) * 100) : 0)
 
       } catch (error) {
         console.error(error)
@@ -141,14 +181,26 @@ export default function AnalyticsPage() {
       }
     }
 
-    fetchAnalytics()
-  }, [])
+    void fetchAnalytics()
+  }, [user, router])
 
 
 
 
   const handleExport = () => {
     toast.success("Analytics report exported successfully")
+  }
+
+  if (!user || user.role === "admin") {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-4">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-32 bg-muted animate-pulse rounded-lg" />
+          ))}
+        </div>
+      </div>
+    )
   }
 
   if (isLoading) {
@@ -173,8 +225,11 @@ export default function AnalyticsPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">Track internship portal performance</p>
+          <h1 className="text-2xl font-bold text-foreground">Analytics</h1>
+          <p className="text-muted-foreground">
+            Department metrics for {user.department ?? "your department"} (applications from students in this
+            department only).
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Select value={dateRange} onValueChange={setDateRange}>
@@ -199,7 +254,7 @@ export default function AnalyticsPage() {
       {/* Key Metrics */}
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {[
-          { title: "Total Students", value: totalStudents, icon: Users, color: "bg-blue-500" },
+          { title: "Students (with applications)", value: totalStudents, icon: Users, color: "bg-blue-500" },
           { title: "Active Internships", value: totalInternships, icon: Briefcase, color: "bg-green-500" },
           { title: "Total Applications", value: totalApplications, icon: FileText, color: "bg-purple-500" },
           { title: "Approval Rate", value: `${approvalRate}%`, icon: CheckCircle2, color: "bg-emerald-500" },

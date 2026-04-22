@@ -5,9 +5,11 @@ const userController = require('../controllers/userController');
 
 const router = express.Router();
 
-router.use(auth, checkRole('admin'));
+router.use(auth);
 
-router.get('/', userController.list);
+router.get('/', checkRole('admin', 'hod'), userController.list);
+
+router.use(checkRole('admin'));
 router.get('/:id', userController.getById);
 router.patch('/:id', userController.update);
 router.patch('/:id/status', userController.updateStatus);

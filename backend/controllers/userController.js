@@ -10,6 +10,9 @@ function parsePagination(req) {
 async function list(req, res) {
   const { page, limit, offset } = parsePagination(req);
   const where = {};
+  if (req.user.role === 'hod' && req.user.department) {
+    where.department = req.user.department;
+  }
   if (req.query.role) where.role = req.query.role;
   if (req.query.isActive !== undefined) where.isActive = req.query.isActive === 'true';
 

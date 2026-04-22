@@ -15,11 +15,21 @@ async function list(req, res) {
   if (req.user.role === 'student') where.studentId = req.user.id;
   if (req.query.status) where.status = req.query.status;
 
+  const studentInclude = {
+    model: User,
+    as: 'student',
+    attributes: ['id', 'firstName', 'lastName', 'email', 'studentId', 'department'],
+  };
+  if (req.user.role === 'hod' && req.user.department) {
+    studentInclude.where = { department: req.user.department };
+    studentInclude.required = true;
+  }
+
   const { rows, count } = await Application.findAndCountAll({
     where,
     include: [
       { model: Internship },
-      { model: User, as: 'student', attributes: ['id', 'firstName', 'lastName', 'email', 'studentId'] },
+      studentInclude,
       { model: User, as: 'reviewer', attributes: ['id', 'firstName', 'lastName', 'email'] },
     ],
     limit,
@@ -42,12 +52,18 @@ async function getById(req, res) {
   const app = await Application.findByPk(req.params.id, {
     include: [
       { model: Internship },
-      { model: User, as: 'student', attributes: ['id', 'firstName', 'lastName', 'email', 'studentId'] },
+      { model: User, as: 'student', attributes: ['id', 'firstName', 'lastName', 'email', 'studentId', 'department'] },
       { model: User, as: 'reviewer', attributes: ['id', 'firstName', 'lastName', 'email'] },
     ],
   });
   if (!app) return res.status(404).json({ message: 'Application not found' });
   if (req.user.role === 'student' && app.studentId !== req.user.id) return res.status(403).json({ message: 'Access denied' });
+  if (req.user.role === 'hod' && req.user.department) {
+    const studentDept = app.student?.department;
+    if (!studentDept || studentDept !== req.user.department) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+  }
   return res.json({ application: app });
 }
 

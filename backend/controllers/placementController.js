@@ -97,7 +97,7 @@ async function getPlacements(req, res) {
       where.status = status;
     }
 
-    const placements = await InternshipPlacement.findAll({ where });
+    let placements = await InternshipPlacement.findAll({ where });
 
     // Load related student data
     const { User } = require('../models');
@@ -106,6 +106,12 @@ async function getPlacements(req, res) {
         const student = await User.findOne({ id: placement.studentId });
         if (student) placement.student = student;
       }
+    }
+
+    if (user.role === 'hod') {
+      placements = placements.filter(
+        (p) => p.student && p.student.department === user.department
+      );
     }
 
     res.json({ placements });
@@ -136,6 +142,9 @@ async function getPlacementById(req, res) {
     if (placement.studentId) {
       const student = await User.findOne({ id: placement.studentId });
       if (student) placement.student = student;
+      if (user.role === 'hod' && (!student || student.department !== user.department)) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
     }
 
     // Load evaluation tokens
@@ -161,8 +170,8 @@ async function updatePlacementStatus(req, res) {
     const { id } = req.params;
     const { status, adminNotes } = req.body;
 
-    if (user.role !== 'admin') {
-      return res.status(403).json({ message: 'Admin access required' });
+    if (user.role !== 'admin' && user.role !== 'hod') {
+      return res.status(403).json({ message: 'Access denied' });
     }
 
     if (!['pending', 'approved', 'rejected', 'modification_requested'].includes(status)) {
@@ -174,10 +183,18 @@ async function updatePlacementStatus(req, res) {
       return res.status(404).json({ message: 'Placement not found' });
     }
 
+    if (user.role === 'hod') {
+      const { User: UserModel } = require('../models');
+      const st = await UserModel.findOne({ id: placement.studentId });
+      if (!st || st.department !== user.department) {
+        return res.status(403).json({ message: 'Access denied' });
+      }
+    }
+
     const updateData = {
       status,
       adminNotes,
-      reviewedBy: user.id,
+      reviewedBy: user.role === 'hod' ? null : user.id,
       reviewedAt: new Date().toISOString(),
     };
 
@@ -445,6 +462,10 @@ async function downloadOfficialLetter(req, res) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
+    if (user.role === 'hod' && student.department !== user.department) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
     const signature = require('../controllers/letterController').programSignatures[student.program] || {
       name: 'Dr. [Name]',
       title: 'Dean of Academic Affairs',
@@ -467,8 +488,8 @@ async function downloadOfficialLetter(req, res) {
 async function getTrackingData(req, res) {
   try {
     const user = req.user;
-    if (user.role !== 'admin') {
-      return res.status(403).json({ message: 'Admin access required' });
+    if (user.role !== 'admin' && user.role !== 'hod') {
+      return res.status(403).json({ message: 'Access denied' });
     }
 
     const { InternshipPlacement, EvaluationToken, EmailLog, User: UserModel } = require('../models');
@@ -479,6 +500,10 @@ async function getTrackingData(req, res) {
     for (const placement of placements) {
       // Get student info
       const student = await UserModel.findOne({ id: placement.studentId });
+
+      if (user.role === 'hod' && (!student || student.department !== user.department)) {
+        continue;
+      }
       
       // Get evaluation tokens
       const tokens = await EvaluationToken.findByPlacement(placement.id);
@@ -495,6 +520,7 @@ async function getTrackingData(req, res) {
           studentId: student.studentId,
           email: student.email,
           program: student.program,
+          department: student.department,
         } : null,
         evaluationTokens: tokens,
         emailLogs,

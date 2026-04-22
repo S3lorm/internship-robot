@@ -5,7 +5,7 @@ const analyticsController = require('../controllers/analyticsController');
 
 const router = express.Router();
 
-router.use(auth, checkRole('admin'));
+router.use(auth, checkRole('admin', 'hod'));
 
 router.get('/dashboard', analyticsController.dashboard);
 router.get('/applications', analyticsController.applications);
