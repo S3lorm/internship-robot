@@ -22,6 +22,18 @@ async function generateOfficialLetterPDF(placement, student, signature) {
         day: 'numeric', month: 'long', year: 'numeric',
       });
 
+      // -- UNIVERSITY CREST (school logo) --
+      const logoPath = path.join(__dirname, '..', 'public', 'rmu-crest.png');
+      if (fs.existsSync(logoPath)) {
+        try {
+          const logoWidth = 88;
+          doc.image(logoPath, (doc.page.width - logoWidth) / 2, doc.y, { width: logoWidth });
+          doc.moveDown(5.2);
+        } catch {
+          doc.moveDown(0.5);
+        }
+      }
+
       // -- HEADER --
       doc.fontSize(20).font('Helvetica-Bold').text('REGIONAL MARITIME UNIVERSITY', { align: 'center' });
       doc.moveDown(0.3);

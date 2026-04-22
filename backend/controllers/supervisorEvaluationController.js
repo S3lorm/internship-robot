@@ -36,29 +36,19 @@ async function getEvaluationForm(req, res) {
     // Load student data
     const student = await User.findByPk(placement.studentId);
 
-    // Enforce 14-day lock
+    // Submission is only allowed within 14 days of internship end (enforced on POST).
+    // GET always returns form metadata so supervisors can open links sent at approval time.
     const now = new Date();
-    // Start of today for exact comparisons
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    let isLocked = false;
+    let isSubmitWindowOpen = true;
     let daysUntilEnd = 0;
-    
     if (placement.internshipEndDate) {
       const endDate = new Date(placement.internshipEndDate);
       endDate.setHours(0, 0, 0, 0);
       daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
-      // Lock if more than 14 days remaining
       if (daysUntilEnd > 14) {
-        isLocked = true;
+        isSubmitWindowOpen = false;
       }
-    }
-
-    if (isLocked) {
-      return res.status(403).json({ 
-        message: `This evaluation form will automatically open 2 weeks before the student's internship ends. (Currently ${daysUntilEnd} days remaining)` 
-      });
     }
 
     res.json({
@@ -75,6 +65,8 @@ async function getEvaluationForm(req, res) {
         department: student.department,
       } : null,
       tokenValid: true,
+      isSubmitWindowOpen,
+      daysUntilEnd: placement.internshipEndDate ? daysUntilEnd : null,
     });
   } catch (error) {
     console.error('Error loading evaluation form:', error);

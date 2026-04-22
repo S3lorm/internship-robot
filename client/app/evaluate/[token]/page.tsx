@@ -66,6 +66,10 @@ export default function EvaluatePage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (formData && formData.isSubmitWindowOpen === false) {
+      toast.error('Evaluation submission opens in the final two weeks before the internship ends.');
+      return;
+    }
 
     // Validate
     const allRated = RATING_CATEGORIES.every(c => Number(form[c.key as keyof typeof form]) > 0);
@@ -207,6 +211,9 @@ export default function EvaluatePage() {
     display: 'block', marginBottom: '6px',
   };
 
+  const submitLocked = Boolean(formData && formData.isSubmitWindowOpen === false);
+  const daysLeft = typeof formData?.daysUntilEnd === 'number' ? formData.daysUntilEnd : null;
+
   return (
     <div style={containerStyle}>
       <div style={cardStyle}>
@@ -240,6 +247,22 @@ export default function EvaluatePage() {
             </p>
             <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: '4px 0 0' }}>
               {formData.student.program} — {formData.placement?.organizationName}
+            </p>
+          </div>
+        )}
+
+        {submitLocked && (
+          <div style={{
+            background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)',
+            borderRadius: '12px', padding: '14px 16px', marginBottom: '20px',
+          }}>
+            <p style={{ color: '#fcd34d', fontSize: '14px', fontWeight: 600, margin: '0 0 6px' }}>
+              Submission opens in the final two weeks of the internship
+            </p>
+            <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
+              {daysLeft != null
+                ? `There are still ${daysLeft} day${daysLeft === 1 ? '' : 's'} until the internship end date. You can review this page now; the university will rely on this same link when you submit the evaluation closer to the end of the placement.`
+                : 'You can review this page now. The university will rely on this same link when you submit the evaluation closer to the end of the placement.'}
             </p>
           </div>
         )}
@@ -356,17 +379,18 @@ export default function EvaluatePage() {
 
           {/* Submit */}
           <button
-            type="submit" disabled={submitting}
+            type="submit"
+            disabled={submitting || submitLocked}
             style={{
               width: '100%', padding: '16px',
-              background: submitting ? 'rgba(34,197,94,0.5)' : 'linear-gradient(135deg, #22c55e, #16a34a)',
+              background: (submitting || submitLocked) ? 'rgba(34,197,94,0.45)' : 'linear-gradient(135deg, #22c55e, #16a34a)',
               color: 'white', border: 'none', borderRadius: '12px',
               fontSize: '16px', fontWeight: '700',
-              cursor: submitting ? 'not-allowed' : 'pointer',
+              cursor: (submitting || submitLocked) ? 'not-allowed' : 'pointer',
               transition: 'all 0.2s',
             }}
           >
-            {submitting ? 'Submitting...' : 'Submit Evaluation'}
+            {submitting ? 'Submitting...' : submitLocked ? 'Submission locked until final two weeks' : 'Submit Evaluation'}
           </button>
         </form>
 

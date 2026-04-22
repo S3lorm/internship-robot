@@ -221,18 +221,52 @@ async function updatePlacementStatus(req, res) {
       const tokenRaw = `${id}-${placement.studentId}-${Date.now()}-${crypto.randomBytes(32).toString('hex')}`;
       const tokenHash = crypto.createHash('sha256').update(tokenRaw).digest('hex');
 
+      let tokenExpiresAt;
+      if (placement.internshipEndDate) {
+        const end = new Date(placement.internshipEndDate);
+        end.setDate(end.getDate() + 90);
+        tokenExpiresAt = end.toISOString();
+      } else {
+        tokenExpiresAt = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
+      }
+
       await EvaluationToken.create({
         placementId: id,
         tokenHash,
+        expiresAt: tokenExpiresAt,
       });
     }
 
     const updated = await InternshipPlacement.update(id, updateData);
 
+    let organizationEmailSent = false;
+    let organizationEmailError = null;
+    if (status === 'approved') {
+      try {
+        const { sendOfficialLetterAndEvaluationToOrganization } = require('../services/placementOrganizationEmail');
+        const sendResult = await sendOfficialLetterAndEvaluationToOrganization(id);
+        if (sendResult.ok) {
+          organizationEmailSent = true;
+        } else {
+          organizationEmailError = sendResult.error;
+          console.error('Auto-send to organization after approval:', sendResult.error);
+        }
+      } catch (err) {
+        organizationEmailError = err.message || String(err);
+        console.error('Auto-send to organization after approval failed:', err);
+      }
+    }
+
     // Notify student
     const { createNotification } = require('../services/notificationService');
+    const approvedMsg = organizationEmailSent
+      ? `Your official placement for ${placement.organizationName} was approved. The official letter (PDF with university logo) and supervisor evaluation link were sent to ${placement.organizationEmail}.`
+      : organizationEmailError
+        ? `Your official placement for ${placement.organizationName} was approved, but the automatic email to the organization could not be sent (${organizationEmailError}). You can try sending from your dashboard when ready.`
+        : `Your official placement request for ${placement.organizationName} has been approved. You can send the official letter to the organization from your dashboard.`;
+
     const statusMsg = {
-      approved: `Your official placement request for ${placement.organizationName} has been approved. You can now send the official letter to the organization.`,
+      approved: approvedMsg,
       rejected: `Your official placement request for ${placement.organizationName} has been rejected.`,
       modification_requested: `Your official placement request for ${placement.organizationName} requires modifications. Please review the admin notes.`,
     };
@@ -240,25 +274,36 @@ async function updatePlacementStatus(req, res) {
     await createNotification({
       userId: placement.studentId,
       type: 'letter_request',
-      title: status === 'approved' ? 'Placement Approved - Official Letter Ready' :
-             status === 'rejected' ? 'Placement Request Rejected' : 'Placement Requires Modifications',
+      title: status === 'approved'
+        ? organizationEmailSent
+          ? 'Placement approved — organization notified'
+          : 'Placement Approved - Official Letter Ready'
+        : status === 'rejected'
+          ? 'Placement Request Rejected'
+          : 'Placement Requires Modifications',
       message: statusMsg[status] || `Your placement request status has been updated to ${status}`,
       relatedId: id,
       link: `/dashboard/letter-requests/official?view=${id}`,
     });
 
-    res.json({ message: 'Placement status updated successfully', placement: updated });
+    res.json({
+      message: 'Placement status updated successfully',
+      placement: updated,
+      ...(status === 'approved'
+        ? { organizationEmailSent, ...(organizationEmailError ? { organizationEmailError } : {}) }
+        : {}),
+    });
   } catch (error) {
     console.error('Error updating placement status:', error);
     res.status(500).json({ message: 'Failed to update placement status', error: error.message });
   }
 }
 
-// Student: send official letter + evaluation form to organization via email
+// Student (or resend): send official letter + evaluation form — same pipeline as HOD approval auto-send
 async function sendToOrganization(req, res) {
   try {
     const user = req.user;
-    const { InternshipPlacement, EvaluationToken, EmailLog, User: UserModel } = require('../models');
+    const { InternshipPlacement } = require('../models');
     const { id } = req.params;
 
     const placement = await InternshipPlacement.findByPk(id);
@@ -274,152 +319,12 @@ async function sendToOrganization(req, res) {
       return res.status(400).json({ message: 'Placement must be approved before sending to organization' });
     }
 
-    // Get student info
-    const student = await UserModel.findOne({ id: placement.studentId });
-    if (!student) {
-      return res.status(404).json({ message: 'Student not found' });
+    const { sendOfficialLetterAndEvaluationToOrganization } = require('../services/placementOrganizationEmail');
+    const sendResult = await sendOfficialLetterAndEvaluationToOrganization(id);
+    if (!sendResult.ok) {
+      return res.status(400).json({ message: sendResult.error });
     }
 
-    // Get evaluation token
-    const tokens = await EvaluationToken.findByPlacement(id);
-    const token = tokens.length > 0 ? tokens[0] : null;
-
-    // Build evaluation form URL
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-    const evaluationUrl = token ? `${frontendUrl}/evaluate/${token.tokenHash}` : null;
-
-    // Send email
-    const transporter = require('../config/email');
-    const { generateOfficialLetterPDF } = require('../services/pdfService');
-    // Use EMAIL_FROM as-is (already includes name + address), fallback to SMTP_USER
-    const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
-
-    const mailOptions = {
-      from: emailFrom,
-      to: placement.organizationEmail,
-      subject: `Official Internship Placement - ${student.firstName} ${student.lastName} | Regional Maritime University`,
-      html: `
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: #1e3a5f; color: white; padding: 20px; text-align: center; }
-            .content { padding: 20px; background: #f9f9f9; }
-            .info-box { background: white; padding: 15px; border-left: 4px solid #1e3a5f; margin: 15px 0; }
-            .eval-box { background: #fff3cd; padding: 15px; border-left: 4px solid #ffc107; margin: 15px 0; }
-            .button { display: inline-block; padding: 12px 24px; background: #1e3a5f; color: white; text-decoration: none; border-radius: 5px; margin: 10px 0; }
-            .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h1>Regional Maritime University</h1>
-              <h2>Official Internship Placement</h2>
-            </div>
-            <div class="content">
-              <p>Dear ${placement.supervisorName || 'Sir/Madam'},</p>
-              
-              <p>We are pleased to inform you that the Regional Maritime University has officially approved the internship placement of our student with your organization.</p>
-              
-              <div class="info-box">
-                <h3>Student Details</h3>
-                <p><strong>Name:</strong> ${student.firstName} ${student.lastName}</p>
-                <p><strong>Student ID:</strong> ${student.studentId || 'N/A'}</p>
-                <p><strong>Program:</strong> ${student.program || 'N/A'}</p>
-                <p><strong>Department:</strong> ${student.department || 'N/A'}</p>
-              </div>
-
-              <div class="info-box">
-                <h3>Placement Details</h3>
-                <p><strong>Organization:</strong> ${placement.organizationName}</p>
-                <p><strong>Role/Department:</strong> ${placement.departmentRole || 'N/A'}</p>
-                ${placement.internshipStartDate ? `<p><strong>Start Date:</strong> ${new Date(placement.internshipStartDate).toLocaleDateString('en-GB')}</p>` : ''}
-                ${placement.internshipEndDate ? `<p><strong>End Date:</strong> ${new Date(placement.internshipEndDate).toLocaleDateString('en-GB')}</p>` : ''}
-                <p><strong>Reference:</strong> ${placement.referenceNumber || 'N/A'}</p>
-              </div>
-
-              <p>Please find attached the official internship letter from the university.</p>
-
-              ${evaluationUrl ? `
-              <div class="eval-box">
-                <h3>📋 Student Evaluation Form</h3>
-                <p>At the end of the internship period, we kindly request that you evaluate the student's performance using the secure evaluation form below. This link is unique to this placement and should not be shared with the student.</p>
-                <p style="text-align: center;">
-                  <a href="${evaluationUrl}" class="button" style="background: #28a745; color: white;">Complete Evaluation Form</a>
-                </p>
-                <p><small><em>This is a secure link. Please keep it confidential.</em></small></p>
-              </div>
-              ` : ''}
-
-              <p>If you have any questions or require further information, please contact the university administration.</p>
-
-              <p>Best regards,<br>Regional Maritime University<br>Internship Coordination Office</p>
-            </div>
-            <div class="footer">
-              <p>This is an official communication from Regional Maritime University</p>
-              <p>For verification, please contact: info@rmu.edu.gh</p>
-            </div>
-          </div>
-        </body>
-        </html>
-      `,
-      text: `
-        Official Internship Placement - Regional Maritime University
-
-        Dear ${placement.supervisorName || 'Sir/Madam'},
-
-        We are pleased to inform you that the Regional Maritime University has officially approved
-        the internship placement of our student with your organization.
-
-        Student: ${student.firstName} ${student.lastName}
-        Student ID: ${student.studentId || 'N/A'}
-        Program: ${student.program || 'N/A'}
-        Organization: ${placement.organizationName}
-        Reference: ${placement.referenceNumber || 'N/A'}
-        ${placement.internshipStartDate ? `Start Date: ${new Date(placement.internshipStartDate).toLocaleDateString('en-GB')}` : ''}
-        ${placement.internshipEndDate ? `End Date: ${new Date(placement.internshipEndDate).toLocaleDateString('en-GB')}` : ''}
-
-        ${evaluationUrl ? `Evaluation Form: ${evaluationUrl} (Please keep this link confidential)` : ''}
-
-        Best regards,
-        Regional Maritime University
-      `,
-    };
-
-    // Generate PDF and attach it
-    try {
-      const signature = require('../controllers/letterController').programSignatures[student.program] || {
-        name: 'Dr. [Name]',
-        title: 'Dean of Academic Affairs',
-        department: 'Regional Maritime University',
-      };
-      const pdfBuffer = await generateOfficialLetterPDF(placement, student, signature);
-      mailOptions.attachments = [{
-        filename: `Official_Letter_${placement.referenceNumber || placement.id}.pdf`,
-        content: pdfBuffer,
-        contentType: 'application/pdf',
-      }];
-    } catch (pdfErr) {
-      console.error('⚠️ PDF generation failed, sending email without attachment:', pdfErr.message);
-    }
-
-    await transporter.sendMail(mailOptions);
-
-    // Log the email
-    await EmailLog.create({
-      placementId: id,
-      studentId: placement.studentId,
-      recipientEmail: placement.organizationEmail,
-      subject: mailOptions.subject,
-      deliveryStatus: 'sent',
-      tokenId: token?.id,
-      attachments: { officialLetter: true, evaluationForm: !!evaluationUrl },
-    });
-
-    // Notify student
     const { createNotification } = require('../services/notificationService');
     await createNotification({
       userId: placement.studentId,
@@ -429,7 +334,10 @@ async function sendToOrganization(req, res) {
       relatedId: id,
     });
 
-    res.json({ message: 'Official letter and evaluation form sent successfully to the organization' });
+    res.json({
+      message: 'Official letter and evaluation form sent successfully to the organization',
+      placement: sendResult.placement,
+    });
   } catch (error) {
     console.error('Error sending to organization:', error);
     res.status(500).json({ message: 'Failed to send to organization', error: error.message });
