@@ -466,7 +466,7 @@ export const mockStudents: User[] = [
     studentId: 'RMU/2024/001',
     phone: '+233 24 123 4567',
     department: 'Marine Engineering',
-    program: 'BSc Marine Engineering',
+    program: 'Marine Engineering',
     yearOfStudy: 3,
     isEmailVerified: true,
     createdAt: '2024-01-15T10:00:00Z',
@@ -481,7 +481,7 @@ export const mockStudents: User[] = [
     studentId: 'RMU/2024/015',
     phone: '+233 24 987 6543',
     department: 'Nautical Science',
-    program: 'BSc Nautical Science',
+    program: 'Nautical Science',
     yearOfStudy: 4,
     isEmailVerified: true,
     createdAt: '2024-01-20T10:00:00Z',
@@ -496,7 +496,7 @@ export const mockStudents: User[] = [
     studentId: 'RMU/2024/022',
     phone: '+233 20 555 1234',
     department: 'Port Management',
-    program: 'BSc Port & Shipping Administration',
+    program: 'Port & Shipping Administration',
     yearOfStudy: 2,
     isEmailVerified: true,
     createdAt: '2024-02-01T10:00:00Z',
@@ -511,7 +511,7 @@ export const mockStudents: User[] = [
     studentId: 'RMU/2024/030',
     phone: '+233 27 333 4444',
     department: 'Marine Engineering',
-    program: 'BSc Marine Engineering',
+    program: 'Marine Engineering',
     yearOfStudy: 3,
     isEmailVerified: false,
     createdAt: '2024-02-10T10:00:00Z',
@@ -556,13 +556,13 @@ export const departments = [
   'Computer Science',
 ];
 
-// Programs at RMU
+// Programs at RMU (display names without degree prefixes)
 export const programs = [
-  'BSc Marine Engineering',
-  'BSc Nautical Science',
-  'BSc Port & Shipping Administration',
-  'BSc Maritime Safety & Security',
-  'BSc Electrical/Electronic Engineering',
-  'BSc Computer Science',
-  'Diploma in Maritime Studies',
+  'Marine Engineering',
+  'Nautical Science',
+  'Port & Shipping Administration',
+  'Maritime Safety & Security',
+  'Electrical/Electronic Engineering',
+  'Computer Science',
+  'Information Technology',
 ];

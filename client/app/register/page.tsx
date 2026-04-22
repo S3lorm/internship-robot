@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
@@ -29,6 +29,7 @@ import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import Image from "next/image";
 import { programs } from "@/lib/mock-data";
 import type { RegisterFormData } from "@/types";
+import { cn } from "@/lib/utils";
 
 const registrationDepartments = [
   "Nautical Science",
@@ -57,6 +58,41 @@ function validateStudentIdByDepartment(department: string, studentId: string): s
   return `Invalid Student ID for ${department}. Use ${prefixes.join("/")} followed by 7 digits (e.g. ${prefixes[0]}1234567).`;
 }
 
+function getPasswordStrength(password: string) {
+  const hasLower = /[a-z]/.test(password);
+  const hasUpper = /[A-Z]/.test(password);
+  const hasSymbol = /[^A-Za-z0-9]/.test(password);
+  const hasMinLength = password.length >= 8;
+  const met = [hasMinLength, hasLower, hasUpper, hasSymbol].filter(Boolean).length;
+  const score = Math.round((met / 4) * 100);
+  let label: "Weak" | "Fair" | "Good" | "Strong" = "Weak";
+  let barColor = "bg-destructive";
+  let textColor = "text-destructive";
+  if (met === 4) {
+    label = "Strong";
+    barColor = "bg-green-600";
+    textColor = "text-green-700 dark:text-green-500";
+  } else if (met === 3) {
+    label = "Good";
+    barColor = "bg-primary";
+    textColor = "text-primary";
+  } else if (met === 2) {
+    label = "Fair";
+    barColor = "bg-amber-500";
+    textColor = "text-amber-700 dark:text-amber-500";
+  }
+  return { hasLower, hasUpper, hasSymbol, hasMinLength, score, label, barColor, textColor };
+}
+
+function getPasswordValidationError(password: string): string | null {
+  if (password.length < 8) return "Password must be at least 8 characters.";
+  if (!/[a-z]/.test(password)) return "Password must include at least one lowercase letter.";
+  if (!/[A-Z]/.test(password)) return "Password must include at least one uppercase letter.";
+  if (!/[^A-Za-z0-9]/.test(password))
+    return "Password must include at least one symbol (e.g. !@#$%).";
+  return null;
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const { register, isLoading } = useAuth();
@@ -79,6 +115,10 @@ export default function RegisterPage() {
     formData.department,
     formData.studentId
   );
+  const passwordStrength = useMemo(
+    () => getPasswordStrength(formData.password),
+    [formData.password]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -90,9 +130,9 @@ export default function RegisterPage() {
       return;
     }
 
-    // Validate password strength
-    if (formData.password.length < 8) {
-      setError("Password must be at least 8 characters long");
+    const passwordError = getPasswordValidationError(formData.password);
+    if (passwordError) {
+      setError(passwordError);
       return;
     }
 
@@ -426,8 +466,41 @@ export default function RegisterPage() {
                     required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Minimum 8 characters
+                    Use at least 8 characters with uppercase, lowercase, and one symbol.
                   </p>
+                  {formData.password.length > 0 && (
+                    <div className="space-y-2 pt-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-muted-foreground">Password strength</span>
+                        <span className={cn("font-medium", passwordStrength.textColor)}>
+                          {passwordStrength.label}
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-muted">
+                        <div
+                          className={cn(
+                            "h-full transition-all duration-300",
+                            passwordStrength.barColor
+                          )}
+                          style={{ width: `${passwordStrength.score}%` }}
+                        />
+                      </div>
+                      <ul className="space-y-1 text-xs text-muted-foreground">
+                        <li className={passwordStrength.hasMinLength ? "font-medium text-green-600" : ""}>
+                          {passwordStrength.hasMinLength ? "✓" : "○"} At least 8 characters
+                        </li>
+                        <li className={passwordStrength.hasUpper ? "font-medium text-green-600" : ""}>
+                          {passwordStrength.hasUpper ? "✓" : "○"} One uppercase letter
+                        </li>
+                        <li className={passwordStrength.hasLower ? "font-medium text-green-600" : ""}>
+                          {passwordStrength.hasLower ? "✓" : "○"} One lowercase letter
+                        </li>
+                        <li className={passwordStrength.hasSymbol ? "font-medium text-green-600" : ""}>
+                          {passwordStrength.hasSymbol ? "✓" : "○"} One symbol (!@#$%^&*…)
+                        </li>
+                      </ul>
+                    </div>
+                  )}
                 </div>
 
                 <div className="space-y-2">
