@@ -74,10 +74,10 @@ export default function VerificationHelpPage() {
             <div>
               <h3 className="font-semibold mb-2 flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-600" />
-                4. Resend Verification Email
+                4. Resend or use the 6-digit code
               </h3>
               <p className="text-sm text-muted-foreground ml-6 mb-2">
-                Go back to the verification page and click "Resend Verification Email". Make sure you're logged in first.
+                On the verification page, enter your student email and click &quot;Resend Verification Email&quot; if needed. If your email includes a 6-digit code, you can enter it there instead of using the link.
               </p>
               <Button asChild variant="outline" className="ml-6">
                 <Link href="/verify-email">

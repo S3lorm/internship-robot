@@ -18,7 +18,7 @@ router.post('/email', async (req, res) => {
     };
     const testToken = 'test-verification-token-' + Date.now();
 
-    await sendVerificationEmail(testUser, testToken);
+    await sendVerificationEmail(testUser, testToken, '123456');
     
     return res.json({ 
       success: true, 

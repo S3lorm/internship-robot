@@ -260,21 +260,12 @@ export default function LoginPage() {
           </Tabs>
         </CardContent>
 
-        <CardFooter className="flex flex-col space-y-4">
-          <div className="text-center text-sm text-muted-foreground">
+        <CardFooter className="flex flex-col">
+          <div className="w-full text-center text-sm text-muted-foreground">
             Don&apos;t have an account?{" "}
             <Link href="/register" className="font-medium text-primary hover:underline">
               Register here
             </Link>
-          </div>
-
-          <div className="rounded-lg bg-muted p-3 text-center text-xs text-muted-foreground">
-            <p className="font-medium">Demo credentials</p>
-            <p className="mt-1">Student: student@st.rmu.edu.gh / password123</p>
-            <p>System admin: admin@rmu.edu.gh / Admin@2024</p>
-            <p className="mt-2 border-t border-border pt-2">
-              HOD: choose your department above; password is set by the institution (default configured on server).
-            </p>
           </div>
         </CardFooter>
       </Card>

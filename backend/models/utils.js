@@ -15,6 +15,7 @@ function mapKeyToSupabase(key) {
     isEmailVerified: 'is_email_verified',
     emailVerificationToken: 'email_verification_token',
     emailVerificationExpires: 'email_verification_expires',
+    emailVerificationCode: 'email_verification_code',
     passwordResetToken: 'password_reset_token',
     passwordResetExpires: 'password_reset_expires',
     

@@ -6,7 +6,7 @@ const { body } = require('express-validator');
 const jwtConfig = require('../config/jwt');
 const { User } = require('../models');
 const { normalizeDepartmentName } = require('../constants/departments');
-const { randomToken, validateStudentEmail } = require('../utils/helpers');
+const { randomToken, validateStudentEmail, generateEmailVerificationCode } = require('../utils/helpers');
 const { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetOtp } = require('../services/emailService');
 
 function signToken(user) {
@@ -74,6 +74,7 @@ async function register(req, res) {
 
   const hashed = await bcrypt.hash(password, 10);
   const token = randomToken(24);
+  const verificationCode = generateEmailVerificationCode();
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000);
 
   let user;
@@ -92,6 +93,7 @@ async function register(req, res) {
       isEmailVerified: false,
       emailVerificationToken: token,
       emailVerificationExpires: expires,
+      emailVerificationCode: verificationCode,
     });
   } catch (err) {
     console.error('[Register] Error creating user:', err);
@@ -119,7 +121,7 @@ async function register(req, res) {
   let emailSent = false;
   let emailError = null;
   try {
-    await sendVerificationEmail(user, token);
+    await sendVerificationEmail(user, token, verificationCode);
     emailSent = true;
   } catch (error) {
     emailError = error.message;
@@ -188,25 +190,65 @@ async function me(req, res) {
   return res.json({ user: req.user });
 }
 
-const verifyEmailValidators = [body('token').notEmpty()];
+const verifyEmailValidators = [];
 
 async function verifyEmail(req, res) {
   try {
-    const { token } = req.body;
-    const user = await User.findOne({ emailVerificationToken: token });
-    if (!user) return res.status(400).json({ message: 'Invalid or expired verification token.' });
+    const rawToken = req.body.token;
+    const rawCode = req.body.code;
+    const rawEmail = req.body.email;
+
+    const hasToken = rawToken != null && String(rawToken).trim().length > 0;
+    const normalizedEmail =
+      typeof rawEmail === 'string' ? rawEmail.trim().toLowerCase() : '';
+    const codeDigits =
+      typeof rawCode === 'string'
+        ? rawCode.replace(/\D/g, '').slice(0, 6)
+        : String(rawCode != null ? rawCode : '')
+            .replace(/\D/g, '')
+            .slice(0, 6);
+    const hasCodePair = normalizedEmail.length > 0 && codeDigits.length === 6;
+
+    if (!hasToken && !hasCodePair) {
+      return res.status(400).json({
+        message:
+          'Open the verification link from your email, or enter your email and the 6-digit code we sent you.',
+      });
+    }
+
+    let user;
+    if (hasToken) {
+      user = await User.findOne({ emailVerificationToken: String(rawToken).trim() });
+    } else {
+      if (!validateStudentEmail(normalizedEmail)) {
+        return res.status(400).json({ message: 'Only @st.rmu.edu.gh addresses can use this verification.' });
+      }
+      user = await User.findOne({
+        email: normalizedEmail,
+        emailVerificationCode: codeDigits,
+      });
+    }
+
+    if (!user) {
+      return res.status(400).json({
+        message: hasToken
+          ? 'Invalid or expired verification token.'
+          : 'Invalid email or code, or the code has expired. Request a new verification email.',
+      });
+    }
 
     if (user.isEmailVerified) {
       return res.json({ message: 'Email already verified. You can log in.' });
     }
 
     if (user.emailVerificationExpires && user.emailVerificationExpires < new Date()) {
-      return res.status(400).json({ message: 'Verification token has expired. Please request a new one.' });
+      return res.status(400).json({ message: 'Verification has expired. Please request a new one.' });
     }
 
     user.isEmailVerified = true;
     user.emailVerificationToken = null;
     user.emailVerificationExpires = null;
+    user.emailVerificationCode = null;
     await user.save();
 
     return res.json({ message: 'Email verified successfully! You can now log in.' });
@@ -221,17 +263,20 @@ const resendVerificationValidators = [body('email').isEmail()];
 async function resendVerification(req, res) {
   try {
     const { email } = req.body;
-    const user = await User.findOne({ email });
+    const normalizedEmail = typeof email === 'string' ? email.trim().toLowerCase() : '';
+    const user = await User.findOne({ email: normalizedEmail });
     if (!user) return res.json({ message: 'If that email exists, a verification link was sent.' });
     if (user.isEmailVerified) return res.json({ message: 'Email already verified. You can log in.' });
 
     const token = randomToken(24);
+    const verificationCode = generateEmailVerificationCode();
     user.emailVerificationToken = token;
     user.emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    user.emailVerificationCode = verificationCode;
     await user.save();
 
     try {
-      await sendVerificationEmail(user, token);
+      await sendVerificationEmail(user, token, verificationCode);
     } catch (emailError) {
       console.error('Failed to resend verification email:', emailError.message);
       return res.status(500).json({ 

@@ -4,6 +4,8 @@ import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Card,
   CardContent,
@@ -30,10 +32,12 @@ function VerifyEmailContent() {
   const [isResending, setIsResending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const emailFromQuery = searchParams.get("email");
+  const [verificationEmail, setVerificationEmail] = useState(() => emailFromQuery || "");
+  const [verificationCode, setVerificationCode] = useState("");
 
   const token = searchParams.get("token");
-  const emailFromQuery = searchParams.get("email");
-  const displayEmail = user?.email || emailFromQuery;
+  const displayEmail = user?.email || emailFromQuery || verificationEmail.trim();
 
   useEffect(() => {
     // If user is already verified, redirect to dashboard
@@ -43,13 +47,16 @@ function VerifyEmailContent() {
   }, [user, router]);
 
   useEffect(() => {
-    // Auto-verify if token is present in URL
-    if (token && !isVerifying) {
-      handleVerify(token);
-    }
-  }, [token]);
+    if (emailFromQuery) setVerificationEmail(emailFromQuery);
+  }, [emailFromQuery]);
 
-  const handleVerify = async (verifyToken?: string) => {
+  useEffect(() => {
+    if (user?.email) {
+      setVerificationEmail((prev) => (prev.trim() ? prev : user.email!));
+    }
+  }, [user?.email]);
+
+  const handleVerifyWithToken = async (verifyToken?: string) => {
     const tokenToUse = verifyToken || token;
     if (!tokenToUse) {
       setError("No verification token provided");
@@ -60,7 +67,7 @@ function VerifyEmailContent() {
     setError(null);
     setMessage(null);
 
-    const result = await verifyEmail(tokenToUse);
+    const result = await verifyEmail({ token: tokenToUse });
     setIsVerifying(false);
 
     if (result.success) {
@@ -73,12 +80,48 @@ function VerifyEmailContent() {
     }
   };
 
+  useEffect(() => {
+    if (!token) return;
+    const key = `rmu_email_verify_attempt_${token}`;
+    if (typeof sessionStorage !== "undefined" && sessionStorage.getItem(key)) return;
+    if (typeof sessionStorage !== "undefined") sessionStorage.setItem(key, "1");
+    void handleVerifyWithToken(token);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- auto-run once per token in URL
+  }, [token]);
+
+  const handleVerifyWithCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const email = verificationEmail.trim().toLowerCase();
+    const code = verificationCode.replace(/\D/g, "").slice(0, 6);
+
+    setError(null);
+    setMessage(null);
+    if (!email) {
+      setError("Enter your student email address.");
+      return;
+    }
+    if (code.length !== 6) {
+      setError("Enter the 6-digit code from your email.");
+      return;
+    }
+    setIsVerifying(true);
+    const result = await verifyEmail({ email, code });
+    setIsVerifying(false);
+    if (result.success) {
+      setMessage("Email verified successfully! You can sign in now.");
+      setTimeout(() => router.push("/login"), 2000);
+    } else {
+      setError(result.error || "Verification failed. Please try again.");
+    }
+  };
+
   const handleResend = async () => {
     setIsResending(true);
     setError(null);
     setMessage(null);
 
-    const result = await resendVerification();
+    const target = verificationEmail.trim() || user?.email;
+    const result = await resendVerification(target || undefined);
     setIsResending(false);
 
     if (result.success) {
@@ -145,8 +188,49 @@ function VerifyEmailContent() {
             </p>
             <p>
               Click the link in the email to verify your account. The link will
-              expire in 24 hours.
+              expire in 24 hours. Your email may also include a <strong>6-digit code</strong> you can use below instead of the link.
             </p>
+
+            <form onSubmit={handleVerifyWithCode} className="space-y-3 rounded-lg border bg-muted/30 p-4">
+                <p className="text-sm font-medium text-foreground">Verify with email + code (optional)</p>
+                <div className="space-y-2">
+                  <Label htmlFor="verify-email-input">Student email</Label>
+                  <Input
+                    id="verify-email-input"
+                    type="email"
+                    autoComplete="email"
+                    placeholder="you@st.rmu.edu.gh"
+                    value={verificationEmail}
+                    onChange={(e) => setVerificationEmail(e.target.value)}
+                    disabled={isVerifying}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="verify-code-input">6-digit code</Label>
+                  <Input
+                    id="verify-code-input"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={6}
+                    placeholder="000000"
+                    className="font-mono text-lg tracking-[0.35em]"
+                    value={verificationCode}
+                    onChange={(e) => setVerificationCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                    disabled={isVerifying}
+                  />
+                </div>
+                <Button type="submit" className="w-full" disabled={isVerifying}>
+                  {isVerifying ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Verifying…
+                    </>
+                  ) : (
+                    "Verify with code"
+                  )}
+                </Button>
+              </form>
+
             <div className="mt-4 rounded-lg bg-blue-50 p-3 text-xs">
               <p className="font-semibold text-blue-900 mb-1">Didn't receive the email?</p>
               <ul className="list-disc list-inside space-y-1 text-blue-800">
@@ -160,7 +244,7 @@ function VerifyEmailContent() {
 
           {token && (
             <Button
-              onClick={() => handleVerify()}
+              onClick={() => void handleVerifyWithToken()}
               disabled={isVerifying}
               className="w-full"
             >
@@ -182,7 +266,7 @@ function VerifyEmailContent() {
             <Button
               variant="outline"
               onClick={handleResend}
-              disabled={isResending}
+              disabled={isResending || !(verificationEmail.trim() || user?.email)}
               className="w-full"
             >
               {isResending ? (

@@ -17,8 +17,8 @@ interface AuthContextType extends AuthState {
   register: (data: RegisterFormData) => Promise<{ success: boolean; error?: string; requiresVerification?: boolean }>;
   logout: () => void;
   updateUser: (user: Partial<User>) => void;
-  verifyEmail: (token: string) => Promise<{ success: boolean; error?: string }>;
-  resendVerification: () => Promise<{ success: boolean; error?: string }>;
+  verifyEmail: (payload: { token?: string; email?: string; code?: string }) => Promise<{ success: boolean; error?: string }>;
+  resendVerification: (email?: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -237,8 +237,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
   }, []);
 
-  const verifyEmail = useCallback(async (token: string): Promise<{ success: boolean; error?: string }> => {
-    const result = await authApi.verifyEmail(token);
+  const verifyEmail = useCallback(async (payload: {
+    token?: string;
+    email?: string;
+    code?: string;
+  }): Promise<{ success: boolean; error?: string }> => {
+    const result = await authApi.verifyEmail(payload);
     if (result.error) {
       return { success: false, error: result.error };
     }
@@ -248,12 +252,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return { success: true };
   }, [state.user, updateUser]);
 
-  const resendVerification = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
-    if (!state.user) {
-      return { success: false, error: 'No user logged in' };
+  const resendVerification = useCallback(async (emailOverride?: string): Promise<{ success: boolean; error?: string }> => {
+    const target = (emailOverride ?? state.user?.email)?.trim();
+    if (!target) {
+      return { success: false, error: 'Enter your student email to resend the verification message.' };
     }
 
-    const result = await authApi.resendVerification(state.user.email);
+    const result = await authApi.resendVerification(target);
     if (result.error) {
       return { success: false, error: result.error };
     }

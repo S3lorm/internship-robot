@@ -116,11 +116,19 @@ export const authApi = {
       body: JSON.stringify(userData),
     }),
 
-  verifyEmail: (token: string) =>
-    fetchApi('/auth/verify-email', {
+  verifyEmail: (payload: { token?: string; email?: string; code?: string }) => {
+    const digits =
+      payload.code != null ? String(payload.code).replace(/\D/g, '').slice(0, 6) : '';
+    const emailTrim = payload.email?.trim();
+    const useCode = digits.length === 6 && !!emailTrim;
+    const body = useCode
+      ? { email: emailTrim!.toLowerCase(), code: digits }
+      : { token: payload.token };
+    return fetchApi('/auth/verify-email', {
       method: 'POST',
-      body: JSON.stringify({ token }),
-    }),
+      body: JSON.stringify(body),
+    });
+  },
 
   resendVerification: (email: string) =>
     fetchApi('/auth/resend-verification', {

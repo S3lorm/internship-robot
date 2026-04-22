@@ -22,6 +22,7 @@ function mapUserFromSupabase(row) {
     isEmailVerified: row.is_email_verified || false,
     emailVerificationToken: row.email_verification_token,
     emailVerificationExpires: row.email_verification_expires,
+    emailVerificationCode: row.email_verification_code,
     passwordResetToken: row.password_reset_token,
     passwordResetExpires: row.password_reset_expires,
     createdAt: row.created_at,
@@ -62,8 +63,9 @@ function mapUserToSupabase(user) {
   if (user.phone !== undefined) mapped.phone = user.phone;
   if (user.isActive !== undefined) mapped.is_active = user.isActive;
   if (user.isEmailVerified !== undefined) mapped.is_email_verified = user.isEmailVerified;
-  if (user.emailVerificationToken !== undefined) mapped.email_verification_token = user.emailVerificationToken;
-  if (user.emailVerificationExpires !== undefined) mapped.email_verification_expires = user.emailVerificationExpires;
+    if (user.emailVerificationToken !== undefined) mapped.email_verification_token = user.emailVerificationToken;
+    if (user.emailVerificationExpires !== undefined) mapped.email_verification_expires = user.emailVerificationExpires;
+    if (user.emailVerificationCode !== undefined) mapped.email_verification_code = user.emailVerificationCode;
   if (user.passwordResetToken !== undefined) mapped.password_reset_token = user.passwordResetToken;
   if (user.passwordResetExpires !== undefined) mapped.password_reset_expires = user.passwordResetExpires;
   return mapped;

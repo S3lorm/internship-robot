@@ -1,6 +1,6 @@
 const transporter = require('../config/email');
 
-async function sendVerificationEmail(user, token) {
+async function sendVerificationEmail(user, token, verificationCode) {
   // Check if SMTP is configured
   if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
     const error = new Error('SMTP not configured. Please set SMTP_USER and SMTP_PASS in backend/.env');
@@ -50,6 +50,13 @@ async function sendVerificationEmail(user, token) {
               </p>
               <p>Or copy and paste this link into your browser:</p>
               <p style="word-break: break-all; color: #1e40af;">${verificationUrl}</p>
+              ${
+                verificationCode
+                  ? `<p style="margin-top: 20px;"><strong>Optional — verify with a code instead:</strong></p>
+              <p>On the verification page, enter your email and this 6-digit code (expires in 24 hours, same as the link):</p>
+              <div style="font-size: 28px; letter-spacing: 10px; font-weight: bold; padding: 16px; text-align: center; background: #e5e7eb; border-radius: 8px; margin: 12px 0;">${verificationCode}</div>`
+                  : ''
+              }
               <p><strong>Important:</strong> This verification link will expire in 24 hours.</p>
               <p>If you did not create an account, please ignore this email.</p>
             </div>
@@ -71,6 +78,11 @@ async function sendVerificationEmail(user, token) {
         Please verify your email address by clicking the link below:
         ${verificationUrl}
         
+        ${
+          verificationCode
+            ? `\nOptional — you can also verify on the website by entering your email and this 6-digit code: ${verificationCode}\n(same 24-hour expiry as the link.)\n`
+            : ''
+        }
         This link expires in 24 hours.
         
         If you did not create an account, please ignore this email.

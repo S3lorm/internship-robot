@@ -11,5 +11,10 @@ function validateStudentEmail(email) {
   return studentEmailRegex.test(normalized);
 }
 
-module.exports = { randomToken, validateStudentEmail };
+/** Six-digit numeric code (100000–999999) for optional email verification */
+function generateEmailVerificationCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+module.exports = { randomToken, validateStudentEmail, generateEmailVerificationCode };
 
