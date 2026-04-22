@@ -810,7 +810,8 @@ async function updateRequestStatus(req, res) {
                 <style>
                   body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
                   .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-                  .header { background: #1e3a5f; color: white; padding: 20px; text-align: center; }
+                  .header { background: #1e3a5f; color: white; padding: 24px 20px; text-align: center; }
+                  .header img { max-width: 120px; height: auto; display: block; margin: 0 auto 14px; background: rgba(255,255,255,0.95); padding: 8px; border-radius: 8px; }
                   .content { padding: 20px; background: #f9f9f9; }
                   .footer { text-align: center; padding: 20px; color: #666; font-size: 12px; }
                 </style>
@@ -818,7 +819,9 @@ async function updateRequestStatus(req, res) {
               <body>
                 <div class="container">
                   <div class="header">
-                    <h1>Internship Application</h1>
+                    ${crestBase64 ? `<img src="${crestBase64}" alt="Regional Maritime University" />` : ''}
+                    <h1 style="margin:0;font-size:22px;">Internship Application</h1>
+                    <p style="margin:10px 0 0;font-size:13px;opacity:0.95;">Regional Maritime University</p>
                   </div>
                   <div class="content">
                     <p>Dear Human Resources Manager,</p>
