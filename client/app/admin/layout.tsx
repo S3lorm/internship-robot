@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { AdminSidebar } from "@/components/admin-sidebar";
 import { Menu } from "lucide-react";
+import { PageTransition } from "@/components/page-transition";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -36,7 +37,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   return (
     <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-background md:flex-row">
       {/* Static column: sidebar in normal flow; main area scrolls (md+) */}
-      <aside className="hidden h-full w-64 shrink-0 md:flex">
+      <aside className="relative z-20 hidden h-full w-64 min-w-[16rem] max-w-[16rem] shrink-0 overflow-hidden bg-sidebar md:flex">
         <AdminSidebar className="h-full min-h-0" />
       </aside>
 
@@ -46,7 +47,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         </SheetContent>
       </Sheet>
 
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
         <header className="z-40 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/60 md:px-6">
           <Button
             variant="ghost"
@@ -75,8 +76,10 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
 
-        <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
-          {children}
+        <main className="min-h-0 w-full min-w-0 max-w-full flex-1 overflow-y-auto overflow-x-hidden p-4 md:p-6 lg:p-8">
+          <div className="mx-auto w-full min-w-0 max-w-full">
+            <PageTransition>{children}</PageTransition>
+          </div>
         </main>
       </div>
     </div>
