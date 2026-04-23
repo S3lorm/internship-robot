@@ -2,12 +2,13 @@
 
 import React from "react";
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
-import { Menu } from "lucide-react";
+import { Home, Menu } from "lucide-react";
 import { PageTransition } from "@/components/page-transition";
 
 export default function DashboardLayout({
@@ -117,6 +118,13 @@ export default function DashboardLayout({
           >
             <Menu className="h-5 w-5" />
             <span className="sr-only">Toggle menu</span>
+          </Button>
+
+          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" asChild>
+            <Link href="/" aria-label="Go to home page">
+              <Home className="h-4 w-4" />
+              <span className="hidden sm:inline">Home</span>
+            </Link>
           </Button>
 
           <div className="flex-1" />
