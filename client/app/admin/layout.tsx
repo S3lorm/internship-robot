@@ -2,13 +2,12 @@
 
 import React from "react";
 import { useState, useEffect } from "react";
-import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { AdminSidebar } from "@/components/admin-sidebar";
-import { Home, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { PageTransition } from "@/components/page-transition";
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
@@ -58,13 +57,6 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           >
             <Menu className="h-5 w-5" />
             <span className="sr-only">Toggle menu</span>
-          </Button>
-
-          <Button variant="outline" size="sm" className="shrink-0 gap-1.5" asChild>
-            <Link href="/" aria-label="Go to home page">
-              <Home className="h-4 w-4" />
-              <span className="hidden sm:inline">Home</span>
-            </Link>
           </Button>
 
           <div className="min-w-0 flex-1">
