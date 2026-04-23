@@ -26,7 +26,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Mail, Lock, AlertCircle } from "lucide-react";
+import { Home, Loader2, Mail, Lock, AlertCircle } from "lucide-react";
 import Image from "next/image";
 import type { LoginFormData } from "@/types";
 
@@ -103,6 +103,14 @@ export default function LoginPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-12">
+      <div className="absolute left-4 top-4 z-20">
+        <Button variant="secondary" size="sm" className="gap-2 bg-background/90 shadow-md backdrop-blur-sm" asChild>
+          <Link href="/" aria-label="Go to home page">
+            <Home className="h-4 w-4" />
+            Home
+          </Link>
+        </Button>
+      </div>
       <div className="absolute inset-0 -z-10">
         <Image
           src="/assets/rmu-campus.jpg"

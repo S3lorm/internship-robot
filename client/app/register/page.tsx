@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
+import { Home, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
 import { programs } from "@/lib/mock-data";
 import type { RegisterFormData } from "@/types";
@@ -215,7 +215,15 @@ export default function RegisterPage() {
 
   if (success) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+      <div className="relative flex min-h-screen flex-col items-center justify-center bg-background px-4 py-12">
+        <div className="absolute left-4 top-4 z-20">
+          <Button variant="secondary" size="sm" className="gap-2 shadow-sm" asChild>
+            <Link href="/" aria-label="Go to home page">
+              <Home className="h-4 w-4" />
+              Home
+            </Link>
+          </Button>
+        </div>
         <Card className="w-full max-w-md text-center">
           <CardContent className="pt-6">
             <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-green-100">
@@ -247,6 +255,14 @@ export default function RegisterPage() {
 
   return (
     <div className="relative flex min-h-screen flex-col items-center justify-center px-4 py-12">
+      <div className="absolute left-4 top-4 z-20">
+        <Button variant="secondary" size="sm" className="gap-2 bg-background/90 shadow-md backdrop-blur-sm" asChild>
+          <Link href="/" aria-label="Go to home page">
+            <Home className="h-4 w-4" />
+            Home
+          </Link>
+        </Button>
+      </div>
       {/* Background Image */}
       <div className="absolute inset-0 -z-10">
         <Image
