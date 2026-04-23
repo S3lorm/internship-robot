@@ -2,13 +2,12 @@
 
 import React from "react";
 import { useEffect, useState } from "react";
-import { useRouter, usePathname } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
 import { Menu } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 export default function DashboardLayout({
   children,
@@ -16,7 +15,6 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const router = useRouter();
-  const pathname = usePathname();
   const { user, isAuthenticated, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [deactivationCountdown, setDeactivationCountdown] = useState<number | null>(null);
@@ -71,7 +69,7 @@ export default function DashboardLayout({
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-background md:flex-row">
       {deactivationCountdown !== null && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
           <div className="bg-card border border-border shadow-lg p-8 rounded-lg max-w-md w-full text-center animate-in zoom-in-95 duration-200">
@@ -95,26 +93,25 @@ export default function DashboardLayout({
         </div>
       )}
 
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <DashboardSidebar />
+      {/* Static column: sidebar stays in the layout; main scrolls independently (md+) */}
+      <aside className="hidden h-full w-64 shrink-0 md:flex">
+        <DashboardSidebar className="h-full min-h-0" />
       </aside>
 
-      {/* Mobile Sidebar */}
+      {/* Mobile Sidebar (overlay below md) */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="p-0 w-64">
           <DashboardSidebar onNavigate={() => setSidebarOpen(false)} />
         </SheetContent>
       </Sheet>
 
-      {/* Main Content Area */}
-      <div className="flex-1 lg:pl-64">
-        {/* Top Header */}
-        <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 lg:px-6">
+      {/* Main column */}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="z-40 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/60 md:px-6">
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden"
+            className="md:hidden"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-5 w-5" />
@@ -124,8 +121,7 @@ export default function DashboardLayout({
           <div className="flex-1" />
         </header>
 
-        {/* Page Content */}
-        <main className="p-4 lg:p-6 lg:p-8">
+        <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           {children}
         </main>
       </div>

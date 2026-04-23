@@ -13,7 +13,6 @@ import {
   LayoutDashboard,
   Users,
   Briefcase,
-  FileText,
   FileCheck,
   Bell,
   Settings,
@@ -37,7 +36,6 @@ const hodNavItems: NavItem[] = [
 const systemAdminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "User Management", icon: Users },
-  { href: "/admin/applications", label: "Applications", icon: FileText },
   { href: "/admin/letter-requests", label: "Letter requests", icon: FileCheck },
   { href: "/admin/official-placement-management", label: "Official placement management", icon: MapPinned },
   { href: "/admin/notices", label: "Notices", icon: Bell },
@@ -60,7 +58,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
   };
 
   return (
-    <div className={cn("flex h-full flex-col bg-sidebar border-r border-sidebar-border", className)}>
+    <div className={cn("flex h-full min-h-0 flex-col bg-sidebar border-r border-sidebar-border", className)}>
       <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-lg">
           <Anchor className="h-5 w-5 text-primary-foreground" />
@@ -75,7 +73,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
+      <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
         {!isHod && (
           <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
             Administration

@@ -506,8 +506,8 @@ export default function AdminDashboard() {
             <div>
               <h1 className="text-2xl font-bold">System administration</h1>
               <p className="text-primary-foreground/85 mt-1 max-w-xl">
-                Manage students and heads of department by department, broadcast notices, and review internship
-                applications. Department-level tools live on each HOD&apos;s dashboard.
+                Manage students and heads of department by department, broadcast notices, and oversee internship letter
+                requests and placements. Department-level tools live on each HOD&apos;s dashboard.
               </p>
             </div>
           </div>
@@ -607,7 +607,7 @@ export default function AdminDashboard() {
         </CardContent>
       </Card>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2">
         <Card className="border shadow-sm">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -620,24 +620,6 @@ export default function AdminDashboard() {
             <Button asChild>
               <Link href="/admin/users">
                 Open user management
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </CardContent>
-        </Card>
-
-        <Card className="border shadow-sm">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <FileText className="h-5 w-5" />
-              Applications
-            </CardTitle>
-            <CardDescription>Approve or deny internship applications across the institution.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button asChild>
-              <Link href="/admin/applications">
-                Review applications
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>

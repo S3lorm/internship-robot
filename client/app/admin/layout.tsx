@@ -34,41 +34,37 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Desktop Sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <AdminSidebar />
+    <div className="flex h-dvh min-h-0 w-full flex-col overflow-hidden bg-background md:flex-row">
+      {/* Static column: sidebar in normal flow; main area scrolls (md+) */}
+      <aside className="hidden h-full w-64 shrink-0 md:flex">
+        <AdminSidebar className="h-full min-h-0" />
       </aside>
 
-      {/* Mobile Sidebar */}
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="p-0 w-64">
           <AdminSidebar onNavigate={() => setSidebarOpen(false)} />
         </SheetContent>
       </Sheet>
 
-      {/* Main Content Area */}
-      <div className="flex-1 lg:pl-64">
-        {/* Top Header */}
-        <header className="sticky top-0 z-40 flex h-16 items-center gap-4 border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 px-4 lg:px-6">
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+        <header className="z-40 flex h-16 shrink-0 items-center gap-4 border-b border-border bg-background/95 px-4 backdrop-blur supports-backdrop-filter:bg-background/60 md:px-6">
           <Button
             variant="ghost"
             size="icon"
-            className="lg:hidden"
+            className="md:hidden"
             onClick={() => setSidebarOpen(true)}
           >
             <Menu className="h-5 w-5" />
             <span className="sr-only">Toggle menu</span>
           </Button>
 
-          <div className="flex-1">
+          <div className="min-w-0 flex-1">
             <h1 className="text-lg font-semibold text-foreground">
               {pathname === "/admin" ? "Dashboard" :
                pathname.includes("/users") ? "User Management" :
                pathname.includes("/official-placement-management") ? "Official placement management" :
                pathname.includes("/internship-tracking") ? "Internship Tracking" :
                pathname.includes("/internships") ? "Internships" :
-               pathname.includes("/applications") ? "Applications" :
                pathname.includes("/notices") ? "Notices" :
                pathname.includes("/notifications") ? "Notifications" :
                pathname.includes("/evaluations") ? "Evaluations" :
@@ -79,8 +75,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </div>
         </header>
 
-        {/* Page Content */}
-        <main className="p-4 lg:p-6 lg:p-8">
+        <main className="min-h-0 flex-1 overflow-y-auto p-4 md:p-6 lg:p-8">
           {children}
         </main>
       </div>

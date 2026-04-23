@@ -180,7 +180,7 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
   };
 
   return (
-    <div className={cn("flex h-full flex-col bg-sidebar border-r border-sidebar-border", className)}>
+    <div className={cn("flex h-full min-h-0 flex-col bg-sidebar border-r border-sidebar-border", className)}>
       <div className="flex h-16 items-center gap-3 border-b border-sidebar-border px-6">
         <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary shadow-lg">
           <Anchor className="h-5 w-5 text-primary-foreground" />
@@ -195,7 +195,7 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
         </div>
       </div>
 
-      <nav className="flex-1 space-y-6 p-4 overflow-y-auto">
+      <nav className="min-h-0 flex-1 space-y-6 overflow-y-auto p-4">
         <NavGroup
           label="Overview"
           items={overviewItems}
