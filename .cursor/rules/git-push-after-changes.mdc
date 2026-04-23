@@ -1,0 +1,14 @@
+---
+description: After implementing new work, commit and push to origin/main
+alwaysApply: true
+---
+
+# Git workflow
+
+When you complete a task that changes the codebase (new files, fixes, or refactors the user asked for):
+
+1. Run `git status` to see what changed.
+2. Stage relevant files, commit with a clear message, and `git push origin main` (or the current branch if not `main`).
+3. Do this in the same session as the implementation—do not leave the work only on disk unpushed unless the user opts out or there is a merge conflict that needs human resolution.
+
+If there is nothing to commit, do not create empty commits.
