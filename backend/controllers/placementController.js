@@ -77,7 +77,7 @@ async function createPlacement(req, res) {
         title: 'New official placement request',
         message: `${user.firstName} ${user.lastName} (${user.studentId || 'student'}) submitted an official placement for ${organizationName}. The department HOD is notified first; if they deny, ignore the request, or you need to step in, you have the same tools in Official placements — approve or deny with a reason, and on approval the official letter and evaluation link are emailed to the organization.`,
         relatedId: placement.id,
-        link: '/admin/internship-tracking',
+        link: '/admin/official-placement-management',
       });
     }
 
@@ -147,7 +147,7 @@ async function getPlacements(req, res) {
 async function getPlacementById(req, res) {
   try {
     const user = req.user;
-    const { InternshipPlacement, EvaluationToken, EmailLog } = require('../models');
+    const { InternshipPlacement, EvaluationToken, EmailLog, PlacementActionLog, User: UserModel } = require('../models');
     const { id } = req.params;
 
     const placement = await InternshipPlacement.findByPk(id);
@@ -159,10 +159,8 @@ async function getPlacementById(req, res) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    // Load related data
-    const { User } = require('../models');
     if (placement.studentId) {
-      const student = await User.findOne({ id: placement.studentId });
+      const student = await UserModel.findOne({ id: placement.studentId });
       if (student) placement.student = student;
       if (user.role === 'hod' && (!student || !departmentMatch(student.department, user.department))) {
         return res.status(403).json({ message: 'Access denied' });
@@ -176,6 +174,27 @@ async function getPlacementById(req, res) {
     // Load email logs
     const emailLogs = await EmailLog.findByPlacement(id);
     placement.emailLogs = emailLogs;
+
+    if (user.role === 'admin' || user.role === 'hod') {
+      const rawLogs = await PlacementActionLog.findByPlacementId(id);
+      const actionLogs = [];
+      for (const log of rawLogs) {
+        let actor = null;
+        if (log.actorId) {
+          const u = await UserModel.findOne({ id: log.actorId });
+          if (u) {
+            actor = {
+              id: u.id,
+              firstName: u.firstName,
+              lastName: u.lastName,
+              email: u.email,
+            };
+          }
+        }
+        actionLogs.push({ ...log, actor });
+      }
+      placement.actionLogs = actionLogs;
+    }
 
     res.json({ placement });
   } catch (error) {
@@ -225,6 +244,15 @@ async function updatePlacementStatus(req, res) {
       });
     }
 
+    const previousStatus = placement.status;
+    if (previousStatus === status) {
+      return res.status(400).json({
+        message: 'This request is already in the selected state. No update was made.',
+      });
+    }
+
+    const isNewApproval = status === 'approved' && previousStatus !== 'approved';
+
     const updateData = {
       status,
       adminNotes:
@@ -233,12 +261,12 @@ async function updatePlacementStatus(req, res) {
           : status === 'approved'
             ? placement.adminNotes ?? null
             : notesTrim,
-      reviewedBy: user.role === 'hod' ? null : user.id,
+      reviewedBy: user.id,
       reviewedAt: new Date().toISOString(),
     };
 
-    // If approved, generate official letter + evaluation token
-    if (status === 'approved') {
+    // First-time approval only: reference, token, and auto-email (avoids duplicate tokens and duplicate emails)
+    if (isNewApproval) {
       // Generate reference number
       const now = new Date();
       const datePart = now.getFullYear().toString() +
@@ -246,7 +274,7 @@ async function updatePlacementStatus(req, res) {
         String(now.getDate()).padStart(2, '0');
       const randomSuffix = String(Math.floor(Math.random() * 100000)).padStart(5, '0');
       updateData.referenceNumber = `INT-${datePart}-${randomSuffix}`;
-      
+
       // Generate alphanumeric verification code
       const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
       let vCode = '';
@@ -280,7 +308,7 @@ async function updatePlacementStatus(req, res) {
 
     let organizationEmailSent = false;
     let organizationEmailError = null;
-    if (status === 'approved') {
+    if (isNewApproval) {
       try {
         const { sendOfficialLetterAndEvaluationToOrganization } = require('../services/placementOrganizationEmail');
         const sendResult = await sendOfficialLetterAndEvaluationToOrganization(id);
@@ -294,6 +322,22 @@ async function updatePlacementStatus(req, res) {
         organizationEmailError = err.message || String(err);
         console.error('Auto-send to organization after approval failed:', err);
       }
+    }
+
+    try {
+      const { PlacementActionLog } = require('../models');
+      await PlacementActionLog.create({
+        placementId: id,
+        actorId: user.id,
+        actorRole: user.role,
+        action: status,
+        previousStatus,
+        newStatus: status,
+        notes: notesTrim.length > 0 ? notesTrim : null,
+        organizationEmailSent: isNewApproval ? organizationEmailSent : null,
+      });
+    } catch (logErr) {
+      console.error('placement_action_logs insert failed:', logErr);
     }
 
     // Notify student
@@ -344,7 +388,7 @@ async function updatePlacementStatus(req, res) {
           title: 'Official placement — HOD decision (you may take over)',
           message: `${stLabel}'s official placement for ${placement.organizationName} was ${actionLabel} by the department HOD.${reasonSnippet ? ` Reason: ${reasonSnippet}` : ''} If the student resubmits or you need to decide instead, open Official placements — you have the same approval, denial, and organisation email options as the HOD.`,
           relatedId: id,
-          link: '/admin/internship-tracking',
+          link: '/admin/official-placement-management',
         });
       }
     }
@@ -352,7 +396,7 @@ async function updatePlacementStatus(req, res) {
     res.json({
       message: 'Placement status updated successfully',
       placement: updated,
-      ...(status === 'approved'
+      ...(isNewApproval
         ? { organizationEmailSent, ...(organizationEmailError ? { organizationEmailError } : {}) }
         : {}),
     });
@@ -375,6 +419,9 @@ async function sendToOrganization(req, res) {
     }
 
     if (user.role === 'student' && placement.studentId !== user.id) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+    if (user.role !== 'admin' && user.role !== 'hod' && user.role !== 'student') {
       return res.status(403).json({ message: 'Access denied' });
     }
 

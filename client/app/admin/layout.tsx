@@ -65,6 +65,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             <h1 className="text-lg font-semibold text-foreground">
               {pathname === "/admin" ? "Dashboard" :
                pathname.includes("/users") ? "User Management" :
+               pathname.includes("/official-placement-management") ? "Official placement management" :
                pathname.includes("/internship-tracking") ? "Internship Tracking" :
                pathname.includes("/internships") ? "Internships" :
                pathname.includes("/applications") ? "Applications" :

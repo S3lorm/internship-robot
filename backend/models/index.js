@@ -15,6 +15,7 @@ const Evaluation = require('./Evaluation');
 const Logbook = require('./Logbook');
 const Report = require('./Report');
 const AdministrativeAction = require('./AdministrativeAction');
+const PlacementActionLog = require('./PlacementActionLog');
 
 // For backward compatibility, export sequelize as null
 // Some code might check for sequelize, but we're using Supabase now
@@ -36,5 +37,6 @@ module.exports = {
   Logbook,
   Report,
   AdministrativeAction,
+  PlacementActionLog,
   supabase,
 };

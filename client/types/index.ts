@@ -302,6 +302,25 @@ export interface LetterRequestFormData {
 // Internship Placement types (Stage 2)
 export type PlacementStatus = 'pending' | 'approved' | 'rejected' | 'modification_requested';
 
+export interface PlacementActionLog {
+  id: string;
+  placementId: string;
+  actorId: string | null;
+  actorRole: "admin" | "hod";
+  action: string;
+  previousStatus?: string | null;
+  newStatus: string;
+  notes?: string | null;
+  organizationEmailSent?: boolean | null;
+  createdAt: string;
+  actor?: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    email: string;
+  } | null;
+}
+
 export interface InternshipPlacement {
   id: string;
   studentId: string;
@@ -327,6 +346,7 @@ export interface InternshipPlacement {
   generalRequest?: LetterRequest;
   evaluationTokens?: EvaluationToken[];
   emailLogs?: EmailLog[];
+  actionLogs?: PlacementActionLog[];
   emailSent?: boolean;
   lastEmailSentAt?: string;
   createdAt: string;

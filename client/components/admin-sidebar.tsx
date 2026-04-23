@@ -39,7 +39,7 @@ const systemAdminNav: NavItem[] = [
   { href: "/admin/users", label: "User Management", icon: Users },
   { href: "/admin/applications", label: "Applications", icon: FileText },
   { href: "/admin/letter-requests", label: "Letter requests", icon: FileCheck },
-  { href: "/admin/internship-tracking", label: "Official placements", icon: MapPinned },
+  { href: "/admin/official-placement-management", label: "Official placement management", icon: MapPinned },
   { href: "/admin/notices", label: "Notices", icon: Bell },
 ];
 

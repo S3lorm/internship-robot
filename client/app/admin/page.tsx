@@ -532,7 +532,7 @@ export default function AdminDashboard() {
                 <Link href="/admin/letter-requests">Open letter queue</Link>
               </Button>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/admin/internship-tracking">Official placements (all depts.)</Link>
+                <Link href="/admin/official-placement-management">Official placement management (all depts.)</Link>
               </Button>
             </div>
           </div>

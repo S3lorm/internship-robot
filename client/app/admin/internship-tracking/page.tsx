@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -55,6 +56,13 @@ const statusConfig = {
 
 export default function InternshipTrackingPage() {
   const { user } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (user?.role === "admin") {
+      router.replace("/admin/official-placement-management");
+    }
+  }, [user, router]);
   const [placements, setPlacements] = useState<InternshipPlacement[]>([]);
   const [filteredPlacements, setFilteredPlacements] = useState<InternshipPlacement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -70,7 +78,8 @@ export default function InternshipTrackingPage() {
 
   useEffect(() => {
     if (!user) return;
-    if (user.role !== "admin" && user.role !== "hod") return;
+    if (user.role === "admin") return;
+    if (user.role !== "hod") return;
     void loadPlacements();
   }, [user]);
 
