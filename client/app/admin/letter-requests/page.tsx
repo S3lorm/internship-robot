@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
-import { useRouter } from "next/navigation";
 import { lettersApi } from "@/lib/api";
 import type { LetterRequest } from "@/types";
 import {
@@ -63,7 +62,6 @@ function letterStudentPrefix(r: LetterRequest): string {
 
 export default function AdminLetterRequestsPage() {
   const { user } = useAuth();
-  const router = useRouter();
   const [bulkBusy, setBulkBusy] = useState(false);
   const [requests, setRequests] = useState<LetterRequest[]>([]);
   const [filteredRequests, setFilteredRequests] = useState<LetterRequest[]>([]);
@@ -80,13 +78,9 @@ export default function AdminLetterRequestsPage() {
 
   useEffect(() => {
     if (!user) return;
-    if (user.role === "admin") {
-      router.replace("/admin");
-      return;
-    }
-    if (user.role !== "hod") return;
+    if (user.role !== "admin" && user.role !== "hod") return;
     void loadRequests();
-  }, [user, router]);
+  }, [user]);
 
   useEffect(() => {
     let filtered = requests;
@@ -220,16 +214,16 @@ export default function AdminLetterRequestsPage() {
     return Array.from(set).filter((p) => p !== "Other").sort();
   }, [filteredRequests]);
 
-  if (!user || user.role === "admin") {
+  if (!user || (user.role !== "admin" && user.role !== "hod")) {
+    return null;
+  }
+
+  if (isLoading) {
     return (
       <div className="flex min-h-[320px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
       </div>
     );
-  }
-
-  if (user.role !== "hod") {
-    return null;
   }
 
   return (
@@ -240,7 +234,9 @@ export default function AdminLetterRequestsPage() {
           Stage 1: General Letter Requests
         </h1>
         <p className="text-muted-foreground mt-1">
-          Review and manage general introduction letter requests from students. Stage 2 placements are managed in the Internship Tracking panel.
+          {user.role === "admin"
+            ? "Review and manage all student introduction letter requests, grouped in the dashboard by department. Stage 2 official placements are under Official placements."
+            : "Review and manage general introduction letter requests from students. Stage 2 placements are managed in the Internship Tracking panel."}
         </p>
       </div>
 
