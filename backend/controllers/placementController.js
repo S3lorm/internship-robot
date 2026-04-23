@@ -176,24 +176,30 @@ async function getPlacementById(req, res) {
     placement.emailLogs = emailLogs;
 
     if (user.role === 'admin' || user.role === 'hod') {
-      const rawLogs = await PlacementActionLog.findByPlacementId(id);
-      const actionLogs = [];
-      for (const log of rawLogs) {
-        let actor = null;
-        if (log.actorId) {
-          const u = await UserModel.findOne({ id: log.actorId });
-          if (u) {
-            actor = {
-              id: u.id,
-              firstName: u.firstName,
-              lastName: u.lastName,
-              email: u.email,
-            };
+      try {
+        const rawLogs = await PlacementActionLog.findByPlacementId(id);
+        const actionLogs = [];
+        for (const log of rawLogs) {
+          let actor = null;
+          if (log.actorId) {
+            const u = await UserModel.findOne({ id: log.actorId });
+            if (u) {
+              actor = {
+                id: u.id,
+                firstName: u.firstName,
+                lastName: u.lastName,
+                email: u.email,
+              };
+            }
           }
+          actionLogs.push({ ...log, actor });
         }
-        actionLogs.push({ ...log, actor });
+        placement.actionLogs = actionLogs;
+      } catch (logErr) {
+        // e.g. migration 016 not applied yet — do not fail the whole GET
+        console.error('placement action logs (non-fatal):', logErr?.message || logErr);
+        placement.actionLogs = [];
       }
-      placement.actionLogs = actionLogs;
     }
 
     res.json({ placement });
