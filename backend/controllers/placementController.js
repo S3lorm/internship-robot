@@ -498,11 +498,8 @@ async function downloadOfficialLetter(req, res) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
-    const signature = require('../controllers/letterController').programSignatures[student.program] || {
-      name: 'Dr. [Name]',
-      title: 'Dean of Academic Affairs',
-      department: 'Regional Maritime University',
-    };
+    const { resolveOfficialPlacementSignature } = require('../services/officialPlacementLetterSignature');
+    const signature = await resolveOfficialPlacementSignature(placement, student);
 
     const pdfBuffer = await generateOfficialLetterPDF(placement, student, signature);
 
