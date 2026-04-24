@@ -276,8 +276,15 @@ export default function RegisterPage() {
       </div>
 
       <Link href="/" className="mb-8 flex flex-col items-center gap-3 transition-transform hover:scale-105">
-        <div className="flex h-16 items-center justify-center rounded-xl bg-white shadow-lg p-3">
-          <Image src="/rmu-logo.png" alt="RMU Logo" width={200} height={50} className="object-contain" priority />
+        <div className="flex h-16 min-w-[168px] items-center justify-center rounded-xl border border-white/60 bg-white p-3 shadow-2xl ring-2 ring-primary/25">
+          <Image
+            src="/rmu-logo.png"
+            alt="RMU Logo"
+            width={220}
+            height={55}
+            className="object-contain contrast-[1.08] drop-shadow-sm"
+            priority
+          />
         </div>
         <div className="flex flex-col items-center text-center">
           <span className="text-xl font-bold leading-none text-white drop-shadow-lg">RMU</span>
