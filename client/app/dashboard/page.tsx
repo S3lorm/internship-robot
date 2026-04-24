@@ -15,7 +15,6 @@ import {
 import { dashboardApi, lettersApi } from "@/lib/api";
 import { toast } from "sonner";
 import type { Application, Internship, Notice, Notification, LetterRequest } from "@/types";
-import type { InternshipRequest } from "@/types/internship";
 import {
   FileText,
   Clock,
@@ -31,7 +30,6 @@ import {
   Download,
   Printer,
   FileCheck2,
-  Building2,
 } from "lucide-react";
 
 const getStatusIcon = (status: string) => {
@@ -77,39 +75,10 @@ type ApplicationStats = {
   companyLettersEmailedCount?: number;
   companyLettersApprovedCount?: number;
   letterRequestsPendingCount?: number;
-  internshipRequestTotal?: number;
-  internshipRequestPending?: number;
 };
 
 function getInternshipFromApplication(application: Application): Internship | undefined {
   return application.internship ?? application.Internship;
-}
-
-function getInternshipRequestCompany(ir: InternshipRequest): string {
-  return ir.companyName ?? ir.company_name ?? "Company";
-}
-
-function getInternshipRequestDate(ir: InternshipRequest): string {
-  const raw = ir.createdAt ?? ir.created_at;
-  return raw ? String(raw) : "";
-}
-
-function getInternshipRequestStatusBadge(status: string) {
-  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
-    pending: "secondary",
-    approved: "default",
-    rejected: "destructive",
-  };
-  const labels: Record<string, string> = {
-    pending: "Pending",
-    approved: "Approved",
-    rejected: "Rejected",
-  };
-  return (
-    <Badge variant={variants[status] || "secondary"}>
-      {labels[status] || status}
-    </Badge>
-  );
 }
 
 export default function DashboardPage() {
@@ -118,7 +87,6 @@ export default function DashboardPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [letterRequests, setLetterRequests] = useState<LetterRequest[]>([]);
-  const [internshipRequests, setInternshipRequests] = useState<InternshipRequest[]>([]);
   const [applicationStats, setApplicationStats] = useState<ApplicationStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -148,9 +116,6 @@ export default function DashboardPage() {
         setNotices(Array.isArray(data?.notices) ? data.notices : []);
         setNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
         setLetterRequests(Array.isArray(data?.letterRequests) ? data.letterRequests : []);
-        setInternshipRequests(
-          Array.isArray(data?.internshipRequests) ? data.internshipRequests : []
-        );
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         setError(err instanceof Error ? err.message : "Failed to load dashboard data");
@@ -176,8 +141,6 @@ export default function DashboardPage() {
           applicationStats.companyLettersEmailedCount ?? applicationStats.companyLettersCount,
         lettersCompanyApproved: applicationStats.companyLettersApprovedCount ?? 0,
         letterRequestsPending: applicationStats.letterRequestsPendingCount ?? 0,
-        internshipRequestTotal: applicationStats.internshipRequestTotal ?? 0,
-        internshipRequestPending: applicationStats.internshipRequestPending ?? 0,
       };
     }
     return {
@@ -193,10 +156,8 @@ export default function DashboardPage() {
         (lr) => lr.requestType === "company" && lr.status === "approved"
       ).length,
       letterRequestsPending: letterRequests.filter((lr) => lr.status === "pending").length,
-      internshipRequestTotal: internshipRequests.length,
-      internshipRequestPending: internshipRequests.filter((r) => r.status === "pending").length,
     };
-  }, [applicationStats, applications, letterRequests, internshipRequests]);
+  }, [applicationStats, applications, letterRequests]);
 
   const unreadNotifications = useMemo(() => notifications.filter((n) => !n.isRead), [notifications]);
   const sortedNotifications = useMemo(
@@ -331,7 +292,7 @@ export default function DashboardPage() {
       )}
 
       {/* Stats — values from your account (API) */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Card>
           <CardContent className="flex items-center gap-4 p-6">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-yellow-100">
@@ -390,27 +351,6 @@ export default function DashboardPage() {
             </div>
           </CardContent>
         </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-100">
-              <Building2 className="h-6 w-6 text-sky-700" />
-            </div>
-            <div className="min-w-0">
-              {loading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              ) : (
-                <>
-                  <p className="text-2xl font-bold">{stats.internshipRequestPending}</p>
-                  <p className="text-sm text-muted-foreground">Placement requests pending</p>
-                  <p className="text-xs text-muted-foreground/80">
-                    {stats.internshipRequestTotal} total requests
-                  </p>
-                </>
-              )}
-            </div>
-          </CardContent>
-        </Card>
       </div>
 
       {/* Application Progress */}
@@ -458,7 +398,6 @@ export default function DashboardPage() {
       )}
 
       <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-        <div className="space-y-6">
         {/* Recent Applications */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
@@ -529,69 +468,6 @@ export default function DashboardPage() {
             )}
           </CardContent>
         </Card>
-
-        {/* Recent internship placement requests (Supabase) */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg">Recent placement requests</CardTitle>
-              <CardDescription>Companies you asked to intern with (request form)</CardDescription>
-            </div>
-            <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/request">Submit request</Link>
-            </Button>
-          </CardHeader>
-          <CardContent>
-            {loading ? (
-              <div className="py-8 text-center">
-                <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="text-muted-foreground">Loading requests...</p>
-              </div>
-            ) : error ? (
-              <div className="py-8 text-center">
-                <p className="text-destructive">{error}</p>
-              </div>
-            ) : internshipRequests.length === 0 ? (
-              <div className="py-8 text-center">
-                <Building2 className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
-                <p className="text-muted-foreground">No placement requests yet</p>
-                <Button variant="link" asChild className="mt-2">
-                  <Link href="/dashboard/request">Submit a company request</Link>
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {internshipRequests.slice(0, 5).map((ir) => {
-                  const created = getInternshipRequestDate(ir);
-                  return (
-                    <div
-                      key={ir.id}
-                      className="flex items-start justify-between rounded-lg border border-border p-4"
-                    >
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{getInternshipRequestCompany(ir)}</p>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {ir.purpose}
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {created
-                            ? new Date(created).toLocaleDateString("en-GB", {
-                                day: "numeric",
-                                month: "short",
-                                year: "numeric",
-                              })
-                            : "—"}
-                        </p>
-                      </div>
-                      <div className="ml-2 shrink-0">{getInternshipRequestStatusBadge(ir.status)}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-        </div>
 
         {/* Notifications overview — full list, scrollable */}
         <Card className="lg:min-h-[320px]">
