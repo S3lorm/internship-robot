@@ -195,7 +195,7 @@ export default function HomePage() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="mb-6 text-balance text-4xl font-bold tracking-tight text-white md:text-5xl lg:text-6xl drop-shadow-lg"
             >
-              Internship Letters, HOD Approval, and Placement Tracking in One Portal
+              RMU online internship system
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 20 }}
@@ -347,7 +347,7 @@ export default function HomePage() {
                 }
                 viewport={{ once: true, margin: "-40px" }}
                 transition={{
-                  duration: isMobile ? 0.5 : 0.5,
+                  duration: 0.5,
                   delay: i * 0.15,
                   ease: isMobile ? [0.22, 1, 0.36, 1] : [0.4, 0, 0.2, 1],
                 }}
