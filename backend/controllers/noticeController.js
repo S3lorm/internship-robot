@@ -9,19 +9,17 @@ function parsePagination(req) {
 }
 
 /**
- * When an admin publishes a notice, departmental HODs get an in-app notification
- * (same notifications inbox as students, on their admin/HOD routes).
+ * When a notice is scoped to a department, HODs in that department get an in-app
+ * notification. Broad notices (no targetDepartment) do not fan out — HODs
+ * already see department notices in their notices list; org-wide posts were
+ * incorrectly notifying every HOD.
  */
 async function notifyHodsForNewNotice(notice, excludeUserId = null) {
-  const audiences = notice.targetAudience || 'students';
-  if (audiences === 'admins' && !notice.targetDepartment) {
+  if (!notice.targetDepartment) {
     return;
   }
 
-  const where = { role: 'hod' };
-  if (notice.targetDepartment) {
-    where.department = notice.targetDepartment;
-  }
+  const where = { role: 'hod', department: notice.targetDepartment };
 
   const hods = await User.findAll({ where });
   const link = '/admin/notifications';
