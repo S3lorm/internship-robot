@@ -242,7 +242,7 @@ export default function InternshipsManagementPage() {
 
   const InternshipForm = ({ isEdit = false }: { isEdit?: boolean }) => (
     <div className="grid gap-4 py-4 max-h-[60vh] overflow-y-auto px-1">
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="title">Job Title *</Label>
           <Input
@@ -263,7 +263,7 @@ export default function InternshipsManagementPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
         <div className="space-y-2">
           <Label htmlFor="location">Location *</Label>
           <Input
@@ -293,7 +293,7 @@ export default function InternshipsManagementPage() {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <div className="space-y-2">
           <Label htmlFor="duration">Duration *</Label>
           <Input
@@ -405,7 +405,7 @@ export default function InternshipsManagementPage() {
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-4">
           {[1, 2, 3, 4].map((i) => (
             <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />
           ))}
@@ -418,7 +418,7 @@ export default function InternshipsManagementPage() {
   return (
     <div className="space-y-6">
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
+      <div className="grid grid-cols-2 gap-4 sm:grid-cols-2 md:grid-cols-4">
         {[
           { label: "Total Internships", value: stats.total, icon: Briefcase, color: "bg-slate-500" },
           { label: "Open Positions", value: stats.open, icon: CheckCircle, color: "bg-green-500" },
@@ -456,7 +456,7 @@ export default function InternshipsManagementPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-36">
+                <SelectTrigger className="w-full min-w-0 sm:w-36">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
@@ -473,7 +473,7 @@ export default function InternshipsManagementPage() {
                     Post Internship
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
+                <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
                   <DialogHeader>
                     <DialogTitle>Post New Internship</DialogTitle>
                     <DialogDescription>
@@ -587,7 +587,7 @@ export default function InternshipsManagementPage() {
                       <Badge variant="outline">{internship.type || "Internship"}</Badge>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-sm text-muted-foreground">
+                    <div className="grid grid-cols-1 gap-2 text-sm text-muted-foreground sm:grid-cols-2">
                       <div className="flex items-center gap-1">
                         <MapPin className="h-4 w-4" />
                         <span className="truncate">{internship.location}</span>
@@ -621,7 +621,7 @@ export default function InternshipsManagementPage() {
 
       {/* Edit Dialog */}
       <Dialog open={editDialog.open} onOpenChange={(open) => setEditDialog({ open, internship: null })}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-h-[90dvh] max-w-2xl overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Internship</DialogTitle>
             <DialogDescription>Update the internship details</DialogDescription>

@@ -329,7 +329,7 @@ export default function RegisterPage() {
             {/* Step 1: Personal Information */}
             {step === 1 && (
               <>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">First Name</Label>
                     <Input

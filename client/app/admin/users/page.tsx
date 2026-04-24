@@ -366,8 +366,8 @@ export default function UserManagementPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="rounded-lg border border-border overflow-hidden">
-              <Table>
+            <div className="overflow-x-auto rounded-lg border border-border">
+              <Table className="min-w-[640px]">
                 <TableHeader>
                   <TableRow className="bg-muted/50">
                     <TableHead className="w-12">

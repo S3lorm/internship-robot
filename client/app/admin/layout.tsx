@@ -60,7 +60,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
           </Button>
 
           <div className="min-w-0 flex-1">
-            <h1 className="text-lg font-semibold text-foreground">
+            <h1 className="truncate text-lg font-semibold text-foreground">
               {pathname === "/admin" ? "Dashboard" :
                pathname.includes("/users") ? "User Management" :
                pathname.includes("/official-placement-management") ? "Official placement management" :

@@ -417,7 +417,7 @@ export default function ProfilePage() {
         {/* Security */}
         <TabsContent value="security" className="space-y-6">
           <div className="grid gap-6 lg:grid-cols-5">
-            <Card className="border-border/80 bg-muted/20 lg:col-span-2">
+            <Card className="border-border/80 bg-muted/20 lg:col-span-2 min-w-0">
               <CardHeader className="space-y-1">
                 <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
                   <Shield className="h-5 w-5" aria-hidden />

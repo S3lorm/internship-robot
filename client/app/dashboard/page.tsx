@@ -270,7 +270,7 @@ export default function DashboardPage() {
                         <p className="text-xs text-muted-foreground">Status: Approved</p>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <Button variant="outline" size="sm" onClick={() => handleViewLetter(request.id)}>
                         <Eye className="mr-2 h-4 w-4" />
                         View
@@ -437,12 +437,12 @@ export default function DashboardPage() {
                   return (
                     <div
                       key={application.id}
-                      className="flex items-start justify-between rounded-lg border border-border p-4"
+                      className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-start sm:justify-between"
                     >
-                      <div className="flex items-start gap-3">
+                      <div className="flex min-w-0 flex-1 items-start gap-3">
                         {getStatusIcon(application.status)}
-                        <div>
-                          <p className="font-medium">
+                        <div className="min-w-0">
+                          <p className="font-medium break-words">
                             {internship?.title || "Internship application"}
                           </p>
                           <p className="text-sm text-muted-foreground">
@@ -460,7 +460,9 @@ export default function DashboardPage() {
                           </p>
                         </div>
                       </div>
-                      {getStatusBadge(application.status)}
+                      <div className="shrink-0 self-start sm:self-auto">
+                        {getStatusBadge(application.status)}
+                      </div>
                     </div>
                   );
                 })}

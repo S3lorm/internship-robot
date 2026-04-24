@@ -157,7 +157,7 @@ export default function ApplicationsPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+      <div className="grid grid-cols-2 gap-2 sm:gap-4 sm:grid-cols-3 md:grid-cols-5">
         {[
           { label: "Total", count: counts.all, color: "bg-slate-100 text-slate-800" },
           { label: "Pending", count: counts.pending, color: "bg-amber-100 text-amber-800" },

@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -7,9 +8,9 @@ import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { mockInternships, mockNotices } from "@/lib/mock-data";
 import {
-  Anchor,
   Ship,
   GraduationCap,
   Briefcase,
@@ -20,10 +21,12 @@ import {
   MapPin,
   Calendar,
   Bell,
+  Menu,
 } from "lucide-react";
 
 export default function HomePage() {
   const { isAuthenticated, user } = useAuth();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const featuredInternships = mockInternships.slice(0, 3);
   const latestNotices = mockNotices.filter((n) => n.isActive).slice(0, 2);
@@ -32,12 +35,12 @@ export default function HomePage() {
     <div className="min-h-screen bg-background">
       {/* Navigation */}
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-        <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <Link href="/" className="flex items-center gap-2">
-            <div className="flex h-10 items-center justify-center rounded-lg bg-white p-1 shadow-sm">
-              <Image src="/rmu-logo.png" alt="RMU Logo" width={120} height={30} className="object-contain" />
+        <div className="container mx-auto flex h-16 min-w-0 items-center justify-between gap-2 px-4">
+          <Link href="/" className="flex min-w-0 max-w-[65%] items-center gap-2 sm:max-w-none">
+            <div className="flex h-9 w-[88px] shrink-0 items-center justify-center rounded-lg bg-white p-1 shadow-sm sm:h-10 sm:w-[120px]">
+              <Image src="/rmu-logo.png" alt="RMU Logo" width={120} height={30} className="h-full w-auto object-contain" />
             </div>
-            <div className="flex flex-col">
+            <div className="hidden min-w-0 flex-col sm:flex">
               <span className="text-sm font-semibold leading-none text-foreground">
                 RMU
               </span>
@@ -47,7 +50,7 @@ export default function HomePage() {
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-6 md:flex">
+          <nav className="hidden items-center gap-6 md:flex" aria-label="Primary">
             <Link
               href="#internships"
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
@@ -68,24 +71,90 @@ export default function HomePage() {
             </Link>
           </nav>
 
-          <div className="flex items-center gap-3">
-            {isAuthenticated ? (
-              <Button asChild>
-                <Link href={user?.role === "admin" ? "/admin" : "/dashboard"}>
-                  Go to Dashboard
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Link>
-              </Button>
-            ) : (
-              <>
-                <Button variant="ghost" asChild>
-                  <Link href="/login">Sign In</Link>
+          <div className="flex shrink-0 items-center gap-2">
+            <div className="hidden items-center gap-2 md:flex md:gap-3">
+              {isAuthenticated ? (
+                <Button asChild size="default">
+                  <Link href={user?.role === "admin" || user?.role === "hod" ? "/admin" : "/dashboard"}>
+                    Go to Dashboard
+                    <ArrowRight className="ml-2 h-4 w-4" />
+                  </Link>
                 </Button>
-                <Button asChild>
-                  <Link href="/register">Register</Link>
-                </Button>
-              </>
-            )}
+              ) : (
+                <>
+                  <Button variant="ghost" asChild>
+                    <Link href="/login">Sign In</Link>
+                  </Button>
+                  <Button asChild>
+                    <Link href="/register">Register</Link>
+                  </Button>
+                </>
+              )}
+            </div>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="md:hidden"
+              aria-label="Open menu"
+              onClick={() => setMobileNavOpen(true)}
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+            <Sheet open={mobileNavOpen} onOpenChange={setMobileNavOpen}>
+              <SheetContent side="right" className="flex w-[min(100vw,20rem)] flex-col gap-6 pt-10">
+                <nav className="flex flex-col gap-1" aria-label="Mobile">
+                  <Link
+                    href="#internships"
+                    className="rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                    onClick={() => setMobileNavOpen(false)}
+                  >
+                    Internships
+                  </Link>
+                  <Link
+                    href="#about"
+                    className="rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                    onClick={() => setMobileNavOpen(false)}
+                  >
+                    About
+                  </Link>
+                  <Link
+                    href="#notices"
+                    className="rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
+                    onClick={() => setMobileNavOpen(false)}
+                  >
+                    Notices
+                  </Link>
+                </nav>
+                <div className="mt-auto flex flex-col gap-2 border-t border-border pt-4">
+                  {isAuthenticated ? (
+                    <Button asChild className="w-full">
+                      <Link
+                        href={user?.role === "admin" || user?.role === "hod" ? "/admin" : "/dashboard"}
+                        onClick={() => setMobileNavOpen(false)}
+                      >
+                        Go to Dashboard
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                      </Link>
+                    </Button>
+                  ) : (
+                    <>
+                      <Button variant="outline" asChild className="w-full">
+                        <Link href="/login" onClick={() => setMobileNavOpen(false)}>
+                          Sign In
+                        </Link>
+                      </Button>
+                      <Button asChild className="w-full">
+                        <Link href="/register" onClick={() => setMobileNavOpen(false)}>
+                          Register
+                        </Link>
+                      </Button>
+                    </>
+                  )}
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </div>
       </header>

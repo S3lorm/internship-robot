@@ -278,7 +278,7 @@ export default function EvaluationsPage() {
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {selectedEvaluation.availableFrom && (
                   <div>
                     <h3 className="font-semibold mb-1 text-sm">Available From</h3>
