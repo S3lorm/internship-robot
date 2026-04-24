@@ -6,24 +6,16 @@ import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
 import {
   mockTrendingNews,
 } from "@/lib/mock-data";
-import {
-  dashboardApi,
-  API_BASE_URL,
-  lettersApi,
-} from "@/lib/api";
+import { dashboardApi, lettersApi } from "@/lib/api";
 import { toast } from "sonner";
 import type { Application, Internship, Notice, Notification, LetterRequest } from "@/types";
+import type { InternshipRequest } from "@/types/internship";
 import {
   FileText,
   Clock,
@@ -32,15 +24,14 @@ import {
   ArrowRight,
   Bell,
   Eye,
-  MapPin,
   Mail,
   Loader2,
   Newspaper,
   ExternalLink,
   Download,
   Printer,
-  FileDown,
-  FileCheck2
+  FileCheck2,
+  Building2,
 } from "lucide-react";
 
 const getStatusIcon = (status: string) => {
@@ -83,7 +74,43 @@ type ApplicationStats = {
   approved: number;
   rejected: number;
   companyLettersCount: number;
+  companyLettersEmailedCount?: number;
+  companyLettersApprovedCount?: number;
+  letterRequestsPendingCount?: number;
+  internshipRequestTotal?: number;
+  internshipRequestPending?: number;
 };
+
+function getInternshipFromApplication(application: Application): Internship | undefined {
+  return application.internship ?? application.Internship;
+}
+
+function getInternshipRequestCompany(ir: InternshipRequest): string {
+  return ir.companyName ?? ir.company_name ?? "Company";
+}
+
+function getInternshipRequestDate(ir: InternshipRequest): string {
+  const raw = ir.createdAt ?? ir.created_at;
+  return raw ? String(raw) : "";
+}
+
+function getInternshipRequestStatusBadge(status: string) {
+  const variants: Record<string, "default" | "secondary" | "destructive" | "outline"> = {
+    pending: "secondary",
+    approved: "default",
+    rejected: "destructive",
+  };
+  const labels: Record<string, string> = {
+    pending: "Pending",
+    approved: "Approved",
+    rejected: "Rejected",
+  };
+  return (
+    <Badge variant={variants[status] || "secondary"}>
+      {labels[status] || status}
+    </Badge>
+  );
+}
 
 export default function DashboardPage() {
   const { user } = useAuth();
@@ -91,6 +118,7 @@ export default function DashboardPage() {
   const [notices, setNotices] = useState<Notice[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [letterRequests, setLetterRequests] = useState<LetterRequest[]>([]);
+  const [internshipRequests, setInternshipRequests] = useState<InternshipRequest[]>([]);
   const [applicationStats, setApplicationStats] = useState<ApplicationStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -120,6 +148,9 @@ export default function DashboardPage() {
         setNotices(Array.isArray(data?.notices) ? data.notices : []);
         setNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
         setLetterRequests(Array.isArray(data?.letterRequests) ? data.letterRequests : []);
+        setInternshipRequests(
+          Array.isArray(data?.internshipRequests) ? data.internshipRequests : []
+        );
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         setError(err instanceof Error ? err.message : "Failed to load dashboard data");
@@ -141,7 +172,12 @@ export default function DashboardPage() {
         underReview: applicationStats.underReview,
         approved: applicationStats.approved,
         rejected: applicationStats.rejected,
-        lettersSentToCompany: applicationStats.companyLettersCount,
+        lettersEmailedToCompany:
+          applicationStats.companyLettersEmailedCount ?? applicationStats.companyLettersCount,
+        lettersCompanyApproved: applicationStats.companyLettersApprovedCount ?? 0,
+        letterRequestsPending: applicationStats.letterRequestsPendingCount ?? 0,
+        internshipRequestTotal: applicationStats.internshipRequestTotal ?? 0,
+        internshipRequestPending: applicationStats.internshipRequestPending ?? 0,
       };
     }
     return {
@@ -150,12 +186,42 @@ export default function DashboardPage() {
       underReview: applications.filter((a) => a.status === "under_review").length,
       approved: applications.filter((a) => a.status === "approved").length,
       rejected: applications.filter((a) => a.status === "rejected").length,
-      lettersSentToCompany: letterRequests.filter((lr) => lr.requestType === "company").length,
+      lettersEmailedToCompany: letterRequests.filter(
+        (lr) => lr.requestType === "company" && lr.emailSent
+      ).length,
+      lettersCompanyApproved: letterRequests.filter(
+        (lr) => lr.requestType === "company" && lr.status === "approved"
+      ).length,
+      letterRequestsPending: letterRequests.filter((lr) => lr.status === "pending").length,
+      internshipRequestTotal: internshipRequests.length,
+      internshipRequestPending: internshipRequests.filter((r) => r.status === "pending").length,
     };
-  }, [applicationStats, applications, letterRequests]);
+  }, [applicationStats, applications, letterRequests, internshipRequests]);
 
   const unreadNotifications = useMemo(() => notifications.filter((n) => !n.isRead), [notifications]);
-  const activeNotices = useMemo(() => notices.filter((n: any) => n.isActive && !n.isRead), [notices]);
+  const sortedNotifications = useMemo(
+    () =>
+      [...notifications].sort(
+        (a, b) =>
+          new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+      ),
+    [notifications]
+  );
+
+  const activeNotices = useMemo(() => {
+    const now = Date.now();
+    return notices.filter((n: Notice & { expiresAt?: string }) => {
+      if (!n.isActive) return false;
+      const exp =
+        (n as Notice & { expiresAt?: string }).expiresAt ||
+        (n as Notice & { expiryDate?: string }).expiryDate;
+      if (exp && new Date(exp).getTime() <= now) return false;
+      if (n.targetDepartment && user?.department && n.targetDepartment !== user.department) {
+        return false;
+      }
+      return true;
+    });
+  }, [notices, user?.department]);
 
 
   const handleDownloadLetter = async (id: string, ref?: string) => {
@@ -264,20 +330,21 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      {/* Stats — values from your account (API) */}
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Card>
           <CardContent className="flex items-center gap-4 p-6">
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-yellow-100">
               <Clock className="h-6 w-6 text-yellow-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               {loading ? (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               ) : (
                 <>
                   <p className="text-2xl font-bold">{stats.pending + stats.underReview}</p>
-                  <p className="text-sm text-muted-foreground">In Progress</p>
+                  <p className="text-sm text-muted-foreground">Applications in progress</p>
+                  <p className="text-xs text-muted-foreground/80">Pending + under review</p>
                 </>
               )}
             </div>
@@ -289,13 +356,14 @@ export default function DashboardPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
               <CheckCircle2 className="h-6 w-6 text-green-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               {loading ? (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               ) : (
                 <>
                   <p className="text-2xl font-bold">{stats.approved}</p>
-                  <p className="text-sm text-muted-foreground">Approved</p>
+                  <p className="text-sm text-muted-foreground">Applications approved</p>
+                  <p className="text-xs text-muted-foreground/80">Of {stats.total} submitted</p>
                 </>
               )}
             </div>
@@ -307,13 +375,37 @@ export default function DashboardPage() {
             <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-100">
               <Mail className="h-6 w-6 text-indigo-600" />
             </div>
-            <div>
+            <div className="min-w-0">
               {loading ? (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               ) : (
                 <>
-                  <p className="text-2xl font-bold">{stats.lettersSentToCompany}</p>
-                  <p className="text-sm text-muted-foreground">Letters Sent</p>
+                  <p className="text-2xl font-bold">{stats.lettersEmailedToCompany}</p>
+                  <p className="text-sm text-muted-foreground">Company letters emailed</p>
+                  <p className="text-xs text-muted-foreground/80">
+                    {stats.lettersCompanyApproved} approved (company type)
+                  </p>
+                </>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="flex items-center gap-4 p-6">
+            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-sky-100">
+              <Building2 className="h-6 w-6 text-sky-700" />
+            </div>
+            <div className="min-w-0">
+              {loading ? (
+                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+              ) : (
+                <>
+                  <p className="text-2xl font-bold">{stats.internshipRequestPending}</p>
+                  <p className="text-sm text-muted-foreground">Placement requests pending</p>
+                  <p className="text-xs text-muted-foreground/80">
+                    {stats.internshipRequestTotal} total requests
+                  </p>
                 </>
               )}
             </div>
@@ -365,16 +457,17 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
+        <div className="space-y-6">
         {/* Recent Applications */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Recent Applications</CardTitle>
-              <CardDescription>Your latest internship applications</CardDescription>
+              <CardTitle className="text-lg">Recent applications</CardTitle>
+              <CardDescription>Internship listings you applied to</CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/applications">View All</Link>
+              <Link href="/dashboard/applications">View all</Link>
             </Button>
           </CardHeader>
           <CardContent>
@@ -397,8 +490,11 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="space-y-4">
-                {applications.slice(0, 3).map((application) => {
-                  const internship = application.Internship;
+                {applications.slice(0, 5).map((application) => {
+                  const internship = getInternshipFromApplication(application);
+                  const applied =
+                    application.appliedAt ||
+                    (application as Application & { createdAt?: string }).createdAt;
                   return (
                     <div
                       key={application.id}
@@ -408,18 +504,20 @@ export default function DashboardPage() {
                         {getStatusIcon(application.status)}
                         <div>
                           <p className="font-medium">
-                            {internship?.title || "Unknown Internship"}
+                            {internship?.title || "Internship application"}
                           </p>
                           <p className="text-sm text-muted-foreground">
-                            {internship?.company || "Unknown Company"}
+                            {internship?.company || "—"}
                           </p>
                           <p className="mt-1 text-xs text-muted-foreground">
                             Applied{" "}
-                            {new Date(application.appliedAt || (application as any).createdAt).toLocaleDateString("en-GB", {
-                              day: "numeric",
-                              month: "short",
-                              year: "numeric",
-                            })}
+                            {applied
+                              ? new Date(applied).toLocaleDateString("en-GB", {
+                                  day: "numeric",
+                                  month: "short",
+                                  year: "numeric",
+                                })
+                              : "—"}
                           </p>
                         </div>
                       </div>
@@ -432,24 +530,88 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Notifications */}
+        {/* Recent internship placement requests (Supabase) */}
         <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Recent placement requests</CardTitle>
+              <CardDescription>Companies you asked to intern with (request form)</CardDescription>
+            </div>
+            <Button variant="ghost" size="sm" asChild>
+              <Link href="/dashboard/request">Submit request</Link>
+            </Button>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="py-8 text-center">
+                <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-muted-foreground" />
+                <p className="text-muted-foreground">Loading requests...</p>
+              </div>
+            ) : error ? (
+              <div className="py-8 text-center">
+                <p className="text-destructive">{error}</p>
+              </div>
+            ) : internshipRequests.length === 0 ? (
+              <div className="py-8 text-center">
+                <Building2 className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
+                <p className="text-muted-foreground">No placement requests yet</p>
+                <Button variant="link" asChild className="mt-2">
+                  <Link href="/dashboard/request">Submit a company request</Link>
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {internshipRequests.slice(0, 5).map((ir) => {
+                  const created = getInternshipRequestDate(ir);
+                  return (
+                    <div
+                      key={ir.id}
+                      className="flex items-start justify-between rounded-lg border border-border p-4"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{getInternshipRequestCompany(ir)}</p>
+                        <p className="text-sm text-muted-foreground line-clamp-2">
+                          {ir.purpose}
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {created
+                            ? new Date(created).toLocaleDateString("en-GB", {
+                                day: "numeric",
+                                month: "short",
+                                year: "numeric",
+                              })
+                            : "—"}
+                        </p>
+                      </div>
+                      <div className="ml-2 shrink-0">{getInternshipRequestStatusBadge(ir.status)}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        </div>
+
+        {/* Notifications overview — full list, scrollable */}
+        <Card className="lg:min-h-[320px]">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg flex items-center gap-2">
                 Notifications
-                {(unreadNotifications.length > 0 || activeNotices.length > 0) && (
-                  <Badge variant="secondary" className="h-5 px-1.5 text-xs bg-primary text-primary-foreground animate-pulse">
-                    {unreadNotifications.length + activeNotices.length} new
+                {unreadNotifications.length > 0 && (
+                  <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                    {unreadNotifications.length} unread
                   </Badge>
                 )}
               </CardTitle>
               <CardDescription>
-                {unreadNotifications.length + activeNotices.length} unread notification{(unreadNotifications.length + activeNotices.length) !== 1 ? "s" : ""}
+                {notifications.length} total
+                {activeNotices.length > 0 ? ` · ${activeNotices.length} active notice${activeNotices.length !== 1 ? "s" : ""}` : ""}
               </CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/notifications">View All</Link>
+              <Link href="/dashboard/notifications">Open inbox</Link>
             </Button>
           </CardHeader>
           <CardContent>
@@ -462,73 +624,73 @@ export default function DashboardPage() {
               <div className="py-8 text-center">
                 <p className="text-destructive">{error}</p>
               </div>
-            ) : unreadNotifications.length === 0 && activeNotices.length === 0 ? (
-              <div className="py-8 text-center">
-                <Bell className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
-                <p className="text-muted-foreground">No new notifications</p>
-                <Button variant="link" asChild className="mt-2">
-                  <Link href="/dashboard/notifications">View all notifications</Link>
-                </Button>
-              </div>
             ) : (
-              <div className="space-y-3">
-                {/* Important Notices as previews */}
-                {activeNotices.slice(0, 2).map((notice) => (
-                  <Link
-                    key={`notice-${notice.id}`}
-                    href="/dashboard/notifications"
-                    className="group block rounded-lg border border-amber-300/40 bg-amber-50/50 dark:bg-amber-900/10 p-3 transition-all hover:bg-amber-100/60 dark:hover:bg-amber-900/20 hover:shadow-sm"
-                  >
-                    <div className="flex items-start gap-2">
-                      <Bell className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-foreground group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors">
-                          {notice.title}
-                        </p>
-                        <p className="text-sm text-muted-foreground line-clamp-2">
-                          {notice.content}
-                        </p>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
+              <div className="space-y-4">
+                {activeNotices.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Notices
+                    </p>
+                    {activeNotices.map((notice) => (
+                      <Link
+                        key={`notice-${notice.id}`}
+                        href="/dashboard/notices"
+                        className="group block rounded-lg border border-amber-300/40 bg-amber-50/50 p-3 transition-colors hover:bg-amber-100/60 dark:bg-amber-900/10 dark:hover:bg-amber-900/20"
+                      >
+                        <p className="font-semibold text-sm">{notice.title}</p>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{notice.content}</p>
+                      </Link>
+                    ))}
+                    <Separator />
+                  </div>
+                )}
 
-                {/* Unread Notifications */}
-                {unreadNotifications.slice(0, 4).map((notification) => (
-                  <Link
-                    key={notification.id}
-                    href="/dashboard/notifications"
-                    className="group block rounded-lg border border-primary/20 bg-primary/5 p-3 transition-all hover:bg-primary/10 hover:shadow-sm"
-                  >
-                    <div className="flex items-start gap-2">
-                      <div className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary animate-pulse" />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-semibold text-sm text-foreground group-hover:text-primary transition-colors">
-                          {notification.title}
-                        </p>
-                        <p className="text-sm text-muted-foreground line-clamp-1">
-                          {notification.message}
-                        </p>
-                        <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                          <Clock className="h-3 w-3" />
-                          {new Date(notification.createdAt).toLocaleDateString("en-GB", {
-                            day: "numeric",
-                            month: "short",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })}
-                        </p>
-                      </div>
+                {sortedNotifications.length === 0 ? (
+                  <div className="py-6 text-center">
+                    <Bell className="mx-auto mb-3 h-10 w-10 text-muted-foreground/40" />
+                    <p className="text-muted-foreground">No notifications yet</p>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-[min(420px,55vh)] pr-3">
+                    <div className="space-y-2">
+                      {sortedNotifications.map((notification) => {
+                        const href = notification.link || "/dashboard/notifications";
+                        return (
+                          <Link
+                            key={notification.id}
+                            href={href}
+                            className={`block rounded-lg border p-3 transition-colors hover:bg-muted/50 ${
+                              notification.isRead
+                                ? "border-border bg-muted/20"
+                                : "border-primary/25 bg-primary/5"
+                            }`}
+                          >
+                            <div className="flex items-start gap-2">
+                              {!notification.isRead && (
+                                <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-primary" />
+                              )}
+                              <div className="min-w-0 flex-1">
+                                <p className="font-medium text-sm">{notification.title}</p>
+                                <p className="text-sm text-muted-foreground line-clamp-2">
+                                  {notification.message}
+                                </p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {new Date(notification.createdAt).toLocaleString("en-GB", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })}
+                                  {notification.isRead ? " · Read" : ""}
+                                </p>
+                              </div>
+                            </div>
+                          </Link>
+                        );
+                      })}
                     </div>
-                  </Link>
-                ))}
-                {unreadNotifications.length > 4 && (
-                  <Button variant="ghost" size="sm" className="w-full text-primary" asChild>
-                    <Link href="/dashboard/notifications">
-                      +{unreadNotifications.length - 4} more notifications
-                      <ArrowRight className="ml-2 h-4 w-4" />
-                    </Link>
-                  </Button>
+                  </ScrollArea>
                 )}
               </div>
             )}

@@ -1,8 +1,7 @@
 "use client";
 
-import React from "react"
-
-import { useState } from "react";
+import React from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -22,12 +21,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { departments, programs } from "@/lib/mock-data";
 import { authApi } from "@/lib/api";
+import type { User } from "@/types";
 import {
   User,
   Mail,
@@ -41,14 +41,14 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
-  Camera,
+  KeyRound,
+  Lock,
 } from "lucide-react";
 
 export default function ProfilePage() {
   const { user, updateUser } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
-  const [isUploadingAvatar, setIsUploadingAvatar] = useState(false);
-  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const [isPasswordLoading, setIsPasswordLoading] = useState(false);
   const [formData, setFormData] = useState({
     firstName: user?.firstName || "",
     lastName: user?.lastName || "",
@@ -57,6 +57,23 @@ export default function ProfilePage() {
     program: user?.program || "",
     yearOfStudy: user?.yearOfStudy || 1,
   });
+  const [passwordFields, setPasswordFields] = useState({
+    current: "",
+    next: "",
+    confirm: "",
+  });
+
+  useEffect(() => {
+    if (!user) return;
+    setFormData({
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
+      phone: user.phone || "",
+      department: user.department || "",
+      program: user.program || "",
+      yearOfStudy: user.yearOfStudy || 1,
+    });
+  }, [user]);
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>
@@ -77,13 +94,60 @@ export default function ProfilePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    try {
+      const result = await authApi.updateProfile({
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        phone: formData.phone || undefined,
+        department: formData.department,
+        program: formData.program,
+        yearOfStudy: formData.yearOfStudy,
+      });
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      const nextUser = (result.data as { user?: User })?.user;
+      if (nextUser) {
+        updateUser(nextUser);
+      } else {
+        updateUser(formData);
+      }
+      toast.success("Profile updated successfully.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Update failed");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-
-    updateUser(formData);
-    setIsLoading(false);
-    toast.success("Profile updated successfully!");
+  const handlePasswordSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordFields.next !== passwordFields.confirm) {
+      toast.error("New password and confirmation do not match.");
+      return;
+    }
+    if (passwordFields.next.length < 8) {
+      toast.error("New password must be at least 8 characters.");
+      return;
+    }
+    setIsPasswordLoading(true);
+    try {
+      const result = await authApi.changePassword(
+        passwordFields.current,
+        passwordFields.next
+      );
+      if (result.error) {
+        toast.error(result.error);
+        return;
+      }
+      setPasswordFields({ current: "", next: "", confirm: "" });
+      toast.success("Password updated successfully.");
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not update password");
+    } finally {
+      setIsPasswordLoading(false);
+    }
   };
 
   if (!user) return null;
@@ -109,143 +173,22 @@ export default function ProfilePage() {
           {/* Profile Card */}
           <Card>
             <CardContent className="flex flex-col items-center gap-6 p-6 sm:flex-row">
-              <div className="relative">
-                <div className="relative">
-                  <Avatar className="h-32 w-32 border-4 border-background shadow-lg">
-                    {isUploadingAvatar ? (
-                      <div className="flex h-full w-full items-center justify-center bg-muted">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                      </div>
-                    ) : (
-                      <>
-                        <AvatarImage
-                          src={
-                            avatarPreview
-                              ? avatarPreview
-                              : user.avatar
-                                ? user.avatar.startsWith('http') || user.avatar.startsWith('/uploads')
-                                  ? user.avatar.startsWith('http')
-                                    ? user.avatar
-                                    : `${typeof window !== 'undefined' ? window.location.origin : ''}${user.avatar}`
-                                  : user.avatar
-                                : "/placeholder.svg"
-                          }
-                          alt={`${user.firstName} ${user.lastName}`}
-                          className="object-cover"
-                        />
-                        <AvatarFallback className="bg-primary/10 text-3xl font-semibold text-primary">
-                          {user.firstName?.[0] || ""}
-                          {user.lastName?.[0] || ""}
-                        </AvatarFallback>
-                      </>
-                    )}
-                  </Avatar>
-                  <label
-                    className={`absolute bottom-0 right-0 flex h-10 w-10 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-lg transition-all hover:scale-110 hover:bg-primary/90 cursor-pointer ${isUploadingAvatar ? "opacity-50 cursor-not-allowed" : ""
-                      }`}
-                    aria-label="Change profile picture"
-                  >
-                    {isUploadingAvatar ? (
-                      <Loader2 className="h-5 w-5 animate-spin" />
-                    ) : (
-                      <Camera className="h-5 w-5" />
-                    )}
-                    <input
-                      type="file"
-                      accept="image/jpeg,image/png,image/webp,image/jpg"
-                      className="hidden"
-                      onChange={async (e) => {
-                        const file = e.target.files?.[0];
-                        if (!file) return;
-
-                        // Validate file size (max 5MB)
-                        if (file.size > 5 * 1024 * 1024) {
-                          toast.error("Image size must be less than 5MB");
-                          return;
-                        }
-
-                        // Validate file type
-                        const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/jpg'];
-                        if (!allowedTypes.includes(file.type)) {
-                          toast.error("Please select a JPG, PNG, or WEBP image file");
-                          return;
-                        }
-
-                        // Show preview immediately
-                        const reader = new FileReader();
-                        reader.onloadend = () => {
-                          setAvatarPreview(reader.result as string);
-                        };
-                        reader.readAsDataURL(file);
-
-                        setIsUploadingAvatar(true);
-                        try {
-                          const result = await authApi.uploadAvatar(file);
-
-                          if (result.error) {
-                            toast.error(result.error);
-                            setAvatarPreview(null); // Clear preview on error
-                          } else {
-                            toast.success("Profile photo updated successfully!");
-                            // Update user with new avatar URL
-                            const resData = (result as any).data;
-                            if (resData?.user) {
-                              updateUser(resData.user);
-                            } else if (resData?.avatarUrl) {
-                              updateUser({ ...user, avatar: resData.avatarUrl });
-                            } else if (resData?.avatar) {
-                              updateUser({ ...user, avatar: resData.avatar });
-                            }
-                            // Clear preview after successful upload - the actual image will load
-                            setTimeout(() => setAvatarPreview(null), 500);
-                          }
-                        } catch (error: any) {
-                          toast.error(error.message || "Failed to upload photo");
-                          setAvatarPreview(null);
-                        } finally {
-                          setIsUploadingAvatar(false);
-                        }
-                      }}
-                      disabled={isUploadingAvatar}
-                    />
-                  </label>
-                </div>
-                {user.avatar && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 text-xs text-muted-foreground hover:text-destructive"
-                    onClick={async () => {
-                      if (!confirm("Are you sure you want to remove your profile photo?")) {
-                        return;
-                      }
-                      try {
-                        const result = await authApi.removeAvatar();
-                        if (result.error) {
-                          toast.error(result.error);
-                        } else {
-                          toast.success("Profile photo removed");
-                          if (result.data?.user) {
-                            updateUser((result as any).data.user);
-                          } else {
-                            updateUser({ ...user, avatar: undefined });
-                          }
-                          setAvatarPreview(null);
-                        }
-                      } catch (error: any) {
-                        toast.error(error.message || "Failed to remove photo");
-                      }
-                    }}
-                  >
-                    Remove Photo
-                  </Button>
-                )}
+              <div className="relative shrink-0">
+                <Avatar className="h-28 w-28 border-2 border-border shadow-md">
+                  <AvatarFallback className="bg-primary/10 text-3xl font-semibold text-primary">
+                    {user.firstName?.[0] || ""}
+                    {user.lastName?.[0] || ""}
+                  </AvatarFallback>
+                </Avatar>
               </div>
               <div className="text-center sm:text-left">
                 <h2 className="text-xl font-semibold">
                   {user.firstName} {user.lastName}
                 </h2>
                 <p className="text-muted-foreground">{user.email}</p>
+                <p className="mt-2 text-xs text-muted-foreground max-w-md">
+                  Profile photos are not used on this portal. Your initials are shown instead.
+                </p>
                 <div className="mt-2 flex flex-wrap justify-center gap-2 sm:justify-start">
                   <Badge variant="secondary" className="gap-1">
                     <GraduationCap className="h-3 w-3" />
@@ -473,60 +416,120 @@ export default function ProfilePage() {
 
         {/* Security */}
         <TabsContent value="security" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Change Password</CardTitle>
-              <CardDescription>
-                Update your password to keep your account secure
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="currentPassword">Current Password</Label>
-                  <div className="relative">
-                    <Shield className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="currentPassword"
-                      type="password"
-                      placeholder="Enter current password"
-                      className="pl-10"
-                    />
-                  </div>
+          <div className="grid gap-6 lg:grid-cols-5">
+            <Card className="border-border/80 bg-muted/20 lg:col-span-2">
+              <CardHeader className="space-y-1">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <Shield className="h-5 w-5" aria-hidden />
                 </div>
+                <CardTitle className="text-lg">Account security</CardTitle>
+                <CardDescription className="text-sm leading-relaxed">
+                  Use a strong password you do not reuse on other sites. After a successful change, keep using your email and the new password to sign in.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-sm text-muted-foreground">
+                <div className="flex gap-2 rounded-lg border border-border/60 bg-background/80 p-3">
+                  <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  <span>Minimum 8 characters for your new password.</span>
+                </div>
+                <div className="flex gap-2 rounded-lg border border-border/60 bg-background/80 p-3">
+                  <Lock className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                  <span>If you forgot your password, use the login page &quot;Forgot password&quot; flow instead.</span>
+                </div>
+              </CardContent>
+            </Card>
 
-                <div className="space-y-2">
-                  <Label htmlFor="newPassword">New Password</Label>
-                  <div className="relative">
-                    <Shield className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="newPassword"
-                      type="password"
-                      placeholder="Enter new password"
-                      className="pl-10"
-                    />
+            <Card className="lg:col-span-3">
+              <CardHeader>
+                <CardTitle className="text-lg">Change password</CardTitle>
+                <CardDescription>Enter your current password once, then your new password twice.</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handlePasswordSubmit} className="space-y-5">
+                  <div className="space-y-2">
+                    <Label htmlFor="currentPassword">Current password</Label>
+                    <div className="relative">
+                      <Shield className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                      <Input
+                        id="currentPassword"
+                        type="password"
+                        autoComplete="current-password"
+                        placeholder="Current password"
+                        className="pl-10"
+                        value={passwordFields.current}
+                        onChange={(e) =>
+                          setPasswordFields((p) => ({ ...p, current: e.target.value }))
+                        }
+                      />
+                    </div>
                   </div>
-                </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="confirmNewPassword">Confirm New Password</Label>
-                  <div className="relative">
-                    <Shield className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="confirmNewPassword"
-                      type="password"
-                      placeholder="Confirm new password"
-                      className="pl-10"
-                    />
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="newPassword">New password</Label>
+                      <div className="relative">
+                        <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          id="newPassword"
+                          type="password"
+                          autoComplete="new-password"
+                          placeholder="At least 8 characters"
+                          className="pl-10"
+                          value={passwordFields.next}
+                          onChange={(e) =>
+                            setPasswordFields((p) => ({ ...p, next: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2 sm:col-span-2">
+                      <Label htmlFor="confirmNewPassword">Confirm new password</Label>
+                      <div className="relative">
+                        <Lock className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <Input
+                          id="confirmNewPassword"
+                          type="password"
+                          autoComplete="new-password"
+                          placeholder="Re-enter new password"
+                          className="pl-10"
+                          value={passwordFields.confirm}
+                          onChange={(e) =>
+                            setPasswordFields((p) => ({ ...p, confirm: e.target.value }))
+                          }
+                        />
+                      </div>
+                    </div>
                   </div>
-                </div>
 
-                <div className="flex justify-end">
-                  <Button type="submit">Update Password</Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
+                  <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() =>
+                        setPasswordFields({ current: "", next: "", confirm: "" })
+                      }
+                      disabled={isPasswordLoading}
+                    >
+                      Clear
+                    </Button>
+                    <Button type="submit" disabled={isPasswordLoading}>
+                      {isPasswordLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Updating…
+                        </>
+                      ) : (
+                        <>
+                          <KeyRound className="mr-2 h-4 w-4" />
+                          Update password
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
       </Tabs>
     </div>

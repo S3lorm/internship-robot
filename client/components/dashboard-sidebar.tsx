@@ -20,6 +20,7 @@ import {
   Anchor,
   Settings,
   ClipboardCheck,
+  Building2,
 } from "lucide-react";
 
 type NavItem = { name: string; href: string; icon: React.ComponentType<{ className?: string }> };
@@ -32,6 +33,7 @@ const workspaceItems: NavItem[] = [
   { name: "Internships", href: "/dashboard/internships", icon: Briefcase },
   { name: "Evaluations", href: "/dashboard/evaluations", icon: ClipboardCheck },
   { name: "Letter Requests", href: "/dashboard/letter-requests", icon: FileText },
+  { name: "Placement request", href: "/dashboard/request", icon: Building2 },
 ];
 
 const accountItems: NavItem[] = [
