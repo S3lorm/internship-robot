@@ -19,7 +19,6 @@ import {
   Clock,
   MapPin,
   Calendar,
-  ChevronRight,
   Bell,
 } from "lucide-react";
 
@@ -28,6 +27,7 @@ export default function HomePage() {
 
   const featuredInternships = mockInternships.slice(0, 3);
   const latestNotices = mockNotices.filter((n) => n.isActive).slice(0, 2);
+  const companyImages = ["/placeholder.jpg", "/assets/rmu-campus.jpg", "/placeholder.jpg"];
 
   return (
     <div className="min-h-screen bg-background">
@@ -125,7 +125,7 @@ export default function HomePage() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="mb-6 text-balance text-4xl font-bold tracking-tight text-white md:text-5xl lg:text-6xl drop-shadow-lg"
             >
-              Launch Your Maritime Career with the Right Internship
+              Internship Letters, HOD Approval, and Placement Tracking in One Portal
             </motion.h1>
             <motion.p
               initial={{ opacity: 0, y: 20 }}
@@ -133,9 +133,9 @@ export default function HomePage() {
               transition={{ duration: 0.5, delay: 0.4 }}
               className="mb-8 text-pretty text-lg text-white/80 md:text-xl drop-shadow"
             >
-              Discover internship opportunities from leading maritime companies.
-              Apply, track your progress, and take the first step towards your
-              professional journey.
+              From requesting your internship introduction letter to receiving HOD
+              approval and confirming your official company placement, the RMU
+              Internship Portal makes every step clear, fast, and trackable.
             </motion.p>
             <motion.div
               initial={{ opacity: 0, y: 20 }}
@@ -155,7 +155,7 @@ export default function HomePage() {
                 asChild
                 className="w-full sm:w-auto bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20 hover:text-white"
               >
-                <Link href="#internships">Browse Internships</Link>
+                <Link href="#internships">View Partner Companies</Link>
               </Button>
             </motion.div>
           </div>
@@ -253,11 +253,11 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="mb-10 text-center">
             <h2 className="mb-3 text-3xl font-bold text-foreground">
-              Featured Opportunities
+              Partner Companies & Internship Opportunities
             </h2>
             <p className="mx-auto max-w-2xl text-muted-foreground">
-              Explore our latest internship openings from top maritime companies
-              and organizations.
+              Browse companies where RMU students can intern and prepare your
+              letter request and placement details in advance.
             </p>
           </div>
 
@@ -275,6 +275,18 @@ export default function HomePage() {
                 className="group transition-all hover:shadow-lg h-full"
               >
                 <CardContent className="p-6">
+                  <div className="relative mb-4 h-36 overflow-hidden rounded-lg border border-border/60">
+                    <Image
+                      src={companyImages[i % companyImages.length]}
+                      alt={`${internship.company} office`}
+                      fill
+                      className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10" />
+                    <p className="absolute bottom-2 left-3 text-xs font-medium text-white/90">
+                      {internship.company}
+                    </p>
+                  </div>
                   <div className="mb-4 flex items-start justify-between">
                     <Badge variant="secondary">{internship.category}</Badge>
                     {internship.isRemote && (
@@ -309,12 +321,9 @@ export default function HomePage() {
                       </span>{" "}
                       slots remaining
                     </div>
-                    <Button variant="ghost" size="sm" asChild className="group">
-                      <Link href={isAuthenticated ? `/dashboard/internships/${internship.id}` : "/login"}>
-                        Apply
-                        <ChevronRight className="ml-1 h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                      </Link>
-                    </Button>
+                    <span className="text-xs font-medium text-primary/90">
+                      {isAuthenticated ? "Track via dashboard" : "Sign in to continue"}
+                    </span>
                   </div>
                 </CardContent>
               </Card>
@@ -353,27 +362,27 @@ export default function HomePage() {
               transition={{ duration: 0.5, delay: 0.2 }}
               className="mb-8 text-muted-foreground"
             >
-              The RMU Internship Portal is designed to streamline the internship
-              application process for students at Regional Maritime University.
-              Our platform connects students with leading maritime companies,
-              providing valuable opportunities for professional development.
+              The RMU Internship Portal supports the full internship workflow for
+              students: discover partner companies, request internship letters, get
+              HOD decisions, and complete official placement confirmation for your
+              chosen organization.
             </motion.p>
             <div className="grid gap-6 md:grid-cols-3">
               {[
                 {
-                  title: "Easy Application",
+                  title: "Request Letter Easily",
                   description:
-                    "Submit applications with your CV and cover letter in just a few clicks.",
+                    "Students submit internship letter requests online and track status updates from their dashboard.",
                 },
                 {
-                  title: "Track Progress",
+                  title: "HOD Review Workflow",
                   description:
-                    "Monitor the status of all your applications in one convenient dashboard.",
+                    "HODs can review, approve, or reject requests with clear notes and notifications.",
                 },
                 {
-                  title: "Stay Informed",
+                  title: "Official Placement Support",
                   description:
-                    "Receive notifications about new opportunities and application updates.",
+                    "After letter approval, students submit official placement details and the system handles follow-up communication.",
                 },
               ].map((feature, i) => (
                 <motion.div
