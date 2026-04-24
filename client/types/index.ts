@@ -48,6 +48,8 @@ export interface Internship {
   applicationsCount: number;
   status: InternshipStatus;
   category: string;
+  /** Hero image on cards (path under /public or absolute URL). */
+  coverImage?: string;
   type?: string;
   isRemote: boolean;
   createdAt: string;

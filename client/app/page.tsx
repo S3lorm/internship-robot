@@ -27,7 +27,6 @@ export default function HomePage() {
 
   const featuredInternships = mockInternships.slice(0, 3);
   const latestNotices = mockNotices.filter((n) => n.isActive).slice(0, 2);
-  const companyImages = ["/placeholder.jpg", "/assets/rmu-campus.jpg", "/placeholder.jpg"];
 
   return (
     <div className="min-h-screen bg-background">
@@ -277,8 +276,8 @@ export default function HomePage() {
                 <CardContent className="p-6">
                   <div className="relative mb-4 h-36 overflow-hidden rounded-lg border border-border/60">
                     <Image
-                      src={companyImages[i % companyImages.length]}
-                      alt={`${internship.company} office`}
+                      src={internship.coverImage ?? "/placeholder.jpg"}
+                      alt={`${internship.company} — internship opportunity`}
                       fill
                       className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
                     />
