@@ -10,6 +10,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
 import { mockInternships, mockNotices } from "@/lib/mock-data";
+import { useIsMobile } from "@/hooks/use-mobile";
 import {
   Ship,
   GraduationCap,
@@ -27,6 +28,7 @@ import {
 export default function HomePage() {
   const { isAuthenticated, user } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const featuredInternships = mockInternships.slice(0, 3);
   const latestNotices = mockNotices.filter((n) => n.isActive).slice(0, 2);
@@ -317,7 +319,7 @@ export default function HomePage() {
       )}
 
       {/* Featured Internships */}
-      <section id="internships" className="py-16 md:py-20">
+      <section id="internships" className="overflow-x-hidden py-16 md:py-20">
         <div className="container mx-auto px-4">
           <div className="mb-10 text-center">
             <h2 className="mb-3 text-3xl font-bold text-foreground">
@@ -333,10 +335,22 @@ export default function HomePage() {
             {featuredInternships.map((internship, i) => (
               <motion.div
                 key={internship.id}
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                transition={{ duration: 0.5, delay: i * 0.15 }}
+                initial={
+                  isMobile
+                    ? { opacity: 0, x: 72 }
+                    : { opacity: 0, scale: 0.95 }
+                }
+                whileInView={
+                  isMobile
+                    ? { opacity: 1, x: 0 }
+                    : { opacity: 1, scale: 1 }
+                }
+                viewport={{ once: true, margin: "-40px" }}
+                transition={{
+                  duration: isMobile ? 0.5 : 0.5,
+                  delay: i * 0.15,
+                  ease: isMobile ? [0.22, 1, 0.36, 1] : [0.4, 0, 0.2, 1],
+                }}
                 className="h-full"
               >
               <Card
