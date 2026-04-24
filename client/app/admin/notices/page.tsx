@@ -174,9 +174,18 @@ export default function NoticesManagementPage() {
   const fetchNotices = async () => {
     try {
       setIsLoading(true)
-      const res = await noticesApi.getAll()
-      const fetchedNotices = (res as any).data?.data || (res as any).data?.notices || (res as any).notices || []
-      setNotices(fetchedNotices)
+      const res = await noticesApi.getAll({ manage: "1", limit: "500" })
+      if (res.error) {
+        toast.error(res.error)
+        setNotices([])
+        return
+      }
+      const fetchedNotices =
+        (res.data as { data?: Notice[] })?.data ||
+        (res.data as { notices?: Notice[] })?.notices ||
+        (Array.isArray(res.data) ? res.data : []) ||
+        []
+      setNotices(Array.isArray(fetchedNotices) ? fetchedNotices : [])
     } catch (error) {
       toast.error("Failed to load notices")
       console.error(error)
@@ -195,7 +204,11 @@ export default function NoticesManagementPage() {
         ...formData,
         expiresAt: formData.expiresAt || undefined,
       }
-      await noticesApi.create(newNoticePayload)
+      const result = await noticesApi.create(newNoticePayload)
+      if (result.error) {
+        toast.error(result.error)
+        return
+      }
       setCreateDialog(false)
       setFormData(emptyNotice)
       toast.success("Notice created successfully")
@@ -212,7 +225,11 @@ export default function NoticesManagementPage() {
           ...formData,
           expiresAt: formData.expiresAt || undefined,
         }
-        await noticesApi.update(editDialog.notice.id, payload)
+        const result = await noticesApi.update(editDialog.notice.id, payload)
+        if (result.error) {
+          toast.error(result.error)
+          return
+        }
         setEditDialog({ open: false, notice: null })
         setFormData(emptyNotice)
         toast.success("Notice updated successfully")
@@ -226,7 +243,11 @@ export default function NoticesManagementPage() {
   const handleDelete = async () => {
     if (deleteDialog.notice) {
       try {
-        await noticesApi.delete(deleteDialog.notice.id)
+        const result = await noticesApi.delete(deleteDialog.notice.id)
+        if (result.error) {
+          toast.error(result.error)
+          return
+        }
         setDeleteDialog({ open: false, notice: null })
         toast.success("Notice deleted successfully")
         fetchNotices()
@@ -238,28 +259,19 @@ export default function NoticesManagementPage() {
 
   const handleToggleActive = async (noticeId: string, currentStatus: boolean) => {
     try {
-      // Optimistic upate
       setNotices((prev) =>
         prev.map((n) => (n.id === noticeId ? { ...n, isActive: !currentStatus } : n))
       )
 
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api'}/notices/${noticeId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${localStorage.getItem('rmu_token')}`,
-        },
-        body: JSON.stringify({ isActive: !currentStatus })
-      })
-
-      if (!response.ok) {
-        throw new Error("Failed");
+      const result = await noticesApi.update(noticeId, { isActive: !currentStatus })
+      if (result.error) {
+        throw new Error(result.error)
       }
 
       toast.success("Notice status updated")
-    } catch (e: any) {
+    } catch {
       toast.error("Failed to update notice status")
-      fetchNotices() // revert
+      fetchNotices()
     }
   }
 
@@ -377,7 +389,7 @@ export default function NoticesManagementPage() {
               </div>
               <div>
                 <p className="text-2xl font-bold text-foreground">
-                  {(notices.filter((n) => (n.priority as any) === "urgent" && n.isActive) || []).length}
+                  {notices.filter((n) => n.priority === "urgent" && n.isActive).length}
                 </p>
                 <p className="text-sm text-muted-foreground">Urgent</p>
               </div>

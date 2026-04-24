@@ -58,7 +58,10 @@ export default function AdminNotificationsPage() {
   const load = async () => {
     setLoading(true);
     try {
-      const res = await noticesApi.getAll({ isActive: "true" });
+      const res =
+        user?.role === "admin"
+          ? await noticesApi.getAll({ manage: "1", limit: "120" })
+          : await noticesApi.getAll();
       const rows = Array.isArray(res.data?.data)
         ? res.data.data
         : Array.isArray(res.data)
@@ -165,14 +168,13 @@ export default function AdminNotificationsPage() {
     return (
       <div className="space-y-6">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Notifications & monitoring</h1>
+          <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
           <p className="text-muted-foreground mt-1">
-            System administrators manage broadcast notices from{" "}
+            Your in-app messages. Broadcast notices are created under{" "}
             <Link href="/admin/notices" className="text-primary underline">
               Notices
             </Link>
-            . Optional <span className="font-medium">target department</span> can be set there when
-            creating a notice to reach one department only.
+            .
           </p>
         </div>
 
@@ -182,7 +184,7 @@ export default function AdminNotificationsPage() {
               <Bell className="h-5 w-5" />
               Your in-app inbox
             </CardTitle>
-            <CardDescription>Recent items from the notifications service (system scope).</CardDescription>
+            <CardDescription>Recent items from the notifications service.</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (

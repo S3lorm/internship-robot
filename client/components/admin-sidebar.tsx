@@ -36,7 +36,6 @@ const hodNavItems: NavItem[] = [
 const systemAdminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "User Management", icon: Users },
-  { href: "/admin/letter-requests", label: "Letter requests", icon: FileCheck },
   { href: "/admin/official-placement-management", label: "Official placement management", icon: MapPinned },
   { href: "/admin/notices", label: "Notices", icon: Bell },
 ];
@@ -65,10 +64,10 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
         </div>
         <div className="flex flex-col min-w-0">
           <span className="text-sm font-bold leading-none text-sidebar-foreground truncate">
-            {isHod ? "HOD Portal" : "System Admin"}
+            {isHod ? "HOD Portal" : "Admin"}
           </span>
           <span className="text-xs leading-none text-sidebar-foreground/70 mt-0.5 truncate">
-            {isHod ? "Department tools" : "Full monitoring"}
+            {isHod ? "Department tools" : "Institution"}
           </span>
         </div>
       </div>
@@ -76,7 +75,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto p-4">
         {!isHod && (
           <p className="px-3 pb-2 text-[11px] font-semibold uppercase tracking-wider text-sidebar-foreground/50">
-            Administration
+            Menu
           </p>
         )}
         {isHod && (
@@ -132,7 +131,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
               {user?.firstName} {user?.lastName}
             </p>
             <Badge variant="outline" className="mt-1 text-xs">
-              {isHod ? "Head of Department" : "System Administrator"}
+              {isHod ? "Head of Department" : "Administrator"}
             </Badge>
           </div>
         </div>

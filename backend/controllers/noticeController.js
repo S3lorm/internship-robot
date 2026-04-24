@@ -1,4 +1,4 @@
-const { Notice, User, Op } = require('../models');
+const { Notice, User } = require('../models');
 const { createNotification } = require('../services/notificationService');
 
 function parsePagination(req) {
@@ -8,28 +8,71 @@ function parsePagination(req) {
   return { page, limit, offset };
 }
 
+/**
+ * When an admin publishes a notice, departmental HODs get an in-app notification
+ * (same notifications inbox as students, on their admin/HOD routes).
+ */
+async function notifyHodsForNewNotice(notice, excludeUserId = null) {
+  const audiences = notice.targetAudience || 'students';
+  if (audiences === 'admins' && !notice.targetDepartment) {
+    return;
+  }
+
+  const where = { role: 'hod' };
+  if (notice.targetDepartment) {
+    where.department = notice.targetDepartment;
+  }
+
+  const hods = await User.findAll({ where });
+  const link = '/admin/notifications';
+  const message = `New notice: ${notice.title}`;
+
+  for (const hod of hods) {
+    if (!hod.id || (excludeUserId && hod.id === excludeUserId)) continue;
+    await createNotification({
+      userId: hod.id,
+      type: 'notice',
+      title: 'New announcement',
+      message,
+      relatedId: notice.id,
+      link,
+    });
+  }
+}
+
 async function list(req, res) {
   const { page, limit, offset } = parsePagination(req);
-  const where = { isActive: true };
   const audience = req.query.audience;
-  if (audience) where.targetAudience = audience;
+  const manage = req.query.manage === '1' && req.user && req.user.role === 'admin';
 
-  // Students shouldn't see admin-only; admins shouldn't see students-only if they filter; default is 'all'
-  if (!audience && req.user && req.user.role === 'student') {
-    where.targetAudience = { in: ['all', 'students'] };
+  const where = {};
+  if (!manage) {
+    where.isActive = true;
   }
-  if (!audience && req.user && req.user.role === 'admin') {
-    where.targetAudience = { in: ['all', 'admins'] };
+  if (audience) {
+    where.targetAudience = audience;
   }
-  if (req.user && req.user.role === 'hod') {
-    where.targetDepartment = req.user.department;
+
+  if (!manage) {
+    if (!audience && req.user && req.user.role === 'student') {
+      where.targetAudience = { in: ['all', 'students'] };
+    }
+    if (!audience && req.user && req.user.role === 'admin') {
+      where.targetAudience = { in: ['all', 'admins'] };
+    }
+    if (req.user && req.user.role === 'hod') {
+      where.targetDepartment = req.user.department;
+    }
   }
+
+  const effectiveLimit = manage ? Math.min(500, Math.max(Number(req.query.limit) || 200, 50)) : limit;
+  const effectiveOffset = manage ? 0 : offset;
 
   const { rows, count } = await Notice.findAndCountAll({
     where,
     include: [{ model: User, as: 'creator', attributes: ['id', 'firstName', 'lastName', 'email'] }],
-    limit,
-    offset,
+    limit: effectiveLimit,
+    offset: effectiveOffset,
     order: [['created_at', 'DESC']],
   });
 
@@ -113,6 +156,15 @@ async function create(req, res) {
       message: `You created notice: ${notice.title}`,
       relatedId: notice.id,
     });
+  }
+
+  if (notice.isActive) {
+    try {
+      const skipId = req.user.role === 'hod' ? req.user.id : null;
+      await notifyHodsForNewNotice(notice, skipId);
+    } catch (err) {
+      console.error('notifyHodsForNewNotice:', err);
+    }
   }
 
   return res.status(201).json({ message: 'Notice created', notice });

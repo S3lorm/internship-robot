@@ -36,17 +36,6 @@ function letterStudentPrefix(r: LetterRequest): string {
   return m ? m[1] : "Other";
 }
 
-function departmentKey(studentDepartment: string | undefined | null) {
-  const t = studentDepartment?.trim();
-  return t && t.length > 0 ? t : "Unassigned";
-}
-
-function sortDepartmentKeys(keys: string[]) {
-  const rest = keys.filter((k) => k !== "Unassigned").sort((a, b) => a.localeCompare(b));
-  if (keys.includes("Unassigned")) rest.push("Unassigned");
-  return rest;
-}
-
 function placementStatusBadgeClass(status: string | undefined) {
   const s = String(status ?? "")
     .toLowerCase()
@@ -68,9 +57,6 @@ export default function AdminDashboard() {
   const [hodLoading, setHodLoading] = useState(false);
   const [letterRequests, setLetterRequests] = useState<LetterRequest[]>([]);
   const [placementRows, setPlacementRows] = useState<any[]>([]);
-
-  const [adminLoading, setAdminLoading] = useState(false);
-  const [adminLetterRequests, setAdminLetterRequests] = useState<LetterRequest[]>([]);
 
   useEffect(() => {
     if (user?.role !== "hod" || !user.department) return;
@@ -97,40 +83,6 @@ export default function AdminDashboard() {
 
     void loadHod();
   }, [user?.role, user?.department]);
-
-  useEffect(() => {
-    if (user?.role !== "admin") return;
-
-    async function loadAdmin() {
-      setAdminLoading(true);
-      try {
-        const lrRes = await lettersApi.getRequests();
-        const reqs = (lrRes as any).data?.requests || (lrRes as any).requests || [];
-        setAdminLetterRequests(Array.isArray(reqs) ? reqs : []);
-      } catch {
-        toast.error("Failed to load letter requests by department");
-      } finally {
-        setAdminLoading(false);
-      }
-    }
-
-    void loadAdmin();
-  }, [user?.role]);
-
-  const lettersByDepartment = useMemo(() => {
-    const map = new Map<string, LetterRequest[]>();
-    for (const r of adminLetterRequests) {
-      const d = departmentKey(r.student?.department);
-      if (!map.has(d)) map.set(d, []);
-      map.get(d)!.push(r);
-    }
-    return map;
-  }, [adminLetterRequests]);
-
-  const adminDepartmentKeysOrdered = useMemo(
-    () => sortDepartmentKeys(Array.from(lettersByDepartment.keys())),
-    [lettersByDepartment]
-  );
 
   const hodPlacementsSorted = useMemo(() => {
     return [...placementRows].sort(
@@ -500,112 +452,12 @@ export default function AdminDashboard() {
 
   return (
     <div className="space-y-6">
-      <Card className="border-0 shadow-sm bg-linear-to-r from-primary to-primary/80 text-primary-foreground">
-        <CardContent className="p-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">System administration</h1>
-              <p className="text-primary-foreground/85 mt-1 max-w-xl">
-                Manage students and heads of department by department, broadcast notices, and oversee internship letter
-                requests and placements. Department-level tools live on each HOD&apos;s dashboard.
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader className="pb-2">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <FileText className="h-5 w-5" />
-                Internship letter requests by department
-              </CardTitle>
-              <CardDescription>
-                All Stage 1 general letter requests, grouped by the student&apos;s registered department. Official
-                placements (Stage 2) are managed on each HOD&apos;s dashboard and in Official placements.
-              </CardDescription>
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/admin/letter-requests">Open letter queue</Link>
-              </Button>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/admin/official-placement-management">Official placement management (all depts.)</Link>
-              </Button>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent>
-          {adminLoading ? (
-            <div className="flex justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-            </div>
-          ) : adminDepartmentKeysOrdered.length === 0 ? (
-            <p className="text-sm text-muted-foreground py-4 text-center">No letter requests in the system yet.</p>
-          ) : (
-            <Accordion type="multiple" className="w-full">
-              {adminDepartmentKeysOrdered.map((dept) => {
-                const letters = lettersByDepartment.get(dept)!;
-                const lPending = letters.filter((l) => l.status === "pending").length;
-                return (
-                  <AccordionItem key={dept} value={dept} className="border rounded-lg px-3 mb-2">
-                    <AccordionTrigger className="text-left hover:no-underline py-3 text-sm sm:text-base">
-                      <div className="flex flex-1 flex-col sm:flex-row sm:items-center sm:justify-between gap-1 pr-2">
-                        <span className="font-semibold">{dept}</span>
-                        <span className="text-xs sm:text-sm text-muted-foreground font-normal">
-                          {letters.length} letter request{letters.length === 1 ? "" : "s"}
-                          {lPending > 0 ? ` · ${lPending} pending` : ""}
-                        </span>
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-4">
-                      <div className="overflow-x-auto rounded-md border">
-                        <table className="w-full text-sm">
-                          <thead className="bg-muted/50 text-left text-xs text-muted-foreground">
-                            <tr>
-                              <th className="p-2 font-medium">Student</th>
-                              <th className="p-2 font-medium">Type</th>
-                              <th className="p-2 font-medium">Status</th>
-                              <th className="p-2 font-medium">Company / purpose</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {letters.slice(0, 20).map((r) => (
-                              <tr key={r.id} className="border-t">
-                                <td className="p-2">
-                                  {r.student?.firstName} {r.student?.lastName}
-                                  <br />
-                                  <span className="text-xs text-muted-foreground">{r.student?.studentId}</span>
-                                </td>
-                                <td className="p-2 capitalize">{r.requestType}</td>
-                                <td className="p-2">
-                                  <Badge variant="secondary" className="text-xs">
-                                    {r.status}
-                                  </Badge>
-                                </td>
-                                <td className="p-2 max-w-[200px] truncate" title={r.companyName || r.purpose}>
-                                  {r.companyName || r.purpose}
-                                </td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                        {letters.length > 20 && (
-                          <p className="p-2 text-xs text-muted-foreground border-t">
-                            Showing 20 of {letters.length}. Open the full queue for the rest.
-                          </p>
-                        )}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
-          )}
-        </CardContent>
-      </Card>
+      <div className="rounded-xl border border-border bg-card p-6 shadow-sm">
+        <h1 className="text-2xl font-bold tracking-tight">Dashboard</h1>
+        <p className="mt-1 text-muted-foreground">
+          Quick links to users, notices, and official placements across departments.
+        </p>
+      </div>
 
       <div className="grid gap-4 md:grid-cols-2">
         <Card className="border shadow-sm">
@@ -614,7 +466,7 @@ export default function AdminDashboard() {
               <Users className="h-5 w-5" />
               Users &amp; HODs
             </CardTitle>
-            <CardDescription>Filter by department, activate or deactivate accounts.</CardDescription>
+            <CardDescription>Accounts by department.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild>
@@ -632,12 +484,30 @@ export default function AdminDashboard() {
               <Bell className="h-5 w-5" />
               Notices
             </CardTitle>
-            <CardDescription>Broadcast announcements to students or departments.</CardDescription>
+            <CardDescription>Announcements for students and departments.</CardDescription>
           </CardHeader>
           <CardContent>
             <Button asChild>
               <Link href="/admin/notices">
                 Manage notices
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </Link>
+            </Button>
+          </CardContent>
+        </Card>
+
+        <Card className="border shadow-sm md:col-span-2">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <MapPinned className="h-5 w-5" />
+              Official placements
+            </CardTitle>
+            <CardDescription>Stage 2 requests and approvals across departments.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link href="/admin/official-placement-management">
+                Open official placement management
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>
