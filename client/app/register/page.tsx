@@ -27,9 +27,41 @@ import {
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Home, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-react";
 import Image from "next/image";
-import { programs } from "@/lib/mock-data";
 import type { RegisterFormData } from "@/types";
 import { cn } from "@/lib/utils";
+
+type DepartmentProgram = {
+  name: string;
+  prefixes: string[];
+};
+
+const departmentProgramMap: Record<string, DepartmentProgram[]> = {
+  "Marine Engineering Department": [
+    { name: "B.Sc. Marine Engineering", prefixes: ["BME"] },
+    { name: "Diploma in Marine Engineering", prefixes: ["DME"] },
+    { name: "B.Sc. Naval Architecture", prefixes: ["BNA"] },
+    { name: "B.Sc. Mechanical Engineering", prefixes: ["BMA", "BME"] },
+  ],
+  "Computer Engineering Department": [
+    { name: "B.Sc. Computer Engineering", prefixes: ["BCE"] },
+    { name: "B.Sc. Marine Electrical & Electronics", prefixes: ["BEE"] },
+    { name: "Diploma in Marine Electrical & Electronics", prefixes: ["DEE"] },
+  ],
+  "Information and Communications Technology Department": [
+    { name: "B.Sc. Information Technology", prefixes: ["BIT"] },
+    { name: "Diploma in Information Technology", prefixes: ["DIT"] },
+    { name: "B.Sc. Computer Science", prefixes: ["BCS"] },
+  ],
+  "Nautical Science Department": [
+    { name: "B.Sc. Nautical Science", prefixes: ["BNS"] },
+    { name: "Diploma in Nautical Science", prefixes: ["DNS"] },
+  ],
+  "Department of Transport, Port & Shipping Administration": [
+    { name: "B.Sc. Logistics Management", prefixes: ["BLM"] },
+    { name: "B.Sc. Port & Shipping Administration", prefixes: ["BPS"] },
+    { name: "Diploma in Port & Shipping Administration", prefixes: ["DPS"] },
+  ],
+};
 
 const registrationDepartments = [
   "Marine Engineering Department",
@@ -39,16 +71,27 @@ const registrationDepartments = [
   "Department of Transport, Port & Shipping Administration",
 ];
 
-const departmentIdPrefixes: Record<string, string[]> = {
-  "Nautical Science Department": ["DNS", "BNS"],
-  "Marine Engineering Department": ["DMS", "BMS"],
-  "Computer Engineering Department": ["DCS", "BCS"],
-  "Information and Communications Technology Department": ["BIT", "DIT"],
-};
+function getDepartmentPrefixes(department: string): string[] {
+  const entries = departmentProgramMap[department] || [];
+  return Array.from(new Set(entries.flatMap((entry) => entry.prefixes)));
+}
+
+function detectProgramByStudentId(department: string, studentId: string): string | null {
+  const entries = departmentProgramMap[department] || [];
+  const normalizedId = studentId.toUpperCase().replace(/\s+/g, "");
+  const match = normalizedId.match(/^([A-Z]{2,4})/);
+  if (!match) return null;
+
+  const typedPrefix = match[1];
+  const program = entries.find((entry) =>
+    entry.prefixes.some((prefix) => prefix === typedPrefix)
+  );
+  return program?.name || null;
+}
 
 function validateStudentIdByDepartment(department: string, studentId: string): string | null {
-  const prefixes = departmentIdPrefixes[department];
-  if (!department || !studentId.trim() || !prefixes) return null;
+  const prefixes = getDepartmentPrefixes(department);
+  if (!department || !studentId.trim() || prefixes.length === 0) return null;
 
   const normalizedId = studentId.toUpperCase().replace(/\s+/g, "");
   const hasValidFormat = prefixes.some((prefix) =>
@@ -118,6 +161,14 @@ export default function RegisterPage() {
     formData.department,
     formData.studentId
   );
+  const departmentPrograms = useMemo(
+    () => (departmentProgramMap[formData.department] || []).map((entry) => entry.name),
+    [formData.department]
+  );
+  const departmentPrefixes = useMemo(
+    () => getDepartmentPrefixes(formData.department),
+    [formData.department]
+  );
   const passwordStrength = useMemo(
     () => getPasswordStrength(formData.password),
     [formData.password]
@@ -168,17 +219,39 @@ export default function RegisterPage() {
   ) => {
     const { name, value } = e.target;
     const normalizedValue = name === "studentId" ? value.toUpperCase() : value;
-    setFormData((prev) => ({
-      ...prev,
-      [name]: normalizedValue,
-    }));
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        [name]: normalizedValue,
+      };
+      if (name === "studentId" && prev.department) {
+        const matchedProgram = detectProgramByStudentId(prev.department, normalizedValue);
+        if (matchedProgram) {
+          next.program = matchedProgram;
+        }
+      }
+      return next;
+    });
   };
 
   const handleSelectChange = (name: string, value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [name]: name === "yearOfStudy" ? parseInt(value) : value,
-    }));
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        [name]: name === "yearOfStudy" ? parseInt(value) : value,
+      };
+
+      if (name === "department") {
+        const matchedProgram = detectProgramByStudentId(value, prev.studentId);
+        const validProgramsForDepartment = (departmentProgramMap[value] || []).map((entry) => entry.name);
+        if (matchedProgram) {
+          next.program = matchedProgram;
+        } else if (!validProgramsForDepartment.includes(prev.program)) {
+          next.program = "";
+        }
+      }
+      return next;
+    });
   };
 
   const nextStep = () => {
@@ -393,6 +466,12 @@ export default function RegisterPage() {
                     onChange={handleChange}
                     required
                   />
+                  {formData.department && departmentPrefixes.length > 0 && (
+                    <p className="text-xs text-muted-foreground">
+                      Valid prefixes for this department:{" "}
+                      <span className="font-medium">{departmentPrefixes.join(", ")}</span>
+                    </p>
+                  )}
                   {studentIdError && (
                     <p className="text-xs font-medium text-destructive">
                       {studentIdError}
@@ -430,7 +509,7 @@ export default function RegisterPage() {
                       <SelectValue placeholder="Select your program" />
                     </SelectTrigger>
                     <SelectContent>
-                      {programs.map((prog) => (
+                      {departmentPrograms.map((prog) => (
                         <SelectItem key={prog} value={prog}>
                           {prog}
                         </SelectItem>
