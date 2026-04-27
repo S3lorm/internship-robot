@@ -173,6 +173,14 @@ export default function RegisterPage() {
     () => getPasswordStrength(formData.password),
     [formData.password]
   );
+  const yearLabel =
+    formData.yearOfStudy === 1
+      ? "1st Year"
+      : formData.yearOfStudy === 2
+        ? "2nd Year"
+        : formData.yearOfStudy === 3
+          ? "3rd Year"
+          : "4th Year";
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -407,9 +415,11 @@ export default function RegisterPage() {
               </Alert>
             )}
 
-            {/* Step 1: Personal Information */}
-            {step === 1 && (
-              <>
+            <div className={cn("grid gap-4", step > 1 && "lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]")}>
+              <div className="min-w-0 space-y-4">
+                {/* Step 1: Personal Information */}
+                {step === 1 && (
+                  <>
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div className="space-y-2">
                     <Label htmlFor="firstName">First Name</Label>
@@ -494,12 +504,12 @@ export default function RegisterPage() {
                     required
                   />
                 </div>
-              </>
-            )}
+                  </>
+                )}
 
-            {/* Step 2: Academic Information */}
-            {step === 2 && (
-              <>
+                {/* Step 2: Academic Information */}
+                {step === 2 && (
+                  <>
                 <div className="space-y-2">
                   <Label htmlFor="program">Program</Label>
                   <Select
@@ -540,12 +550,12 @@ export default function RegisterPage() {
                     </SelectContent>
                   </Select>
                 </div>
-              </>
-            )}
+                  </>
+                )}
 
-            {/* Step 3: Account Details (email & password last) */}
-            {step === 3 && (
-              <>
+                {/* Step 3: Account Details (email & password last) */}
+                {step === 3 && (
+                  <>
                 <div className="space-y-2">
                   <Label htmlFor="email">Student Email</Label>
                   <Input
@@ -658,44 +668,76 @@ export default function RegisterPage() {
                     </Button>
                   </div>
                 </div>
-              </>
-            )}
+                  </>
+                )}
 
-            {/* Navigation Buttons */}
-            <div className="flex gap-3">
-              {step > 1 && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="flex-1 bg-transparent"
-                  onClick={prevStep}
-                >
-                  Previous
-                </Button>
-              )}
-              {step < 3 ? (
-                <Button
-                  type="button"
-                  className="flex-1"
-                  onClick={nextStep}
-                >
-                  Continue
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  className="flex-1"
-                  disabled={isLoading}
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Creating Account...
-                    </>
-                  ) : (
-                    "Create Account"
+                {/* Navigation Buttons */}
+                <div className="flex gap-3">
+                  {step > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="flex-1 bg-transparent"
+                      onClick={prevStep}
+                    >
+                      Previous
+                    </Button>
                   )}
-                </Button>
+                  {step < 3 ? (
+                    <Button
+                      type="button"
+                      className="flex-1"
+                      onClick={nextStep}
+                    >
+                      Continue
+                    </Button>
+                  ) : (
+                    <Button
+                      type="submit"
+                      className="flex-1"
+                      disabled={isLoading}
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Creating Account...
+                        </>
+                      ) : (
+                        "Create Account"
+                      )}
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {step > 1 && (
+                <div className="space-y-3">
+                  <Card className="border border-border/70 bg-muted/20 shadow-none">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-base">Step 1 summary</CardTitle>
+                      <CardDescription>Personal details (read-only)</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2 text-sm">
+                      <p><span className="font-medium text-muted-foreground">Name:</span> {formData.firstName || "—"} {formData.lastName || ""}</p>
+                      <p><span className="font-medium text-muted-foreground">Department:</span> {formData.department || "—"}</p>
+                      <p><span className="font-medium text-muted-foreground">Student ID:</span> {formData.studentId || "—"}</p>
+                      <p><span className="font-medium text-muted-foreground">Phone:</span> {formData.phone || "—"}</p>
+                    </CardContent>
+                  </Card>
+
+                  {step > 2 && (
+                    <Card className="border border-border/70 bg-muted/20 shadow-none">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-base">Step 2 summary</CardTitle>
+                        <CardDescription>Academic details (read-only)</CardDescription>
+                      </CardHeader>
+                      <CardContent className="space-y-2 text-sm">
+                        <p><span className="font-medium text-muted-foreground">Program:</span> {formData.program || "—"}</p>
+                        <p><span className="font-medium text-muted-foreground">Year of study:</span> {yearLabel}</p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
               )}
             </div>
           </CardContent>
