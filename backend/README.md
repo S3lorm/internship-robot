@@ -1,6 +1,6 @@
 ## RMU Internship Management System (Backend)
 
-Node.js/Express API for the RMU Internship Portal frontend in `/app`.
+Node.js/Express API for the RMU Internship Portal frontend in `/client`.
 
 ### Setup
 
@@ -29,6 +29,18 @@ npm run dev
 ```
 
 The API will run on `http://localhost:5000`.
+
+### Run frontend (Next.js app)
+
+In a separate terminal:
+
+```bash
+cd client
+npm install
+npm run dev
+```
+
+The frontend will run on `http://localhost:3000`.
 
 ### Notes
 
