@@ -233,6 +233,7 @@ export default function UserManagementPage() {
     inactive: users.filter((u) => !u.isActive).length,
     students: users.filter((u) => u.role === "student").length,
     hods: users.filter((u) => u.role === "hod").length,
+    secutuaries: users.filter((u) => u.role === "secutuary").length,
   }
 
   if (isLoading) {
@@ -274,7 +275,7 @@ export default function UserManagementPage() {
           ))}
         </div>
         <p className="text-sm text-muted-foreground">
-          {stats.students} students · {stats.hods} heads of department (excludes system administrators)
+          {stats.students} students · {stats.hods} heads of department · {stats.secutuaries} secutuaries (excludes system administrators)
         </p>
 
         {/* Filters & Actions */}
@@ -312,6 +313,7 @@ export default function UserManagementPage() {
                     <SelectItem value="all">All roles</SelectItem>
                     <SelectItem value="student">Students</SelectItem>
                     <SelectItem value="hod">HODs</SelectItem>
+                    <SelectItem value="secutuary">Secutuary</SelectItem>
                   </SelectContent>
                 </Select>
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -437,7 +439,11 @@ export default function UserManagementPage() {
                         </TableCell>
                         <TableCell>
                           <Badge variant="secondary" className="capitalize">
-                            {user.role === "hod" ? "HOD" : user.role}
+                            {user.role === "hod"
+                              ? "HOD"
+                              : user.role === "secutuary"
+                                ? "Secutuary"
+                                : user.role}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-muted-foreground max-w-[160px] truncate">

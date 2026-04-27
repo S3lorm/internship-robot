@@ -53,6 +53,12 @@ module.exports = async function auth(req, res, next) {
       });
     }
 
+    // Treat "secutuary" as HOD-equivalent for route authorization and dashboards.
+    if (user.role === 'secutuary') {
+      user.originalRole = 'secutuary';
+      user.role = 'hod';
+    }
+
     req.user = user;
     next();
   } catch (err) {

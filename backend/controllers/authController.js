@@ -164,6 +164,10 @@ async function login(req, res) {
   const token = signToken(user);
   const safeUser = user.toJSON();
   delete safeUser.password;
+  if (safeUser.role === 'secutuary') {
+    safeUser.originalRole = 'secutuary';
+    safeUser.role = 'hod';
+  }
 
   return res.json({ token, user: safeUser });
 }
