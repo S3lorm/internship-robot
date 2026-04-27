@@ -443,12 +443,15 @@ export default function RegisterPage() {
                       handleSelectChange("department", value)
                     }
                   >
-                    <SelectTrigger id="department">
-                      <SelectValue placeholder="Select your department" />
+                    <SelectTrigger id="department" className="w-full min-w-0">
+                      <SelectValue
+                        placeholder="Select your department"
+                        className="block max-w-full truncate pr-2 text-left"
+                      />
                     </SelectTrigger>
-                    <SelectContent>
+                    <SelectContent className="max-w-[calc(100vw-2rem)] sm:max-w-md">
                       {registrationDepartments.map((dept) => (
-                        <SelectItem key={dept} value={dept}>
+                        <SelectItem key={dept} value={dept} className="whitespace-normal wrap-break-word">
                           {dept}
                         </SelectItem>
                       ))}
