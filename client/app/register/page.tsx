@@ -32,17 +32,18 @@ import type { RegisterFormData } from "@/types";
 import { cn } from "@/lib/utils";
 
 const registrationDepartments = [
-  "Nautical Science",
-  "Marine Engineering",
-  "Computer Science",
-  "Information Technology",
+  "Marine Engineering Department",
+  "Computer Engineering Department",
+  "Information and Communications Technology Department",
+  "Nautical Science Department",
+  "Department of Transport, Port & Shipping Administration",
 ];
 
 const departmentIdPrefixes: Record<string, string[]> = {
-  "Nautical Science": ["DNS", "BNS"],
-  "Marine Engineering": ["DMS", "BMS"],
-  "Computer Science": ["DCS", "BCS"],
-  "Information Technology": ["BIT", "DIT"],
+  "Nautical Science Department": ["DNS", "BNS"],
+  "Marine Engineering Department": ["DMS", "BMS"],
+  "Computer Engineering Department": ["DCS", "BCS"],
+  "Information and Communications Technology Department": ["BIT", "DIT"],
 };
 
 function validateStudentIdByDepartment(department: string, studentId: string): string | null {
