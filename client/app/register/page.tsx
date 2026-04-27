@@ -374,7 +374,12 @@ export default function RegisterPage() {
         </div>
       </Link>
 
-      <Card className="w-full max-w-md shadow-xl border-2">
+      <Card
+        className={cn(
+          "w-full shadow-xl border-2",
+          step > 1 ? "max-w-5xl" : "max-w-md"
+        )}
+      >
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold">Create Account</CardTitle>
           <CardDescription>
@@ -415,7 +420,7 @@ export default function RegisterPage() {
               </Alert>
             )}
 
-            <div className={cn("grid gap-4", step > 1 && "lg:grid-cols-[minmax(0,1.1fr)_minmax(0,0.9fr)]")}>
+            <div className={cn("grid gap-5", step > 1 && "lg:grid-cols-[minmax(0,1.15fr)_minmax(340px,1fr)]")}>
               <div className="min-w-0 space-y-4">
                 {/* Step 1: Personal Information */}
                 {step === 1 && (
