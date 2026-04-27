@@ -711,29 +711,47 @@ export default function RegisterPage() {
               </div>
 
               {step > 1 && (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <Card className="border border-border/70 bg-muted/20 shadow-none">
-                    <CardHeader className="pb-2">
+                    <CardHeader className="pb-3">
                       <CardTitle className="text-base">Step 1 summary</CardTitle>
                       <CardDescription>Personal details (read-only)</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-2 text-sm">
-                      <p><span className="font-medium text-muted-foreground">Name:</span> {formData.firstName || "—"} {formData.lastName || ""}</p>
-                      <p><span className="font-medium text-muted-foreground">Department:</span> {formData.department || "—"}</p>
-                      <p><span className="font-medium text-muted-foreground">Student ID:</span> {formData.studentId || "—"}</p>
-                      <p><span className="font-medium text-muted-foreground">Phone:</span> {formData.phone || "—"}</p>
+                    <CardContent className="space-y-3 text-sm">
+                      <div className="space-y-1 rounded-md bg-background/70 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Name</p>
+                        <p className="leading-relaxed wrap-break-word">{formData.firstName || "—"} {formData.lastName || ""}</p>
+                      </div>
+                      <div className="space-y-1 rounded-md bg-background/70 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Department</p>
+                        <p className="leading-relaxed wrap-break-word">{formData.department || "—"}</p>
+                      </div>
+                      <div className="space-y-1 rounded-md bg-background/70 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Student ID</p>
+                        <p className="leading-relaxed wrap-break-word">{formData.studentId || "—"}</p>
+                      </div>
+                      <div className="space-y-1 rounded-md bg-background/70 p-3">
+                        <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Phone</p>
+                        <p className="leading-relaxed wrap-break-word">{formData.phone || "—"}</p>
+                      </div>
                     </CardContent>
                   </Card>
 
                   {step > 2 && (
                     <Card className="border border-border/70 bg-muted/20 shadow-none">
-                      <CardHeader className="pb-2">
+                      <CardHeader className="pb-3">
                         <CardTitle className="text-base">Step 2 summary</CardTitle>
                         <CardDescription>Academic details (read-only)</CardDescription>
                       </CardHeader>
-                      <CardContent className="space-y-2 text-sm">
-                        <p><span className="font-medium text-muted-foreground">Program:</span> {formData.program || "—"}</p>
-                        <p><span className="font-medium text-muted-foreground">Year of study:</span> {yearLabel}</p>
+                      <CardContent className="space-y-3 text-sm">
+                        <div className="space-y-1 rounded-md bg-background/70 p-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Program</p>
+                          <p className="leading-relaxed wrap-break-word">{formData.program || "—"}</p>
+                        </div>
+                        <div className="space-y-1 rounded-md bg-background/70 p-3">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Year of study</p>
+                          <p className="leading-relaxed wrap-break-word">{yearLabel}</p>
+                        </div>
                       </CardContent>
                     </Card>
                   )}
