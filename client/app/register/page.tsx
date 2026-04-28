@@ -432,7 +432,7 @@ export default function RegisterPage() {
             alt="RMU Logo"
             width={260}
             height={84}
-            className="h-full w-full rounded-xl object-contain contrast-[1.2] drop-shadow-[0_6px_18px_rgba(0,0,0,0.42)]"
+            className="h-full w-full rounded-2xl object-contain contrast-[1.2] drop-shadow-[0_6px_18px_rgba(0,0,0,0.42)]"
             priority
           />
         </div>
