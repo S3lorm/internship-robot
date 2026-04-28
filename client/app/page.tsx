@@ -39,13 +39,13 @@ export default function HomePage() {
       <header className="sticky top-0 z-50 w-full border-b border-border bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <div className="container mx-auto flex h-16 min-w-0 items-center justify-between gap-2 px-4">
           <Link href="/" className="flex min-w-0 max-w-[65%] items-center gap-2 sm:max-w-none">
-            <div className="flex h-10 w-[96px] shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-white p-1.5 shadow-md ring-1 ring-black/5 sm:h-11 sm:w-[128px] sm:p-2">
+            <div className="flex h-11 w-[118px] shrink-0 items-center justify-center rounded-lg border border-primary/15 bg-white p-1.5 shadow-md ring-1 ring-black/5 sm:h-12 sm:w-[156px] sm:p-2">
               <Image
                 src="/rmu-logo.png"
                 alt="RMU Logo"
-                width={120}
-                height={30}
-                className="h-full w-auto object-contain contrast-[1.06]"
+                width={220}
+                height={72}
+                className="h-full w-full object-contain contrast-[1.06]"
               />
             </div>
             <div className="hidden min-w-0 flex-col sm:flex">
@@ -523,8 +523,14 @@ export default function HomePage() {
         <div className="container mx-auto px-4">
           <div className="flex flex-col items-center justify-between gap-6 md:flex-row">
             <div className="flex items-center gap-2">
-              <div className="flex h-10 items-center justify-center rounded-lg bg-white p-1 shadow-sm">
-                <Image src="/rmu-logo.png" alt="RMU Logo" width={100} height={25} className="object-contain" />
+              <div className="flex h-11 w-[132px] items-center justify-center rounded-lg border border-border/60 bg-white p-1.5 shadow-sm">
+                <Image
+                  src="/rmu-logo.png"
+                  alt="RMU Logo"
+                  width={220}
+                  height={72}
+                  className="h-full w-full object-contain"
+                />
               </div>
               <span className="font-semibold text-foreground">
                 RMU Internship Portal

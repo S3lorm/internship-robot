@@ -91,13 +91,13 @@ export default function LoginPage() {
       </div>
 
       <Link href="/" className="mb-8 flex items-center gap-2 transition-transform hover:scale-105">
-        <div className="flex h-14 min-w-[152px] items-center justify-center rounded-xl border border-white/60 bg-white p-2.5 shadow-2xl ring-2 ring-primary/25">
+        <div className="flex h-16 w-[210px] items-center justify-center rounded-xl border border-white/60 bg-white p-2.5 shadow-2xl ring-2 ring-primary/25">
           <Image
             src="/rmu-logo.png"
             alt="RMU Logo"
-            width={180}
-            height={45}
-            className="object-contain contrast-[1.08] drop-shadow-sm"
+            width={260}
+            height={84}
+            className="h-full w-full object-contain contrast-[1.08] drop-shadow-sm"
             priority
           />
         </div>
