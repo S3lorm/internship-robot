@@ -426,13 +426,13 @@ export default function RegisterPage() {
       </div>
 
       <Link href="/" className="mb-8 flex flex-col items-center gap-3 transition-transform hover:scale-105">
-        <div className="flex h-16 w-[220px] items-center justify-center rounded-xl border border-white/60 bg-white p-2.5 shadow-2xl ring-2 ring-primary/25">
+        <div className="flex h-16 w-[220px] items-center justify-center p-1.5">
           <Image
             src="/rmu-logo.png"
             alt="RMU Logo"
             width={260}
             height={84}
-            className="h-full w-full object-contain contrast-[1.08] drop-shadow-sm"
+            className="h-full w-full object-contain contrast-[1.2] drop-shadow-[0_6px_18px_rgba(0,0,0,0.42)] motion-safe:animate-[pulse_3.6s_ease-in-out_infinite]"
             priority
           />
         </div>
