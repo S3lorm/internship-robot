@@ -244,7 +244,9 @@ async function main() {
       }
     }
   } finally {
-    rl.close();
+    if (!rl.closed) {
+      rl.close();
+    }
   }
 }
 

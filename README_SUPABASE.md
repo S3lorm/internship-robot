@@ -69,6 +69,35 @@ This project has been migrated from an Express.js/MySQL backend to use **Supabas
    pnpm dev
    ```
 
+## Staff Manager (Terminal)
+
+Use the backend terminal tool to manage RBAC staff accounts (HOD + secutuary) from the command line.
+
+### Prerequisites
+
+- Make sure migrations are applied, especially:
+  - `018_allow_secutuary_role.sql`
+  - `019_department_program_catalog.sql`
+- Ensure backend `.env` has valid Supabase credentials:
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+
+### Run
+
+```bash
+cd backend
+npm run staff:manage
+```
+
+### What you can do
+
+- List departments (fetched from database)
+- List all HOD accounts
+- Create/update HOD account (choose department first)
+- Set HOD password
+- Activate/deactivate HOD account
+- Create/update secutuary account (choose department first)
+
 ## Key Differences from Express Backend
 
 ### Authentication
