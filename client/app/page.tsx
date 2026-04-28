@@ -45,7 +45,7 @@ export default function HomePage() {
                 alt="RMU Logo"
                 width={220}
                 height={72}
-                className="h-full w-full object-contain contrast-[1.18] drop-shadow-[0_3px_10px_rgba(0,0,0,0.28)] motion-safe:animate-[pulse_3.8s_ease-in-out_infinite]"
+                className="h-full w-full rounded-lg object-contain contrast-[1.18] drop-shadow-[0_3px_10px_rgba(0,0,0,0.28)]"
               />
             </div>
             <div className="hidden min-w-0 flex-col sm:flex">
@@ -529,7 +529,7 @@ export default function HomePage() {
                   alt="RMU Logo"
                   width={220}
                   height={72}
-                  className="h-full w-full object-contain contrast-[1.14] drop-shadow-[0_3px_10px_rgba(0,0,0,0.2)] motion-safe:animate-[pulse_4.2s_ease-in-out_infinite]"
+                  className="h-full w-full rounded-lg object-contain contrast-[1.14] drop-shadow-[0_3px_10px_rgba(0,0,0,0.2)]"
                 />
               </div>
               <span className="font-semibold text-foreground">
