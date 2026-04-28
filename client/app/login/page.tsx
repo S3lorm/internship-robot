@@ -18,34 +18,17 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Home, Loader2, Mail, Lock, AlertCircle } from "lucide-react";
 import Image from "next/image";
 import type { LoginFormData } from "@/types";
 
-const registrationDepartments = [
-  "Nautical Science",
-  "Marine Engineering",
-  "Computer Science",
-  "Information Technology",
-];
-
 export default function LoginPage() {
   const router = useRouter();
-  const { login, loginHod, isLoading } = useAuth();
+  const { login, isLoading } = useAuth();
   const [formData, setFormData] = useState<LoginFormData>({
     email: "",
     password: "",
   });
-  const [hodDepartment, setHodDepartment] = useState("");
-  const [hodPassword, setHodPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -76,21 +59,6 @@ export default function LoginPage() {
         return;
       }
       setError(result.error || "Login failed. Please try again.");
-    }
-  };
-
-  const handleHodSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError(null);
-    if (!hodDepartment) {
-      setError("Please select your department.");
-      return;
-    }
-    const result = await loginHod(hodDepartment, hodPassword);
-    if (result.success) {
-      router.push("/admin");
-    } else {
-      setError(result.error || "Login failed. Check department name and password.");
     }
   };
 
@@ -138,141 +106,70 @@ export default function LoginPage() {
       <Card className="w-full max-w-md shadow-xl border-2">
         <CardHeader className="space-y-1 text-center">
           <CardTitle className="text-2xl font-bold">Welcome Back</CardTitle>
-          <CardDescription>Sign in as a student or Head of Department</CardDescription>
+          <CardDescription>Sign in with your role account (student, HOD, secutuary, admin)</CardDescription>
         </CardHeader>
 
         <CardContent>
-          <Tabs
-            defaultValue="student"
-            className="w-full"
-            onValueChange={() => setError(null)}
-          >
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="student">Student</TabsTrigger>
-              <TabsTrigger value="hod">HOD</TabsTrigger>
-            </TabsList>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
 
-            <TabsContent value="student" className="mt-4">
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="your.email@rmu.edu.gh"
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="pl-10"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="email"
-                      name="email"
-                      type="email"
-                      placeholder="your.name@st.rmu.edu.gh"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="pl-10"
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+                <Link href="/forgot-password" className="text-sm text-primary hover:underline">
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="Enter your password"
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="pl-10"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+            </div>
 
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <Label htmlFor="password">Password</Label>
-                    <Link href="/forgot-password" className="text-sm text-primary hover:underline">
-                      Forgot password?
-                    </Link>
-                  </div>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="password"
-                      name="password"
-                      type="password"
-                      placeholder="Enter your password"
-                      value={formData.password}
-                      onChange={handleChange}
-                      className="pl-10"
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    "Sign In"
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-
-            <TabsContent value="hod" className="mt-4">
-              <form onSubmit={handleHodSubmit} className="space-y-4">
-                {error && (
-                  <Alert variant="destructive">
-                    <AlertCircle className="h-4 w-4" />
-                    <AlertDescription>{error}</AlertDescription>
-                  </Alert>
-                )}
-
-                <div className="space-y-2">
-                  <Label>Department</Label>
-                  <Select value={hodDepartment} onValueChange={setHodDepartment} disabled={isLoading}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select department (must match registry)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {registrationDepartments.map((d) => (
-                        <SelectItem key={d} value={d}>
-                          {d}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <p className="text-xs text-muted-foreground">
-                    Use the exact department name from the list. Unknown departments cannot sign in.
-                  </p>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="hod-password">Password</Label>
-                  <div className="relative">
-                    <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      id="hod-password"
-                      type="password"
-                      placeholder="HOD password"
-                      value={hodPassword}
-                      onChange={(e) => setHodPassword(e.target.value)}
-                      className="pl-10"
-                      required
-                      disabled={isLoading}
-                    />
-                  </div>
-                </div>
-
-                <Button type="submit" className="w-full" disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Signing in...
-                    </>
-                  ) : (
-                    "Sign in as HOD"
-                  )}
-                </Button>
-              </form>
-            </TabsContent>
-          </Tabs>
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                "Sign In"
+              )}
+            </Button>
+          </form>
         </CardContent>
 
         <CardFooter className="flex flex-col">
