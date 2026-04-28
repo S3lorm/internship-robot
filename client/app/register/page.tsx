@@ -2,7 +2,7 @@
 
 import React from "react"
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/auth-context";
@@ -29,13 +29,16 @@ import { Home, Loader2, AlertCircle, CheckCircle2, Eye, EyeOff } from "lucide-re
 import Image from "next/image";
 import type { RegisterFormData } from "@/types";
 import { cn } from "@/lib/utils";
+import { authApi } from "@/lib/api";
 
 type DepartmentProgram = {
   name: string;
   prefixes: string[];
 };
 
-const departmentProgramMap: Record<string, DepartmentProgram[]> = {
+type DepartmentProgramMap = Record<string, DepartmentProgram[]>;
+
+const fallbackDepartmentProgramMap: DepartmentProgramMap = {
   "Marine Engineering Department": [
     { name: "B.Sc. Marine Engineering", prefixes: ["BME"] },
     { name: "Diploma in Marine Engineering", prefixes: ["DME"] },
@@ -63,20 +66,19 @@ const departmentProgramMap: Record<string, DepartmentProgram[]> = {
   ],
 };
 
-const registrationDepartments = [
-  "Marine Engineering Department",
-  "Computer Engineering Department",
-  "Information and Communications Technology Department",
-  "Nautical Science Department",
-  "Department of Transport, Port & Shipping Administration",
-];
-
-function getDepartmentPrefixes(department: string): string[] {
+function getDepartmentPrefixes(
+  department: string,
+  departmentProgramMap: DepartmentProgramMap
+): string[] {
   const entries = departmentProgramMap[department] || [];
   return Array.from(new Set(entries.flatMap((entry) => entry.prefixes)));
 }
 
-function detectProgramByStudentId(department: string, studentId: string): string | null {
+function detectProgramByStudentId(
+  department: string,
+  studentId: string,
+  departmentProgramMap: DepartmentProgramMap
+): string | null {
   const entries = departmentProgramMap[department] || [];
   const normalizedId = studentId.toUpperCase().replace(/\s+/g, "");
   const match = normalizedId.match(/^([A-Z]{2,4})/);
@@ -89,8 +91,12 @@ function detectProgramByStudentId(department: string, studentId: string): string
   return program?.name || null;
 }
 
-function validateStudentIdByDepartment(department: string, studentId: string): string | null {
-  const prefixes = getDepartmentPrefixes(department);
+function validateStudentIdByDepartment(
+  department: string,
+  studentId: string,
+  departmentProgramMap: DepartmentProgramMap
+): string | null {
+  const prefixes = getDepartmentPrefixes(department, departmentProgramMap);
   if (!department || !studentId.trim() || prefixes.length === 0) return null;
 
   const normalizedId = studentId.toUpperCase().replace(/\s+/g, "");
@@ -140,6 +146,10 @@ function getPasswordValidationError(password: string): string | null {
 export default function RegisterPage() {
   const router = useRouter();
   const { register, isLoading } = useAuth();
+  const [departmentProgramMap, setDepartmentProgramMap] = useState<DepartmentProgramMap>(
+    fallbackDepartmentProgramMap
+  );
+  const [catalogLoading, setCatalogLoading] = useState(true);
   const [step, setStep] = useState(1);
   const [formData, setFormData] = useState<RegisterFormData>({
     email: "",
@@ -159,15 +169,20 @@ export default function RegisterPage() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const studentIdError = validateStudentIdByDepartment(
     formData.department,
-    formData.studentId
+    formData.studentId,
+    departmentProgramMap
+  );
+  const registrationDepartments = useMemo(
+    () => Object.keys(departmentProgramMap),
+    [departmentProgramMap]
   );
   const departmentPrograms = useMemo(
     () => (departmentProgramMap[formData.department] || []).map((entry) => entry.name),
-    [formData.department]
+    [formData.department, departmentProgramMap]
   );
   const departmentPrefixes = useMemo(
-    () => getDepartmentPrefixes(formData.department),
-    [formData.department]
+    () => getDepartmentPrefixes(formData.department, departmentProgramMap),
+    [formData.department, departmentProgramMap]
   );
   const passwordStrength = useMemo(
     () => getPasswordStrength(formData.password),
@@ -181,6 +196,51 @@ export default function RegisterPage() {
         : formData.yearOfStudy === 3
           ? "3rd Year"
           : "4th Year";
+
+  useEffect(() => {
+    let mounted = true;
+    async function loadCatalog() {
+      setCatalogLoading(true);
+      const result = await authApi.getRegistrationCatalog();
+      if (!mounted) return;
+
+      if (result.error) {
+        console.warn("Using fallback registration catalog:", result.error);
+        setCatalogLoading(false);
+        return;
+      }
+
+      const rows = (result.data as any)?.departments;
+      if (!Array.isArray(rows) || rows.length === 0) {
+        setCatalogLoading(false);
+        return;
+      }
+
+      const map: DepartmentProgramMap = {};
+      for (const d of rows) {
+        if (!d || typeof d.name !== "string") continue;
+        const programs = Array.isArray(d.programs) ? d.programs : [];
+        map[d.name] = programs
+          .filter((p: any) => p && typeof p.name === "string")
+          .map((p: any) => ({
+            name: p.name,
+            prefixes: Array.isArray(p.prefixes)
+              ? p.prefixes.map((x: any) => String(x).toUpperCase().trim()).filter(Boolean)
+              : [],
+          }));
+      }
+
+      if (Object.keys(map).length > 0) {
+        setDepartmentProgramMap(map);
+      }
+      setCatalogLoading(false);
+    }
+
+    void loadCatalog();
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -233,7 +293,11 @@ export default function RegisterPage() {
         [name]: normalizedValue,
       };
       if (name === "studentId" && prev.department) {
-        const matchedProgram = detectProgramByStudentId(prev.department, normalizedValue);
+        const matchedProgram = detectProgramByStudentId(
+          prev.department,
+          normalizedValue,
+          departmentProgramMap
+        );
         if (matchedProgram) {
           next.program = matchedProgram;
         }
@@ -250,7 +314,11 @@ export default function RegisterPage() {
       };
 
       if (name === "department") {
-        const matchedProgram = detectProgramByStudentId(value, prev.studentId);
+        const matchedProgram = detectProgramByStudentId(
+          value,
+          prev.studentId,
+          departmentProgramMap
+        );
         const validProgramsForDepartment = (departmentProgramMap[value] || []).map((entry) => entry.name);
         if (matchedProgram) {
           next.program = matchedProgram;
@@ -457,10 +525,11 @@ export default function RegisterPage() {
                     onValueChange={(value) =>
                       handleSelectChange("department", value)
                     }
+                    disabled={catalogLoading}
                   >
                     <SelectTrigger id="department" className="w-full min-w-0">
                       <SelectValue
-                        placeholder="Select your department"
+                        placeholder={catalogLoading ? "Loading departments..." : "Select your department"}
                         className="block max-w-full truncate pr-2 text-left"
                       />
                     </SelectTrigger>
@@ -522,6 +591,7 @@ export default function RegisterPage() {
                     onValueChange={(value) =>
                       handleSelectChange("program", value)
                     }
+                    disabled={departmentPrograms.length === 0}
                   >
                     <SelectTrigger>
                       <SelectValue placeholder="Select your program" />

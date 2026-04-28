@@ -98,6 +98,8 @@ async function fetchApi<T = any>(
 
 // Auth API
 export const authApi = {
+  getRegistrationCatalog: () => fetchApi('/auth/registration-catalog'),
+
   login: (email: string, password: string) =>
     fetchApi('/auth/login', {
       method: 'POST',

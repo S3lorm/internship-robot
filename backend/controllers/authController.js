@@ -43,6 +43,49 @@ function buildHodUser(department) {
   };
 }
 
+async function getRegistrationCatalog(_req, res) {
+  try {
+    const { supabase } = require('../models');
+    const { data, error } = await supabase
+      .from('departments')
+      .select('id,name,is_active,department_programs(program_name,index_prefix,is_active)')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+
+    if (error) {
+      console.error('getRegistrationCatalog departments query failed:', error);
+      return res.status(500).json({ message: 'Failed to load registration catalog' });
+    }
+
+    const departments = (data || []).map((row) => {
+      const groupedPrograms = new Map();
+      for (const p of row.department_programs || []) {
+        if (!p || p.is_active === false) continue;
+        const existing = groupedPrograms.get(p.program_name) || new Set();
+        existing.add(String(p.index_prefix || '').trim().toUpperCase());
+        groupedPrograms.set(p.program_name, existing);
+      }
+
+      const programs = Array.from(groupedPrograms.entries())
+        .map(([name, prefixSet]) => ({
+          name,
+          prefixes: Array.from(prefixSet).filter(Boolean).sort(),
+        }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
+      return {
+        name: row.name,
+        programs,
+      };
+    });
+
+    return res.json({ departments });
+  } catch (err) {
+    console.error('getRegistrationCatalog unexpected error:', err);
+    return res.status(500).json({ message: 'Failed to load registration catalog' });
+  }
+}
+
 const registerValidators = [
   body('email').isEmail(),
   body('password').isLength({ min: 6 }),
@@ -357,6 +400,7 @@ async function logout(_req, res) {
 }
 
 module.exports = {
+  getRegistrationCatalog,
   registerValidators,
   register,
   loginValidators,

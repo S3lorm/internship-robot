@@ -5,6 +5,7 @@ const authController = require('../controllers/authController');
 
 const router = express.Router();
 
+router.get('/registration-catalog', authController.getRegistrationCatalog);
 router.post('/register', authController.registerValidators, validate, authController.register);
 router.post('/login', authController.loginValidators, validate, authController.login);
 router.post('/login-hod', authController.loginHodValidators, validate, authController.loginHod);
