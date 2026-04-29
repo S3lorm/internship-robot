@@ -12,7 +12,6 @@ import { Separator } from "@/components/ui/separator";
 import {
   LayoutDashboard,
   Users,
-  Briefcase,
   FileCheck,
   Bell,
   Settings,
@@ -27,16 +26,15 @@ type NavItem = { href: string; label: string; icon: React.ComponentType<{ classN
 const hodNavItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/letter-requests", label: "Letter Requests", icon: FileCheck },
-  { href: "/admin/internship-tracking", label: "Official placements", icon: MapPinned },
+  { href: "/admin/official-placement-management", label: "Official placements", icon: MapPinned },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/evaluations", label: "Evaluations", icon: ClipboardCheck },
-  { href: "/admin/internships", label: "Post Internship", icon: Briefcase },
 ];
 
 const systemAdminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/users", label: "User Management", icon: Users },
-  { href: "/admin/official-placement-management", label: "Official placement management", icon: MapPinned },
+  { href: "/admin/internship-tracking", label: "Official placements", icon: MapPinned },
   { href: "/admin/notices", label: "Notices", icon: Bell },
 ];
 
@@ -49,6 +47,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   const isHod = user?.role === "hod";
+  const isSecutuary = isHod && user?.originalRole === "secutuary";
   const items = isHod ? hodNavItems : systemAdminNav;
 
   const handleLogout = () => {
@@ -64,10 +63,10 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
         </div>
         <div className="flex flex-col min-w-0">
           <span className="text-sm font-bold leading-none text-sidebar-foreground truncate">
-            {isHod ? "HOD Portal" : "Admin"}
+            {isHod ? (isSecutuary ? "Secutuary Portal" : "HOD Portal") : "Admin"}
           </span>
           <span className="text-xs leading-none text-sidebar-foreground/70 mt-0.5 truncate">
-            {isHod ? "Department tools" : "Institution"}
+            {isHod ? (isSecutuary ? "Secutuary tools" : "Department tools") : "Institution"}
           </span>
         </div>
       </div>
@@ -131,7 +130,7 @@ export function AdminSidebar({ className, onNavigate }: AdminSidebarProps) {
               {user?.firstName} {user?.lastName}
             </p>
             <Badge variant="outline" className="mt-1 text-xs">
-              {isHod ? "Head of Department" : "Administrator"}
+              {isHod ? (isSecutuary ? "Secutuary" : "Head of Department") : "Administrator"}
             </Badge>
           </div>
         </div>

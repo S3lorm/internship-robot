@@ -82,6 +82,8 @@ const STALE_MS = 14 * 24 * 60 * 60 * 1000;
 export default function OfficialPlacementManagementPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const isDepartmentRole = user?.role === "hod";
+  const canAccessPage = user?.role === "admin" || isDepartmentRole;
   const [placements, setPlacements] = useState<InternshipPlacement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPlacement, setSelectedPlacement] = useState<InternshipPlacement | null>(null);
@@ -97,10 +99,10 @@ export default function OfficialPlacementManagementPage() {
   const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user && user.role !== "admin") {
+    if (user && !canAccessPage) {
       router.replace("/admin");
     }
-  }, [user, router]);
+  }, [user, router, canAccessPage]);
 
   const loadPlacements = async () => {
     setIsLoading(true);
@@ -117,8 +119,8 @@ export default function OfficialPlacementManagementPage() {
   };
 
   useEffect(() => {
-    if (user?.role === "admin") void loadPlacements();
-  }, [user?.role]);
+    if (canAccessPage) void loadPlacements();
+  }, [canAccessPage]);
 
   const departmentOptions = useMemo(() => {
     const s = new Set<string>();
@@ -279,7 +281,7 @@ export default function OfficialPlacementManagementPage() {
       .length,
   };
 
-  if (!user || user.role !== "admin") {
+  if (!user || !canAccessPage) {
     return null;
   }
 
@@ -288,9 +290,9 @@ export default function OfficialPlacementManagementPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Official placement management</h1>
         <p className="mt-1 max-w-3xl text-muted-foreground">
-          System-wide visibility of Stage 2 official placement requests. Approve, reject, or request changes. On
-          approval, the same organisation email (PDF + evaluation link) is sent as for HOD decisions. Actions are
-          recorded for audit.
+          {isDepartmentRole
+            ? "Department visibility of Stage 2 official placement requests. Approve, reject, or request changes. On approval, the same organisation email (PDF + evaluation link) is sent and actions are recorded for audit."
+            : "System-wide visibility of Stage 2 official placement requests. Approve, reject, or request changes. On approval, the same organisation email (PDF + evaluation link) is sent as for HOD decisions. Actions are recorded for audit."}
         </p>
       </div>
 
@@ -540,27 +542,27 @@ export default function OfficialPlacementManagementPage() {
                 </div>
               )}
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-2 min-w-0">
                 <Card className="border bg-muted/20">
                   <CardHeader className="py-3">
                     <CardTitle className="text-sm flex items-center gap-2">
                       <User className="h-4 w-4" /> Student
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-1 text-sm pt-0">
-                    <p>
+                  <CardContent className="space-y-1 text-sm pt-0 min-w-0">
+                    <p className="break-words">
                       <span className="text-muted-foreground">Name: </span>
                       {selectedPlacement.student?.firstName} {selectedPlacement.student?.lastName}
                     </p>
-                    <p>
+                    <p className="break-all">
                       <span className="text-muted-foreground">ID: </span>
                       {selectedPlacement.student?.studentId}
                     </p>
-                    <p>
+                    <p className="break-words">
                       <span className="text-muted-foreground">Department: </span>
                       {selectedPlacement.student?.department || "—"}
                     </p>
-                    <p>
+                    <p className="break-words">
                       <span className="text-muted-foreground">Program: </span>
                       {selectedPlacement.student?.program || "—"}
                     </p>
@@ -573,14 +575,14 @@ export default function OfficialPlacementManagementPage() {
                       <Building2 className="h-4 w-4" /> Company
                     </CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-1 text-sm pt-0">
-                    <p className="font-medium">{selectedPlacement.organizationName}</p>
-                    <p className="flex items-center gap-2 text-blue-600 dark:text-blue-400">
+                  <CardContent className="space-y-1 text-sm pt-0 min-w-0">
+                    <p className="font-medium break-words">{selectedPlacement.organizationName}</p>
+                    <p className="flex items-center gap-2 text-blue-600 dark:text-blue-400 break-all">
                       <Mail className="h-3.5 w-3.5 shrink-0" />
                       {selectedPlacement.organizationEmail}
                     </p>
                     {selectedPlacement.organizationAddress && (
-                      <p className="text-muted-foreground text-xs">
+                      <p className="text-muted-foreground text-xs break-words">
                         <MapPin className="h-3.5 w-3.5 inline mr-1" />
                         {selectedPlacement.organizationAddress}
                       </p>
@@ -595,7 +597,7 @@ export default function OfficialPlacementManagementPage() {
                     </CardTitle>
                     <CardDescription>Who changed status, when, and whether the org email was sent on approval.</CardDescription>
                   </CardHeader>
-                  <CardContent className="pt-0">
+                  <CardContent className="pt-0 min-w-0">
                     {selectedPlacement.actionLogs && selectedPlacement.actionLogs.length > 0 ? (
                       <ul className="space-y-2 text-sm max-h-48 overflow-y-auto">
                         {selectedPlacement.actionLogs.map((log) => (
@@ -614,7 +616,7 @@ export default function OfficialPlacementManagementPage() {
                                 {new Date(log.createdAt).toLocaleString("en-GB")}
                               </span>
                             </div>
-                            <div className="text-xs text-muted-foreground mt-1">
+                            <div className="text-xs text-muted-foreground mt-1 break-words">
                               {log.actor
                                 ? `${log.actor.firstName} ${log.actor.lastName} (${log.actorRole})`
                                 : `User ${log.actorId || "—"}`}
@@ -622,7 +624,7 @@ export default function OfficialPlacementManagementPage() {
                               {log.organizationEmailSent === false && " · organisation email not sent (see logs)"}
                             </div>
                             {log.notes && (
-                              <p className="text-xs mt-1 whitespace-pre-wrap border-t border-border/40 pt-1">
+                              <p className="text-xs mt-1 whitespace-pre-wrap break-words border-t border-border/40 pt-1">
                                 {log.notes}
                               </p>
                             )}
@@ -635,8 +637,8 @@ export default function OfficialPlacementManagementPage() {
                   </CardContent>
                 </Card>
 
-                {(selectedPlacement.status === "pending" ||
-                  selectedPlacement.status === "modification_requested") && (
+                  {(selectedPlacement.status === "pending" ||
+                    selectedPlacement.status === "modification_requested") && (
                   <div className="md:col-span-2 space-y-2">
                     <Label htmlFor="decision-notes">Notes (required to reject or request changes)</Label>
                     <Textarea
@@ -696,13 +698,6 @@ export default function OfficialPlacementManagementPage() {
                         onClick={() => void handleUpdateStatus("rejected")}
                       >
                         Reject
-                      </Button>
-                      <Button
-                        variant="outline"
-                        disabled={isUpdating}
-                        onClick={() => void handleUpdateStatus("modification_requested")}
-                      >
-                        Request changes
                       </Button>
                       <Button disabled={isUpdating} onClick={() => void handleUpdateStatus("approved")}>
                         {isUpdating ? <Loader2 className="h-4 w-4 animate-spin" /> : "Approve & notify company"}

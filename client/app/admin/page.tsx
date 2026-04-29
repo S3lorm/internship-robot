@@ -54,6 +54,9 @@ function placementStatusBadgeClass(status: string | undefined) {
 
 export default function AdminDashboard() {
   const { user } = useAuth();
+  const isSecutuary = user?.role === "hod" && user?.originalRole === "secutuary";
+  const roleHeading = isSecutuary ? "Secutuary" : "Head of department";
+  const roleOverviewTitle = isSecutuary ? "Secutuary overview" : "Department overview";
   const [hodLoading, setHodLoading] = useState(false);
   const [letterRequests, setLetterRequests] = useState<LetterRequest[]>([]);
   const [placementRows, setPlacementRows] = useState<any[]>([]);
@@ -138,8 +141,8 @@ export default function AdminDashboard() {
             aria-hidden
           />
           <div className="relative p-6 md:p-8">
-            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/90">Head of department</p>
-            <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">Department overview</h1>
+            <p className="text-xs font-semibold uppercase tracking-[0.22em] text-primary/90">{roleHeading}</p>
+            <h1 className="mt-2 text-3xl font-bold tracking-tight md:text-4xl">{roleOverviewTitle}</h1>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <span
                 className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-3.5 py-1.5 text-sm font-medium text-primary"
@@ -369,7 +372,7 @@ export default function AdminDashboard() {
                   variant="outline"
                   asChild
                 >
-                  <Link href="/admin/internship-tracking">
+                  <Link href="/admin/official-placement-management">
                     Open full list
                     <ArrowRight className="ml-1.5 h-4 w-4" />
                   </Link>
@@ -507,7 +510,7 @@ export default function AdminDashboard() {
           <CardContent>
             <Button asChild>
               <Link href="/admin/official-placement-management">
-                Open official placement management
+                Open official placements
                 <ArrowRight className="ml-2 h-4 w-4" />
               </Link>
             </Button>

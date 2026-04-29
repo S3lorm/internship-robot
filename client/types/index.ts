@@ -7,11 +7,13 @@ export interface User {
   firstName: string;
   lastName: string;
   role: UserRole;
+  originalRole?: 'secutuary';
   studentId?: string;
   phone?: string;
   department?: string;
   program?: string;
   yearOfStudy?: number;
+  mustChangePassword?: boolean;
   avatar?: string;
   bio?: string;
   skills?: string[];
@@ -107,7 +109,7 @@ export interface Notice {
   content: string;
   type: NoticeType;
   priority: NoticePriority;
-  targetAudience: 'all' | 'students' | 'admins';
+  targetAudience: 'all' | 'students' | 'admins' | 'hod' | 'secutuary';
   /** When set, only students in this department see the notice on the dashboard. */
   targetDepartment?: string | null;
   publishDate: string;
@@ -224,7 +226,7 @@ export interface NoticeFormData {
   content: string;
   type: NoticeType;
   priority: NoticePriority;
-  targetAudience: 'all' | 'students' | 'admins';
+  targetAudience: 'all' | 'students' | 'admins' | 'hod' | 'secutuary';
   publishDate: string;
   expiryDate?: string;
   isPinned: boolean;

@@ -1,11 +1,11 @@
 "use client";
 
-import React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { notificationsApi, noticesApi } from "@/lib/api";
 import type { Notification, Notice } from "@/types";
 import {
@@ -13,7 +13,6 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
-  X,
   CheckCheck,
   Trash2,
   Filter,
@@ -25,13 +24,16 @@ import {
   Megaphone,
 } from "lucide-react";
 import { toast } from "sonner";
-import Link from "next/link";
 
 export default function NotificationsPage() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   // We'll extend Notice with an isRead property for the UI state
   type UINotice = Notice & { isRead?: boolean };
+  type SelectedItem =
+    | { kind: "notification"; item: Notification }
+    | { kind: "notice"; item: UINotice };
   const [notices, setNotices] = useState<UINotice[]>([]);
+  const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
 
@@ -239,6 +241,23 @@ export default function NotificationsPage() {
     return null;
   };
 
+  const openDetails = (item: Notification | UINotice, isNotice: boolean) => {
+    if (isNotice) {
+      const notice = item as UINotice;
+      if (!notice.isRead) {
+        void markAsRead(notice.id, true);
+      }
+      setSelectedItem({ kind: "notice", item: notice });
+      return;
+    }
+
+    const notification = item as Notification;
+    if (!notification.isRead) {
+      void markAsRead(notification.id);
+    }
+    setSelectedItem({ kind: "notification", item: notification });
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -441,6 +460,15 @@ export default function NotificationsPage() {
                               )}
                             </div>
                             <div className="flex shrink-0 gap-1 sm:opacity-0 sm:transition-opacity sm:group-hover:opacity-100">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-8 px-2 text-xs"
+                                onClick={(e) => { e.stopPropagation(); openDetails(notice, true); }}
+                                title="View details"
+                              >
+                                View details
+                              </Button>
                               {!notice.isRead && (
                                 <Button
                                   variant="ghost"
@@ -533,9 +561,25 @@ export default function NotificationsPage() {
                               variant="link"
                               size="sm"
                               className="mt-2 h-auto p-0"
-                              asChild
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDetails(notification, false);
+                              }}
                             >
-                              <Link href={notification.link}>View details →</Link>
+                              View details →
+                            </Button>
+                          )}
+                          {!notification.link && (
+                            <Button
+                              variant="link"
+                              size="sm"
+                              className="mt-2 h-auto p-0"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                openDetails(notification, false);
+                              }}
+                            >
+                              View details →
                             </Button>
                           )}
                         </div>
@@ -569,6 +613,72 @@ export default function NotificationsPage() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={Boolean(selectedItem)} onOpenChange={(open) => { if (!open) setSelectedItem(null); }}>
+        <DialogContent className="sm:max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="pr-6 break-words">
+              {selectedItem?.item.title || "Notification details"}
+            </DialogTitle>
+            <DialogDescription>
+              {selectedItem?.kind === "notice" ? "Notice details" : "Notification details"}
+            </DialogDescription>
+          </DialogHeader>
+
+          {selectedItem && (
+            <div className="space-y-4">
+              <div className="flex flex-wrap items-center gap-2">
+                {selectedItem.kind === "notice" ? (
+                  <>
+                    <Badge variant="outline">Notice</Badge>
+                    {(selectedItem.item as UINotice).priority === "high" && (
+                      <Badge variant="destructive">High Priority</Badge>
+                    )}
+                  </>
+                ) : (
+                  <>
+                    {getNotificationBadge(selectedItem.item as Notification)}
+                    <Badge variant="outline">
+                      {(selectedItem.item as Notification).isRead ? "Read" : "Unread"}
+                    </Badge>
+                  </>
+                )}
+              </div>
+
+              <div className="rounded-md border bg-muted/30 p-3">
+                <p className="text-sm leading-relaxed whitespace-pre-line break-words">
+                  {selectedItem.kind === "notice"
+                    ? (selectedItem.item as UINotice).content
+                    : (selectedItem.item as Notification).message}
+                </p>
+              </div>
+
+              <p className="text-xs text-muted-foreground">
+                {selectedItem.kind === "notice" ? "Published: " : "Created: "}
+                {new Date(
+                  selectedItem.kind === "notice"
+                    ? (selectedItem.item as UINotice).publishDate
+                    : (selectedItem.item as Notification).createdAt
+                ).toLocaleString("en-GB", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                  hour: "2-digit",
+                  minute: "2-digit",
+                })}
+              </p>
+
+              {selectedItem.kind === "notification" && (selectedItem.item as Notification).link && (
+                <Button asChild className="w-full sm:w-auto">
+                  <a href={(selectedItem.item as Notification).link}>
+                    Open related page
+                  </a>
+                </Button>
+              )}
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

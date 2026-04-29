@@ -51,6 +51,18 @@ const statusConfig: Record<string, { label: string; color: string; icon: any }> 
   modification_requested: { label: "Modifications Requested", color: "bg-blue-100 text-blue-800 border-blue-200", icon: AlertCircle },
 };
 
+function calculateSixWeeksEndDate(startDate: string): string {
+  if (!startDate) return "";
+  const start = new Date(`${startDate}T00:00:00`);
+  if (Number.isNaN(start.getTime())) return "";
+  const end = new Date(start);
+  end.setDate(end.getDate() + 42); // 6 weeks
+  const year = end.getFullYear();
+  const month = String(end.getMonth() + 1).padStart(2, "0");
+  const day = String(end.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
 export default function LetterRequestsPage() {
   const { user } = useAuth();
 
@@ -161,6 +173,14 @@ export default function LetterRequestsPage() {
   // Stage 1 handlers
   const handleGeneralSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!generalForm.internshipStartDate) {
+      toast.error("Please select your internship start date.");
+      return;
+    }
+    if (!generalForm.internshipEndDate) {
+      toast.error("Please select your internship end date.");
+      return;
+    }
     setIsSubmittingGeneral(true);
     try {
       const result = await lettersApi.createRequest(generalForm as any);
@@ -407,12 +427,20 @@ export default function LetterRequestsPage() {
                         name="internshipStartDate"
                         type="date"
                         value={generalForm.internshipStartDate}
-                        onChange={(e) => setGeneralForm({ ...generalForm, internshipStartDate: e.target.value })}
+                        onChange={(e) =>
+                          setGeneralForm((prev) => ({
+                            ...prev,
+                            internshipStartDate: e.target.value,
+                            internshipEndDate: e.target.value
+                              ? calculateSixWeeksEndDate(e.target.value)
+                              : "",
+                          }))
+                        }
                         required
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="internshipEndDate">End Date <span className="text-destructive">*</span></Label>
+                      <Label htmlFor="internshipEndDate">End Date (Auto: 6 weeks) <span className="text-destructive">*</span></Label>
                       <Input
                         id="internshipEndDate"
                         name="internshipEndDate"
@@ -421,6 +449,9 @@ export default function LetterRequestsPage() {
                         onChange={(e) => setGeneralForm({ ...generalForm, internshipEndDate: e.target.value })}
                         required
                       />
+                      <p className="text-xs text-muted-foreground">
+                        End date is auto-filled to 6 weeks from start date, but you can change it.
+                      </p>
                     </div>
                   </div>
                 </div>

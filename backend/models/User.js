@@ -19,6 +19,7 @@ function mapUserFromSupabase(row) {
     classOf: row.class_of,
     phone: row.phone,
     isActive: row.is_active !== undefined ? row.is_active : true,
+    mustChangePassword: row.must_change_password || false,
     isEmailVerified: row.is_email_verified || false,
     emailVerificationToken: row.email_verification_token,
     emailVerificationExpires: row.email_verification_expires,
@@ -62,6 +63,7 @@ function mapUserToSupabase(user) {
   if (user.classOf !== undefined) mapped.class_of = user.classOf;
   if (user.phone !== undefined) mapped.phone = user.phone;
   if (user.isActive !== undefined) mapped.is_active = user.isActive;
+  if (user.mustChangePassword !== undefined) mapped.must_change_password = user.mustChangePassword;
   if (user.isEmailVerified !== undefined) mapped.is_email_verified = user.isEmailVerified;
     if (user.emailVerificationToken !== undefined) mapped.email_verification_token = user.emailVerificationToken;
     if (user.emailVerificationExpires !== undefined) mapped.email_verification_expires = user.emailVerificationExpires;

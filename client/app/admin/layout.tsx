@@ -15,12 +15,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   const router = useRouter();
   const { user, isLoading } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const isSecutuary = user?.role === "hod" && user?.originalRole === "secutuary";
 
   useEffect(() => {
     if (!isLoading && (!user || (user.role !== "admin" && user.role !== "hod"))) {
       router.push("/login");
     }
-  }, [user, isLoading, router]);
+    if (!isLoading && user?.mustChangePassword && pathname !== "/force-password-change") {
+      router.push("/force-password-change");
+    }
+  }, [user, isLoading, router, pathname]);
 
   if (isLoading) {
     return (
@@ -65,13 +69,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                pathname.includes("/users") ? "User Management" :
                pathname.includes("/official-placement-management") ? "Official placement management" :
                pathname.includes("/internship-tracking") ? "Internship Tracking" :
-               pathname.includes("/internships") ? "Internships" :
                pathname.includes("/notices") ? "Notices" :
                pathname.includes("/notifications") ? "Notifications" :
                pathname.includes("/evaluations") ? "Evaluations" :
                pathname.includes("/letter-requests") ? "Letter Requests" :
                pathname.includes("/letter") ? "Application Letter" :
-               pathname.includes("/analytics") ? "Analytics" : user.role === "hod" ? "HOD" : "Admin"}
+               pathname.includes("/analytics") ? "Analytics" : user.role === "hod" ? (isSecutuary ? "Secutuary" : "HOD") : "Admin"}
             </h1>
           </div>
         </header>

@@ -24,6 +24,10 @@ export default function DashboardLayout({
     if (!isLoading && !isAuthenticated) {
       router.push("/login");
     }
+    if (!isLoading && user?.mustChangePassword) {
+      router.push("/force-password-change");
+      return;
+    }
     if (!isLoading && isAuthenticated && (user?.role === "admin" || user?.role === "hod")) {
       router.push("/admin");
     }

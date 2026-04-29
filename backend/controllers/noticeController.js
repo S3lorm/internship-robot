@@ -1,5 +1,6 @@
 const { Notice, User } = require('../models');
 const { createNotification } = require('../services/notificationService');
+const NOTICE_AUDIENCES = ['all', 'students', 'admins', 'hod', 'secutuary'];
 
 function parsePagination(req) {
   const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
@@ -8,27 +9,45 @@ function parsePagination(req) {
   return { page, limit, offset };
 }
 
-/**
- * When a notice is scoped to a department, HODs in that department get an in-app
- * notification. Broad notices (no targetDepartment) do not fan out — HODs
- * already see department notices in their notices list; org-wide posts were
- * incorrectly notifying every HOD.
- */
-async function notifyHodsForNewNotice(notice, excludeUserId = null) {
-  if (!notice.targetDepartment) {
-    return;
-  }
+function noticeAudienceForUser(user) {
+  if (!user) return null;
+  if (user.role === 'student') return 'students';
+  if (user.role === 'admin') return 'admins';
+  if (user.role === 'hod' && user.originalRole === 'secutuary') return 'secutuary';
+  if (user.role === 'hod') return 'hod';
+  return null;
+}
 
-  const where = { role: 'hod', department: notice.targetDepartment };
+function canUserViewNotice(user, notice) {
+  if (!user || !notice) return false;
+  const audience = noticeAudienceForUser(user);
+  if (!audience) return false;
+  if (notice.targetAudience !== 'all' && notice.targetAudience !== audience) return false;
+  if (notice.targetDepartment && user.role !== 'admin' && notice.targetDepartment !== user.department) return false;
+  return true;
+}
 
-  const hods = await User.findAll({ where });
-  const link = '/admin/notifications';
+async function notifyUsersForNewNotice(notice, excludeUserId = null) {
+  if (!notice?.id) return;
+
+  const where = { isActive: true };
+  if (notice.targetAudience === 'students') where.role = 'student';
+  if (notice.targetAudience === 'admins') where.role = 'admin';
+  if (notice.targetAudience === 'hod') where.role = 'hod';
+  if (notice.targetAudience === 'secutuary') where.role = 'secutuary';
+
+  const candidates = await User.findAll({ where });
+  const recipients = notice.targetDepartment
+    ? candidates.filter((u) => u.department === notice.targetDepartment)
+    : candidates;
+
+  const link = notice.targetAudience === 'students' ? '/dashboard/notices' : '/admin/notifications';
   const message = `New notice: ${notice.title}`;
 
-  for (const hod of hods) {
-    if (!hod.id || (excludeUserId && hod.id === excludeUserId)) continue;
+  for (const recipient of recipients) {
+    if (!recipient?.id || (excludeUserId && recipient.id === excludeUserId)) continue;
     await createNotification({
-      userId: hod.id,
+      userId: recipient.id,
       type: 'notice',
       title: 'New announcement',
       message,
@@ -51,18 +70,6 @@ async function list(req, res) {
     where.targetAudience = audience;
   }
 
-  if (!manage) {
-    if (!audience && req.user && req.user.role === 'student') {
-      where.targetAudience = { in: ['all', 'students'] };
-    }
-    if (!audience && req.user && req.user.role === 'admin') {
-      where.targetAudience = { in: ['all', 'admins'] };
-    }
-    if (req.user && req.user.role === 'hod') {
-      where.targetDepartment = req.user.department;
-    }
-  }
-
   const effectiveLimit = manage ? Math.min(500, Math.max(Number(req.query.limit) || 200, 50)) : limit;
   const effectiveOffset = manage ? 0 : offset;
 
@@ -77,9 +84,7 @@ async function list(req, res) {
   const now = new Date();
   let filteredRows = rows.filter((n) => {
     if (n.expiresAt && new Date(n.expiresAt) <= now) return false;
-    if (req.user && req.user.role === 'student') {
-      if (n.targetDepartment && n.targetDepartment !== req.user.department) return false;
-    }
+    if (!manage && req.user && !canUserViewNotice(req.user, n)) return false;
     return true;
   });
 
@@ -135,6 +140,10 @@ async function create(req, res) {
     createdBy = null;
   }
 
+  if (!NOTICE_AUDIENCES.includes(targetAudience)) {
+    return res.status(400).json({ message: 'Invalid target audience.' });
+  }
+
   const notice = await Notice.create({
     title: req.body.title,
     content: req.body.content,
@@ -159,9 +168,9 @@ async function create(req, res) {
   if (notice.isActive) {
     try {
       const skipId = req.user.role === 'hod' ? req.user.id : null;
-      await notifyHodsForNewNotice(notice, skipId);
+      await notifyUsersForNewNotice(notice, skipId);
     } catch (err) {
-      console.error('notifyHodsForNewNotice:', err);
+      console.error('notifyUsersForNewNotice:', err);
     }
   }
 

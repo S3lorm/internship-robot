@@ -10,6 +10,7 @@ router.use(auth);
 router.get('/', checkRole('admin', 'hod'), userController.list);
 
 router.use(checkRole('admin'));
+router.post('/', userController.createStaff);
 router.get('/:id', userController.getById);
 router.patch('/:id', userController.update);
 router.patch('/:id/status', userController.updateStatus);

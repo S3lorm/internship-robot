@@ -221,5 +221,70 @@ async function sendApplicationStatusEmail(user, application, internship) {
   }
 }
 
-module.exports = { sendVerificationEmail, sendPasswordResetEmail, sendPasswordResetOtp, sendApplicationStatusEmail };
+async function sendTemporaryPasswordEmail(user, temporaryPassword) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    const error = new Error('SMTP not configured. Please set SMTP_USER and SMTP_PASS in backend/.env');
+    console.error('Cannot send temporary password email:', error.message);
+    throw error;
+  }
+
+  const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const loginUrl = `${frontend}/login`;
+  const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER}>`;
+  const displayRole = user.role === 'secutuary' ? 'Secutuary' : 'Head of Department';
+
+  await transporter.sendMail({
+    from: emailFrom,
+    to: user.email,
+    subject: `Your ${displayRole} account temporary password - RMU Internship Portal`,
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+          .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #1e40af; color: white; padding: 20px; text-align: center; }
+          .content { padding: 20px; background-color: #f9fafb; }
+          .code-box { font-size: 22px; letter-spacing: 2px; font-weight: bold; padding: 14px; text-align: center; background: #e5e7eb; border-radius: 8px; margin: 16px 0; }
+          .button { display: inline-block; padding: 12px 24px; background-color: #1e40af; color: white; text-decoration: none; border-radius: 5px; margin: 16px 0; }
+          .footer { text-align: center; padding: 20px; color: #6b7280; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>RMU Internship Portal</h1>
+          </div>
+          <div class="content">
+            <h2>Hello ${user.firstName || 'User'},</h2>
+            <p>An administrator created your <strong>${displayRole}</strong> account.</p>
+            <p>Use this temporary password to sign in:</p>
+            <div class="code-box">${temporaryPassword}</div>
+            <p><strong>Important:</strong> You will be required to change this temporary password immediately after login.</p>
+            <p style="text-align: center;">
+              <a href="${loginUrl}" class="button">Sign in now</a>
+            </p>
+            <p>If you did not expect this account, please contact the system administrator.</p>
+          </div>
+          <div class="footer">
+            <p>Regional Maritime University Internship Portal</p>
+            <p>This is an automated email. Please do not reply.</p>
+          </div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Hello ${user.firstName || 'User'},\n\nAn administrator created your ${displayRole} account.\n\nTemporary password: ${temporaryPassword}\n\nSign in here: ${loginUrl}\n\nYou will be required to change this temporary password immediately after login.\n\nIf you did not expect this account, contact the system administrator.`,
+  });
+}
+
+module.exports = {
+  sendVerificationEmail,
+  sendPasswordResetEmail,
+  sendPasswordResetOtp,
+  sendApplicationStatusEmail,
+  sendTemporaryPasswordEmail,
+};
 

@@ -68,8 +68,38 @@ const defaultSignature = {
   signature: '/signatures/default.png'
 };
 
-function generateLetterHTML(user, internship = null, letterRequest = null) {
-  const signature = programSignatures[user.program] || defaultSignature;
+function formatDepartmentLabel(department) {
+  const d = String(department || '').trim();
+  if (!d) return 'Regional Maritime University';
+  return /department/i.test(d) ? d : `${d} Department`;
+}
+
+async function resolveLetterSignature(user) {
+  const base = programSignatures[user.program] || defaultSignature;
+  const department = String(user.department || '').trim();
+
+  if (!department) return base;
+
+  const hod =
+    (await User.findOne({ where: { role: 'hod', department, isActive: true } })) ||
+    (await User.findOne({ where: { role: 'secutuary', department, isActive: true } }));
+
+  if (!hod) {
+    return { ...base, department };
+  }
+
+  const fullName = `${hod.firstName || ''} ${hod.lastName || ''}`.trim();
+  return {
+    ...base,
+    name: fullName || base.name,
+    title: hod.role === 'secutuary' ? 'Secutuary' : 'Head of Department',
+    department,
+  };
+}
+
+function generateLetterHTML(user, internship = null, letterRequest = null, resolvedSignature = null) {
+  const signature = resolvedSignature || programSignatures[user.program] || defaultSignature;
+  const signatureDepartmentLabel = formatDepartmentLabel(signature.department);
   const currentDate = new Date().toLocaleDateString('en-GB', {
     day: 'numeric',
     month: 'long',
@@ -266,7 +296,7 @@ function generateLetterHTML(user, internship = null, letterRequest = null) {
 
     <p>
       <strong>${user.firstName} ${user.lastName}</strong> is a ${user.yearOfStudy || 'N/A'}${getOrdinalSuffix(user.yearOfStudy)} year [Level ${user.yearOfStudy ? user.yearOfStudy * 100 : 'N/A'}] student of the University who is pursuing 
-      ${user.program || 'N/A'} programme in the ${signature.department} Department.
+      ${user.program || 'N/A'} programme in the ${signatureDepartmentLabel}.
     </p>
 
     <p>
@@ -297,7 +327,7 @@ function generateLetterHTML(user, internship = null, letterRequest = null) {
     <!-- <img src="${signature.signature}" alt="Signature" class="signature-img" onerror="this.style.display='none';" /> -->
     <br><br>
     <div class="signature-name">${signature.name}</div>
-    <div class="signature-title">[${signature.title.toUpperCase()} - ${signature.department}]</div>
+    <div class="signature-title">[${signature.title.toUpperCase()} - ${signatureDepartmentLabel.toUpperCase()}]</div>
   </div>
 
   ${letterRequest && letterRequest.verificationCode ? `
@@ -330,7 +360,7 @@ function getOrdinalSuffix(num) {
 }
 
 // Generate a real PDF buffer of the formal letter using pdfkit
-async function generatePDFBuffer(user, letterRequest) {
+async function generatePDFBuffer(user, letterRequest, resolvedSignature = null) {
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -340,7 +370,8 @@ async function generatePDFBuffer(user, letterRequest) {
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', (err) => reject(err));
 
-      const signature = programSignatures[user.program] || defaultSignature;
+      const signature = resolvedSignature || programSignatures[user.program] || defaultSignature;
+      const signatureDepartmentLabel = formatDepartmentLabel(signature.department);
       const currentDate = new Date().toLocaleDateString('en-GB', {
         day: 'numeric',
         month: 'long',
@@ -401,7 +432,7 @@ async function generatePDFBuffer(user, letterRequest) {
       const level = user.yearOfStudy ? user.yearOfStudy * 100 : 'N/A';
 
       doc.font('Helvetica-Bold').text(`${user.firstName} ${user.lastName}`, { continued: true })
-         .font('Helvetica').text(` is a ${user.yearOfStudy || 'N/A'}${getOrdinalSuffix(user.yearOfStudy)} year [Level ${level}] student of the University who is pursuing ${user.program || 'N/A'} programme in the ${signature.department} Department.`, { align: 'justify' });
+         .font('Helvetica').text(` is a ${user.yearOfStudy || 'N/A'}${getOrdinalSuffix(user.yearOfStudy)} year [Level ${level}] student of the University who is pursuing ${user.program || 'N/A'} programme in the ${signatureDepartmentLabel}.`, { align: 'justify' });
       doc.moveDown(1);
 
       doc.text(`In fulfillment of the requirement for the programme, ${genderPronoun} has to undertake an industrial attachment.`, { align: 'justify' });
@@ -428,7 +459,7 @@ async function generatePDFBuffer(user, letterRequest) {
       doc.text('Yours faithfully,');
       doc.moveDown(4);
       doc.font('Helvetica-Bold').text(signature.name);
-      doc.font('Helvetica-Bold').text(`[${signature.title.toUpperCase()} - ${signature.department.toUpperCase()}]`);
+      doc.font('Helvetica-Bold').text(`[${signature.title.toUpperCase()} - ${signatureDepartmentLabel.toUpperCase()}]`);
 
       // --- Reference / Verification ---
       if (letterRequest && letterRequest.verificationCode) {
@@ -472,7 +503,8 @@ async function generateLetter(req, res) {
       internship = await Internship.findByPk(internshipId);
     }
 
-    const html = generateLetterHTML(fullUser, internship);
+    const signature = await resolveLetterSignature(fullUser);
+    const html = generateLetterHTML(fullUser, internship, null, signature);
 
     // Return HTML that can be rendered or converted to PDF
     res.setHeader('Content-Type', 'text/html');
@@ -503,7 +535,8 @@ async function downloadLetter(req, res) {
       internship = await Internship.findByPk(internshipId);
     }
 
-    const html = generateLetterHTML(fullUser, internship);
+    const signature = await resolveLetterSignature(fullUser);
+    const html = generateLetterHTML(fullUser, internship, null, signature);
 
     if (format === 'html') {
       const filename = `Internship_Letter_${user.firstName}_${user.lastName}_${Date.now()}.html`;
@@ -828,7 +861,8 @@ async function updateRequestStatus(req, res) {
         const { User } = require('../models');
         const student = await User.findOne({ id: request.studentId });
         if (student) {
-          const pdfBuffer = await generatePDFBuffer(student, request);
+          const signature = await resolveLetterSignature(student);
+          const pdfBuffer = await generatePDFBuffer(student, request, signature);
           const transporter = require('../config/email');
           const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
 
@@ -923,7 +957,8 @@ async function generateLetterPDF(request) {
   }
 
   // Generate HTML letter
-  const html = generateLetterHTML(student, null, request);
+  const signature = await resolveLetterSignature(student);
+  const html = generateLetterHTML(student, null, request, signature);
 
   // Create document verification record for security and integrity
   if (request.referenceNumber && request.verificationCode) {
@@ -1071,7 +1106,8 @@ async function downloadLetterPDF(req, res) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const html = generateLetterHTML(student, null, request);
+    const signature = await resolveLetterSignature(student);
+    const html = generateLetterHTML(student, null, request, signature);
 
     // Log document download
     const { logActivity } = require('../services/activityLogService');
@@ -1160,7 +1196,8 @@ async function viewLetterHTML(req, res) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const html = generateLetterHTML(student, null, request);
+    const signature = await resolveLetterSignature(student);
+    const html = generateLetterHTML(student, null, request, signature);
 
     // Return HTML (inline)
     res.setHeader('Content-Type', 'text/html');

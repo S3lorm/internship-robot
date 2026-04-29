@@ -8,9 +8,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { noticesApi, notificationsApi } from "@/lib/api";
+import { authApi, noticesApi, notificationsApi } from "@/lib/api";
 import type { Notice } from "@/types";
 import { toast } from "sonner";
 import {
@@ -44,12 +51,17 @@ function parseInboxPayload(raw: unknown): InboxItem[] {
 
 export default function AdminNotificationsPage() {
   const { user } = useAuth();
+  const isSecutuary = user?.role === "hod" && user?.originalRole === "secutuary";
+  const roleLabel = isSecutuary ? "Secutuary" : "HOD";
   const [notices, setNotices] = useState<Notice[]>([]);
   const [loading, setLoading] = useState(true);
   const [title, setTitle] = useState("");
   const [content, setContent] = useState("");
   const [expiresAt, setExpiresAt] = useState("");
   const [posting, setPosting] = useState(false);
+  const [targetAudience, setTargetAudience] = useState<Notice["targetAudience"]>("students");
+  const [targetDepartment, setTargetDepartment] = useState("all");
+  const [departmentOptions, setDepartmentOptions] = useState<string[]>([]);
   const [inbox, setInbox] = useState<InboxItem[]>([]);
   const [inboxBusyId, setInboxBusyId] = useState<string | null>(null);
 
@@ -88,6 +100,25 @@ export default function AdminNotificationsPage() {
     if (user) void load();
   }, [user?.role, user?.department]);
 
+  useEffect(() => {
+    let mounted = true;
+    async function loadDepartmentCatalog() {
+      if (user?.role !== "admin") return;
+      const result = await authApi.getRegistrationCatalog();
+      if (!mounted) return;
+      const rows = ((result.data as any)?.departments || []) as Array<{ name?: string }>;
+      const departments = rows
+        .map((d) => String(d?.name || "").trim())
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+      setDepartmentOptions(departments);
+    }
+    void loadDepartmentCatalog();
+    return () => {
+      mounted = false;
+    };
+  }, [user?.role]);
+
   const handlePost = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim() || !content.trim()) {
@@ -100,7 +131,13 @@ export default function AdminNotificationsPage() {
         title: title.trim(),
         content: content.trim(),
         priority: "medium",
-        targetAudience: "students",
+        targetAudience: user?.role === "admin" ? targetAudience : "students",
+        targetDepartment:
+          user?.role === "admin"
+            ? targetDepartment === "all"
+              ? undefined
+              : targetDepartment
+            : user?.department || undefined,
         isActive: true,
         expiresAt: expiresAt ? new Date(expiresAt).toISOString() : undefined,
       });
@@ -108,10 +145,18 @@ export default function AdminNotificationsPage() {
         toast.error(result.error);
         return;
       }
-      toast.success("Notice published to your department");
+      toast.success(
+        user?.role === "admin"
+          ? "Notice published successfully"
+          : "Notice published to your department"
+      );
       setTitle("");
       setContent("");
       setExpiresAt("");
+      if (user?.role === "admin") {
+        setTargetAudience("students");
+        setTargetDepartment("all");
+      }
       await load();
     } finally {
       setPosting(false);
@@ -170,13 +215,120 @@ export default function AdminNotificationsPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
           <p className="text-muted-foreground mt-1">
-            Your in-app messages. Broadcast notices are created under{" "}
-            <Link href="/admin/notices" className="text-primary underline">
-              Notices
-            </Link>
-            .
+            Post role-based notices and review your in-app messages.
           </p>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Megaphone className="h-5 w-5" />
+              Post notice
+            </CardTitle>
+            <CardDescription>
+              Choose who should receive this notice: all users, students, HODs, or secutuaries.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handlePost} className="space-y-4 max-w-2xl">
+              <div className="space-y-2">
+                <Label htmlFor="admin-notice-title">Title</Label>
+                <Input
+                  id="admin-notice-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Short headline"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="admin-notice-message">Message</Label>
+                <Textarea
+                  id="admin-notice-message"
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  rows={4}
+                  placeholder="Write your notice..."
+                />
+              </div>
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-2">
+                  <Label>Target audience</Label>
+                  <Select
+                    value={targetAudience}
+                    onValueChange={(value: Notice["targetAudience"]) => setTargetAudience(value)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All users</SelectItem>
+                      <SelectItem value="students">Students only</SelectItem>
+                      <SelectItem value="hod">HOD only</SelectItem>
+                      <SelectItem value="secutuary">Secutuary only</SelectItem>
+                      <SelectItem value="admins">Admins only</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Department scope (optional)</Label>
+                  <Select value={targetDepartment} onValueChange={setTargetDepartment}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All departments</SelectItem>
+                      {departmentOptions.map((dept) => (
+                        <SelectItem key={dept} value={dept}>
+                          {dept}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="admin-notice-exp">Expires at (optional)</Label>
+                <Input
+                  id="admin-notice-exp"
+                  type="datetime-local"
+                  value={expiresAt}
+                  onChange={(e) => setExpiresAt(e.target.value)}
+                />
+              </div>
+              <Button type="submit" disabled={posting}>
+                {posting ? <Loader2 className="h-4 w-4 animate-spin" /> : "Publish notice"}
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Recently published notices</CardTitle>
+            <CardDescription>Latest notices posted from this admin panel.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            ) : notices.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No notices yet.</p>
+            ) : (
+              <ul className="space-y-3">
+                {notices.slice(0, 12).map((n) => (
+                  <li key={n.id} className="rounded-lg border p-3 text-sm">
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium">{n.title}</p>
+                      <Badge variant="secondary" className="capitalize">
+                        {n.targetAudience}
+                      </Badge>
+                    </div>
+                    <p className="text-muted-foreground mt-1 whitespace-pre-wrap">{n.content}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
@@ -296,7 +448,7 @@ export default function AdminNotificationsPage() {
             Incoming notifications
           </CardTitle>
           <CardDescription>
-            Alerts for your HOD account (e.g. system messages). Mark as read or remove when you are done.
+            Alerts for your {roleLabel} account (e.g. system messages). Mark as read or remove when you are done.
           </CardDescription>
         </div>
         {unreadInbox > 0 && (
@@ -380,7 +532,7 @@ export default function AdminNotificationsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
         <p className="text-muted-foreground mt-1">
-          Inbox for your HOD account, and department notices for{" "}
+          Inbox for your {roleLabel} account, and department notices for{" "}
           <span className="font-medium text-foreground">{user.department}</span> students — on one page.
         </p>
       </div>

@@ -72,6 +72,7 @@ export default function AdminLetterRequestsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [adminNotes, setAdminNotes] = useState("");
   const [isUpdating, setIsUpdating] = useState(false);
+  const [updatingAction, setUpdatingAction] = useState<"approved" | "rejected" | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedData, setEditedData] = useState<Partial<LetterRequest>>({});
   const [isSaving, setIsSaving] = useState(false);
@@ -128,6 +129,7 @@ export default function AdminLetterRequestsPage() {
     if (!selectedRequest) return;
 
     setIsUpdating(true);
+    setUpdatingAction(status);
     try {
       const sendEmailCheckbox = document.getElementById("sendEmail") as HTMLInputElement;
       const sendEmail = sendEmailCheckbox ? sendEmailCheckbox.checked : true;
@@ -151,6 +153,7 @@ export default function AdminLetterRequestsPage() {
       toast.error(error.message || "Failed to update request");
     } finally {
       setIsUpdating(false);
+      setUpdatingAction(null);
     }
   };
 
@@ -565,32 +568,32 @@ export default function AdminLetterRequestsPage() {
                 </DialogDescription>
               </DialogHeader>
 
-              <div className="space-y-6 mt-2">
+                <div className="mt-2 space-y-6 min-w-0">
                 {/* Student Info */}
                 <div className="bg-muted/30 p-4 rounded-lg border">
                   <h3 className="font-semibold mb-3 flex items-center gap-2">
                     User Information
                   </h3>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-y-3 gap-x-4 text-sm">
-                    <div>
+                  <div className="grid grid-cols-1 gap-x-4 gap-y-3 text-sm sm:grid-cols-2 md:grid-cols-3">
+                    <div className="min-w-0">
                       <span className="text-muted-foreground block text-xs">Name</span>
-                      <span className="font-medium">{selectedRequest.student?.firstName} {selectedRequest.student?.lastName}</span>
+                      <span className="font-medium break-words">{selectedRequest.student?.firstName} {selectedRequest.student?.lastName}</span>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-muted-foreground block text-xs">Student ID</span>
-                      <span className="font-medium">{selectedRequest.student?.studentId}</span>
+                      <span className="font-medium break-all">{selectedRequest.student?.studentId}</span>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-muted-foreground block text-xs">Email</span>
-                      <span className="font-medium truncate">{selectedRequest.student?.email}</span>
+                      <span className="font-medium break-all">{selectedRequest.student?.email}</span>
                     </div>
-                    <div className="col-span-2">
+                    <div className="min-w-0 sm:col-span-2">
                       <span className="text-muted-foreground block text-xs">Program</span>
-                      <span className="font-medium">{selectedRequest.student?.program}</span>
+                      <span className="font-medium break-words">{selectedRequest.student?.program}</span>
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-muted-foreground block text-xs">Department</span>
-                      <span className="font-medium">{selectedRequest.student?.department}</span>
+                      <span className="font-medium break-words">{selectedRequest.student?.department}</span>
                     </div>
                   </div>
                 </div>
@@ -638,8 +641,8 @@ export default function AdminLetterRequestsPage() {
                         </div>
                       </div>
                     ) : (
-                      <div className="space-y-2 text-sm">
-                        <p><span className="text-muted-foreground">Duration:</span> {selectedRequest.internshipDuration}</p>
+                      <div className="space-y-2 text-sm min-w-0">
+                        <p className="break-words"><span className="text-muted-foreground">Duration:</span> {selectedRequest.internshipDuration}</p>
                         {selectedRequest.internshipStartDate && (
                           <p><span className="text-muted-foreground">Start:</span> {new Date(selectedRequest.internshipStartDate).toLocaleDateString()}</p>
                         )}
@@ -647,7 +650,7 @@ export default function AdminLetterRequestsPage() {
                           <p><span className="text-muted-foreground">End:</span> {new Date(selectedRequest.internshipEndDate).toLocaleDateString()}</p>
                         )}
                         {selectedRequest.category && (
-                          <p><span className="text-muted-foreground">Category:</span> <Badge variant="secondary" className="ml-1">{selectedRequest.category}</Badge></p>
+                          <p className="break-words"><span className="text-muted-foreground">Category:</span> <Badge variant="secondary" className="ml-1">{selectedRequest.category}</Badge></p>
                         )}
                       </div>
                     )}
@@ -697,15 +700,15 @@ export default function AdminLetterRequestsPage() {
                           </div>
                         </div>
                       ) : (
-                        <div className="space-y-2 text-sm">
+                        <div className="space-y-2 text-sm min-w-0">
                           {selectedRequest.requestType !== 'general' && selectedRequest.companyName && (
-                            <p><span className="text-muted-foreground">Name:</span> {selectedRequest.companyName}</p>
+                            <p className="break-words"><span className="text-muted-foreground">Name:</span> {selectedRequest.companyName}</p>
                           )}
                           {selectedRequest.companyEmail && (
-                            <p><span className="text-muted-foreground">Email:</span> {selectedRequest.companyEmail}</p>
+                            <p className="break-all"><span className="text-muted-foreground">Email:</span> {selectedRequest.companyEmail}</p>
                           )}
                           {selectedRequest.contactInfo && (
-                            <p><span className="text-muted-foreground">Contact/Addressee:</span> {selectedRequest.contactInfo}</p>
+                            <p className="break-words"><span className="text-muted-foreground">Contact/Addressee:</span> {selectedRequest.contactInfo}</p>
                           )}
                           {!selectedRequest.companyName && !selectedRequest.contactInfo && (
                             <p className="text-muted-foreground text-xs italic">Open generic letter</p>
@@ -864,22 +867,36 @@ export default function AdminLetterRequestsPage() {
                       Close
                     </Button>
                     <div className="flex gap-2">
-                      <Button
-                        variant="destructive"
-                        onClick={() => handleUpdateStatus("rejected")}
-                        disabled={isUpdating}
-                      >
-                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <XCircle className="mr-2 h-4 w-4" />}
-                        Reject
-                      </Button>
-                      <Button
-                        onClick={() => handleUpdateStatus("approved")}
-                        disabled={isUpdating}
-                        className="bg-green-600 hover:bg-green-700"
-                      >
-                        {isUpdating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                        Approve & Generate Letter
-                      </Button>
+                      {isUpdating ? (
+                        updatingAction === "rejected" ? (
+                          <Button variant="destructive" disabled>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Rejecting...
+                          </Button>
+                        ) : (
+                          <Button className="bg-green-600 hover:bg-green-700" disabled>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            Approving...
+                          </Button>
+                        )
+                      ) : (
+                        <>
+                          <Button
+                            variant="destructive"
+                            onClick={() => handleUpdateStatus("rejected")}
+                          >
+                            <XCircle className="mr-2 h-4 w-4" />
+                            Reject
+                          </Button>
+                          <Button
+                            onClick={() => handleUpdateStatus("approved")}
+                            className="bg-green-600 hover:bg-green-700"
+                          >
+                            <CheckCircle2 className="mr-2 h-4 w-4" />
+                            Approve & Generate Letter
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ) : (

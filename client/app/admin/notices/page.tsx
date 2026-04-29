@@ -122,6 +122,8 @@ const NoticeForm = ({ formData, setFormData }: { formData: any, setFormData: any
           <SelectContent>
             <SelectItem value="all">All Users</SelectItem>
             <SelectItem value="students">Students Only</SelectItem>
+            <SelectItem value="hod">HOD Only</SelectItem>
+            <SelectItem value="secutuary">Secutuary Only</SelectItem>
             <SelectItem value="admins">Admins Only</SelectItem>
           </SelectContent>
         </Select>
@@ -444,6 +446,10 @@ export default function NoticesManagementPage() {
                               ? "All Users"
                               : notice.targetAudience === "students"
                                 ? "Students"
+                                : notice.targetAudience === "hod"
+                                  ? "HOD"
+                                  : notice.targetAudience === "secutuary"
+                                    ? "Secutuary"
                                 : "Admins"}
                           </Badge>
                           {!notice.isActive && (

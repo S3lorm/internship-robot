@@ -42,17 +42,25 @@ import {
   MoreVertical,
   UserCheck,
   UserX,
-  Trash2,
+  Archive,
   Mail,
-  Download,
   Users,
+  Plus,
 } from "lucide-react"
 import { User } from "@/types"
-import { usersApi } from "@/lib/api"
+import { authApi, usersApi } from "@/lib/api"
 import { toast } from "sonner"
 import { useSearchParams } from "next/navigation"
 import { Suspense } from "react"
 import Loading from "./loading"
+
+const fallbackRegistrationDepartments = [
+  "Marine Engineering Department",
+  "Computer Engineering Department",
+  "Information and Communications Technology Department",
+  "Nautical Science Department",
+  "Department of Transport, Port & Shipping Administration",
+]
 
 export default function UserManagementPage() {
   const [users, setUsers] = useState<User[]>([])
@@ -63,9 +71,20 @@ export default function UserManagementPage() {
   const [roleFilter, setRoleFilter] = useState<string>("all")
   const [selectedUsers, setSelectedUsers] = useState<string[]>([])
   const [isLoading, setIsLoading] = useState(true)
-  const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; user: User | null }>({
+  const [archiveDialog, setArchiveDialog] = useState<{ open: boolean; user: User | null }>({
     open: false,
     user: null,
+  })
+  const [createDialogOpen, setCreateDialogOpen] = useState(false)
+  const [isCreating, setIsCreating] = useState(false)
+  const [catalogDepartments, setCatalogDepartments] = useState<string[]>(fallbackRegistrationDepartments)
+  const [catalogLoading, setCatalogLoading] = useState(true)
+  const [createForm, setCreateForm] = useState({
+    firstName: "",
+    lastName: "",
+    email: "",
+    department: "",
+    role: "hod" as "hod" | "secutuary",
   })
   const searchParams = useSearchParams()
 
@@ -98,13 +117,41 @@ export default function UserManagementPage() {
     fetchUsers()
   }, [])
 
+  useEffect(() => {
+    let mounted = true
+    const loadCatalog = async () => {
+      setCatalogLoading(true)
+      const response = await authApi.getRegistrationCatalog()
+      if (!mounted) return
+      if (response.error) {
+        console.warn("Using fallback staff department catalog:", response.error)
+        setCatalogLoading(false)
+        return
+      }
+      const departments = ((response.data as any)?.departments || [])
+        .map((d: { name?: string }) => String(d?.name || "").trim())
+        .filter(Boolean)
+      if (departments.length > 0) {
+        setCatalogDepartments(departments.sort((a: string, b: string) => a.localeCompare(b)))
+      }
+      setCatalogLoading(false)
+    }
+    void loadCatalog()
+    return () => {
+      mounted = false
+    }
+  }, [])
+
   const departmentOptions = useMemo(() => {
     const set = new Set<string>()
+    for (const d of catalogDepartments) {
+      if (d.trim()) set.add(d.trim())
+    }
     for (const u of users) {
       if (u.department?.trim()) set.add(u.department.trim())
     }
     return Array.from(set).sort((a, b) => a.localeCompare(b))
-  }, [users])
+  }, [users, catalogDepartments])
 
   useEffect(() => {
     let filtered = users
@@ -153,15 +200,21 @@ export default function UserManagementPage() {
     }
   }
 
-  const handleDeleteUser = async () => {
-    if (deleteDialog.user) {
+  const handleArchiveUser = async () => {
+    if (archiveDialog.user) {
       try {
-        await usersApi.delete(deleteDialog.user.id)
-        setUsers((prev) => prev.filter((user) => user.id !== deleteDialog.user?.id))
-        toast.success("User deleted successfully")
-        setDeleteDialog({ open: false, user: null })
+        await usersApi.updateStatus(archiveDialog.user.id, false)
+        setUsers((prev) =>
+          prev.map((user) =>
+            user.id === archiveDialog.user?.id
+              ? { ...user, isActive: false }
+              : user
+          )
+        )
+        toast.success("User archived successfully")
+        setArchiveDialog({ open: false, user: null })
       } catch (error) {
-        toast.error("Failed to delete user")
+        toast.error("Failed to archive user")
       }
     }
   }
@@ -177,8 +230,8 @@ export default function UserManagementPage() {
       for (const id of selectedUsers) {
         if (action === "activate" || action === "deactivate") {
           await usersApi.updateStatus(id, action === "activate")
-        } else if (action === "delete") {
-          await usersApi.delete(id)
+        } else if (action === "archive") {
+          await usersApi.updateStatus(id, false)
         }
       }
 
@@ -189,8 +242,8 @@ export default function UserManagementPage() {
         case "deactivate":
           toast.success(`${selectedUsers.length} users deactivated`)
           break
-        case "delete":
-          toast.success(`${selectedUsers.length} users deleted`)
+        case "archive":
+          toast.success(`${selectedUsers.length} users archived`)
           break
       }
       fetchUsers()
@@ -201,30 +254,52 @@ export default function UserManagementPage() {
     }
   }
 
-  const handleExport = () => {
-    const csvContent = [
-      ["ID", "Name", "Email", "Student ID", "Department", "Role", "Status", "Created At"].join(","),
-      ...filteredUsers.map((user) =>
-        [
-          user.id,
-          `${user.firstName} ${user.lastName}`,
-          user.email,
-          user.studentId || "N/A",
-          user.department || "N/A",
-          user.role,
-          user.isActive ? "Active" : "Inactive",
-          new Date((user as any).createdAt || new Date()).toLocaleDateString(),
-        ].join(",")
-      ),
-    ].join("\n")
+  const resetCreateForm = () => {
+    setCreateForm({
+      firstName: "",
+      lastName: "",
+      email: "",
+      department: "",
+      role: "hod",
+    })
+  }
 
-    const blob = new Blob([csvContent], { type: "text/csv" })
-    const url = window.URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url
-    a.download = `users-export-${new Date().toISOString().split("T")[0]}.csv`
-    a.click()
-    toast.success("Users exported successfully")
+  const handleCreateStaff = async () => {
+    if (!createForm.firstName.trim() || !createForm.lastName.trim() || !createForm.email.trim() || !createForm.department.trim()) {
+      toast.error("Please fill in first name, last name, email and department.")
+      return
+    }
+
+    setIsCreating(true)
+    const response = await usersApi.createStaff({
+      firstName: createForm.firstName.trim(),
+      lastName: createForm.lastName.trim(),
+      email: createForm.email.trim().toLowerCase(),
+      department: createForm.department.trim(),
+      role: createForm.role,
+    })
+    setIsCreating(false)
+
+    if (response.error) {
+      if (response.error.toLowerCase().includes("authentication required")) {
+        toast.error("Your session has expired. Please sign in again.")
+        return
+      }
+      toast.error(response.error)
+      return
+    }
+
+    const data = response.data as { message?: string; emailSent?: boolean; temporaryPassword?: string } | undefined
+    const baseMessage = data?.message || "Staff account created successfully."
+    if (data?.emailSent === false && data?.temporaryPassword) {
+      toast.success(`${baseMessage} Temporary password: ${data.temporaryPassword}`)
+    } else {
+      toast.success(baseMessage)
+    }
+
+    setCreateDialogOpen(false)
+    resetCreateForm()
+    fetchUsers()
   }
 
   const stats = {
@@ -292,6 +367,24 @@ export default function UserManagementPage() {
                 />
               </div>
               <div className="flex flex-wrap gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      View Accounts
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start">
+                    <DropdownMenuItem onClick={() => setStatusFilter("all")}>
+                      All accounts
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setStatusFilter("active")}>
+                      Active accounts
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => setStatusFilter("inactive")}>
+                      Archived accounts
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
                 <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
                   <SelectTrigger className="w-[200px]">
                     <SelectValue placeholder="Department" />
@@ -316,19 +409,9 @@ export default function UserManagementPage() {
                     <SelectItem value="secutuary">Secutuary</SelectItem>
                   </SelectContent>
                 </Select>
-                <Select value={statusFilter} onValueChange={setStatusFilter}>
-                  <SelectTrigger className="w-36">
-                    <SelectValue placeholder="Status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Status</SelectItem>
-                    <SelectItem value="active">Active</SelectItem>
-                    <SelectItem value="inactive">Inactive</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button variant="outline" onClick={handleExport}>
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
+                <Button onClick={() => setCreateDialogOpen(true)}>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create HOD/Secutuary
                 </Button>
               </div>
             </div>
@@ -348,10 +431,12 @@ export default function UserManagementPage() {
                     <UserX className="h-4 w-4 mr-1" />
                     Deactivate
                   </Button>
-                  <Button size="sm" variant="destructive" onClick={() => handleBulkAction("delete")}>
-                    <Trash2 className="h-4 w-4 mr-1" />
-                    Delete
-                  </Button>
+                  {statusFilter !== "inactive" && (
+                    <Button size="sm" variant="outline" onClick={() => handleBulkAction("archive")}>
+                      <Archive className="h-4 w-4 mr-1" />
+                      Archive
+                    </Button>
+                  )}
                 </div>
               </div>
             )}
@@ -496,13 +581,14 @@ export default function UserManagementPage() {
                                 )}
                               </DropdownMenuItem>
                               <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive"
-                                onClick={() => setDeleteDialog({ open: true, user })}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Delete User
-                              </DropdownMenuItem>
+                              {user.isActive && (
+                                <DropdownMenuItem
+                                  onClick={() => setArchiveDialog({ open: true, user })}
+                                >
+                                  <Archive className="mr-2 h-4 w-4" />
+                                  Archive User
+                                </DropdownMenuItem>
+                              )}
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
@@ -515,22 +601,112 @@ export default function UserManagementPage() {
           </CardContent>
         </Card>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog open={deleteDialog.open} onOpenChange={(open) => setDeleteDialog({ open, user: null })}>
+        {/* Archive Confirmation Dialog */}
+        <Dialog open={archiveDialog.open} onOpenChange={(open) => setArchiveDialog({ open, user: null })}>
           <DialogContent>
             <DialogHeader>
-              <DialogTitle>Delete User</DialogTitle>
+              <DialogTitle>Archive User</DialogTitle>
               <DialogDescription>
-                Are you sure you want to delete {deleteDialog.user?.firstName} {deleteDialog.user?.lastName}?
-                This action cannot be undone.
+                Are you sure you want to archive {archiveDialog.user?.firstName} {archiveDialog.user?.lastName}?
+                Archived users can be reactivated later.
               </DialogDescription>
             </DialogHeader>
             <DialogFooter>
-              <Button variant="outline" onClick={() => setDeleteDialog({ open: false, user: null })}>
+              <Button variant="outline" onClick={() => setArchiveDialog({ open: false, user: null })}>
                 Cancel
               </Button>
-              <Button variant="destructive" onClick={handleDeleteUser}>
-                Delete
+              <Button onClick={handleArchiveUser}>
+                Archive
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog
+          open={createDialogOpen}
+          onOpenChange={(open) => {
+            setCreateDialogOpen(open)
+            if (!open) resetCreateForm()
+          }}
+        >
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create staff account</DialogTitle>
+              <DialogDescription>
+                Create a HOD or secutuary account. A temporary password will be emailed automatically, and the user
+                must change it on first login.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Input
+                  placeholder="First name"
+                  value={createForm.firstName}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, firstName: e.target.value }))}
+                />
+                <Input
+                  placeholder="Last name"
+                  value={createForm.lastName}
+                  onChange={(e) => setCreateForm((prev) => ({ ...prev, lastName: e.target.value }))}
+                />
+              </div>
+              <Input
+                type="email"
+                placeholder="Email address"
+                value={createForm.email}
+                onChange={(e) => setCreateForm((prev) => ({ ...prev, email: e.target.value }))}
+              />
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <Select
+                  value={createForm.role}
+                  onValueChange={(value: "hod" | "secutuary") =>
+                    setCreateForm((prev) => ({ ...prev, role: value }))
+                  }
+                >
+                  <SelectTrigger className="w-full min-w-0">
+                    <SelectValue placeholder="Select role" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="hod">HOD</SelectItem>
+                    <SelectItem value="secutuary">Secutuary</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={createForm.department}
+                  onValueChange={(value) => setCreateForm((prev) => ({ ...prev, department: value }))}
+                >
+                  <SelectTrigger className="w-full min-w-0" disabled={catalogLoading}>
+                    <SelectValue placeholder={catalogLoading ? "Loading departments..." : "Select department"} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {catalogDepartments.length === 0 ? (
+                      <SelectItem value="__none" disabled>
+                        No departments available
+                      </SelectItem>
+                    ) : (
+                      catalogDepartments.map((d) => (
+                        <SelectItem key={d} value={d}>
+                          {d}
+                        </SelectItem>
+                      ))
+                    )}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setCreateDialogOpen(false)
+                  resetCreateForm()
+                }}
+                disabled={isCreating}
+              >
+                Cancel
+              </Button>
+              <Button onClick={handleCreateStaff} disabled={isCreating}>
+                {isCreating ? "Creating..." : "Create account"}
               </Button>
             </DialogFooter>
           </DialogContent>

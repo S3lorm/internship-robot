@@ -41,16 +41,35 @@ module.exports = async function auth(req, res, next) {
     // Remove password from user object
     delete user.password;
 
+    // Build a normalized route string that works for nested routers.
+    const routePath = `${req.baseUrl || ''}${req.path || ''}`;
+    const fullPath = req.originalUrl || routePath;
+
     // For students, check email verification (except for auth routes and profile update)
-    // Allow access to verify-email, resend-verification, and profile update routes
+    // Allow access to verify-email, resend-verification, and profile routes
     const allowedPaths = ['/auth/verify-email', '/auth/resend-verification', '/profile'];
-    const isAllowedPath = allowedPaths.some(path => req.path.includes(path));
+    const isAllowedPath = allowedPaths.some(
+      path => routePath.includes(path) || fullPath.includes(path)
+    );
 
     if (user.role === 'student' && !user.isEmailVerified && !isAllowedPath) {
       return res.status(403).json({ 
         message: 'Please verify your email before accessing this resource.',
         requiresVerification: true 
       });
+    }
+
+    if (user.mustChangePassword) {
+      const passwordChangeAllowedPaths = ['/auth/me', '/profile/password'];
+      const canProceed = passwordChangeAllowedPaths.some(
+        path => routePath.includes(path) || fullPath.includes(path)
+      );
+      if (!canProceed) {
+        return res.status(403).json({
+          message: 'Password update required before accessing this resource.',
+          requiresPasswordChange: true,
+        });
+      }
     }
 
     // Treat "secutuary" as HOD-equivalent for route authorization and dashboards.

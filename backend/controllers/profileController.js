@@ -22,10 +22,14 @@ async function update(req, res) {
 
 async function changePassword(req, res) {
   const { currentPassword, newPassword } = req.body;
+  if (!newPassword || String(newPassword).length < 6) {
+    return res.status(400).json({ message: 'New password must be at least 6 characters.' });
+  }
   const user = await User.findByPk(req.user.id);
   const ok = await bcrypt.compare(currentPassword, user.password);
   if (!ok) return res.status(400).json({ message: 'Current password is incorrect' });
   user.password = await bcrypt.hash(newPassword, 10);
+  user.mustChangePassword = false;
   await user.save();
   return res.json({ message: 'Password updated' });
 }

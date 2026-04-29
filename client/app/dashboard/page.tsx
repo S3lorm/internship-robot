@@ -9,9 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import {
-  mockTrendingNews,
-} from "@/lib/mock-data";
 import { dashboardApi, lettersApi } from "@/lib/api";
 import { toast } from "sonner";
 import type { Application, Internship, Notice, Notification, LetterRequest } from "@/types";
@@ -20,13 +17,9 @@ import {
   Clock,
   CheckCircle2,
   XCircle,
-  ArrowRight,
   Bell,
   Eye,
-  Mail,
   Loader2,
-  Newspaper,
-  ExternalLink,
   Download,
   Printer,
   FileCheck2,
@@ -291,63 +284,56 @@ export default function DashboardPage() {
         </Card>
       )}
 
-      {/* Stats — values from your account (API) */}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      {/* Essentials and quick actions */}
+      <div className="grid gap-6 lg:grid-cols-2">
         <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-yellow-100">
-              <Clock className="h-6 w-6 text-yellow-600" />
-            </div>
-            <div className="min-w-0">
-              {loading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              ) : (
-                <>
-                  <p className="text-2xl font-bold">{stats.pending + stats.underReview}</p>
-                  <p className="text-sm text-muted-foreground">Applications in progress</p>
-                  <p className="text-xs text-muted-foreground/80">Pending + under review</p>
-                </>
-              )}
-            </div>
+          <CardHeader>
+            <CardTitle className="text-lg">Quick actions</CardTitle>
+            <CardDescription>Shortcuts to the pages you use most</CardDescription>
+          </CardHeader>
+          <CardContent className="grid gap-3 sm:grid-cols-2">
+            <Button asChild>
+              <Link href="/dashboard/applications">My applications</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/letter-requests">Letter requests</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/notifications">Notifications</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/dashboard/notices">Notices</Link>
+            </Button>
           </CardContent>
         </Card>
 
         <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
+          <CardHeader>
+            <CardTitle className="text-lg">What needs attention</CardTitle>
+            <CardDescription>Important items for your internship workflow</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Unread notifications</p>
+              <Badge variant={unreadNotifications.length > 0 ? "default" : "secondary"}>
+                {unreadNotifications.length}
+              </Badge>
             </div>
-            <div className="min-w-0">
-              {loading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              ) : (
-                <>
-                  <p className="text-2xl font-bold">{stats.approved}</p>
-                  <p className="text-sm text-muted-foreground">Applications approved</p>
-                  <p className="text-xs text-muted-foreground/80">Of {stats.total} submitted</p>
-                </>
-              )}
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Applications in progress</p>
+              <Badge variant={stats.pending + stats.underReview > 0 ? "default" : "secondary"}>
+                {stats.pending + stats.underReview}
+              </Badge>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-indigo-100">
-              <Mail className="h-6 w-6 text-indigo-600" />
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Pending letter requests</p>
+              <Badge variant={stats.letterRequestsPending > 0 ? "default" : "secondary"}>
+                {stats.letterRequestsPending}
+              </Badge>
             </div>
-            <div className="min-w-0">
-              {loading ? (
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-              ) : (
-                <>
-                  <p className="text-2xl font-bold">{stats.lettersEmailedToCompany}</p>
-                  <p className="text-sm text-muted-foreground">Company letters emailed</p>
-                  <p className="text-xs text-muted-foreground/80">
-                    {stats.lettersCompanyApproved} approved (company type)
-                  </p>
-                </>
-              )}
+            <div className="flex items-center justify-between rounded-lg border p-3">
+              <p className="text-sm text-muted-foreground">Approved applications</p>
+              <Badge variant="outline">{stats.approved}</Badge>
             </div>
           </CardContent>
         </Card>
@@ -532,7 +518,7 @@ export default function DashboardPage() {
                   <ScrollArea className="h-[min(420px,55vh)] pr-3">
                     <div className="space-y-2">
                       {sortedNotifications.map((notification) => {
-                        const href = notification.link || "/dashboard/notifications";
+                        const href = "/dashboard/notifications";
                         return (
                           <Link
                             key={notification.id}
@@ -576,70 +562,6 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Daily News of Trending Companies in Ghana */}
-      <Card>
-        <CardHeader className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Newspaper className="h-5 w-5 text-primary" />
-              Daily News: Trending Companies in Ghana
-            </CardTitle>
-            <CardDescription>
-              Stay updated with the latest news from top maritime and logistics companies in Ghana
-            </CardDescription>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2 selection:bg-primary/10">
-            {mockTrendingNews.map((news) => (
-              <div
-                key={news.id}
-                className="group flex flex-col rounded-lg border border-border bg-card p-5 transition-all hover:border-primary/50 hover:shadow-md"
-              >
-                <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                  <Badge variant="secondary" className="font-medium text-primary">
-                    {news.company}
-                  </Badge>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {new Date(news.date).toLocaleDateString("en-GB", {
-                        day: "numeric",
-                        month: "short",
-                        year: "numeric",
-                      })}
-                    </span>
-                    <span>{news.readTime}</span>
-                  </div>
-                </div>
-
-                <h3 className="mb-2 font-semibold leading-tight text-foreground transition-colors group-hover:text-primary">
-                  {news.headline}
-                </h3>
-
-                <p className="mb-4 text-sm text-muted-foreground flex-grow">
-                  {news.summary}
-                </p>
-
-                <Button variant="ghost" size="sm" className="mt-auto w-full justify-between" asChild>
-                  <a href={news.url || "#"} target="_blank" rel="noopener noreferrer">
-                    Read full article
-                    <ExternalLink className="ml-2 h-4 w-4" />
-                  </a>
-                </Button>
-              </div>
-            ))}
-          </div>
-          {mockTrendingNews.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-8 text-center">
-              <Newspaper className="mb-3 h-10 w-10 text-muted-foreground/30" />
-              <p className="text-muted-foreground">
-                No trending news available at the moment.
-              </p>
-            </div>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

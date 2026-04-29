@@ -522,6 +522,32 @@ export const usersApi = {
 
   getById: (id: string) => fetchApi(`/users/${id}`),
 
+  createStaff: (data: {
+    firstName: string;
+    lastName: string;
+    email: string;
+    department: string;
+    role: 'hod' | 'secutuary';
+  }) =>
+    fetch(`${API_BASE_URL}/users`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(typeof window !== 'undefined' && localStorage.getItem('rmu_token')
+          ? { Authorization: `Bearer ${localStorage.getItem('rmu_token')}` }
+          : {}),
+      },
+      body: JSON.stringify(data),
+    }).then(async (res) => {
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        return { error: json.message || json.error || `Error ${res.status}: ${res.statusText}`, data: json };
+      }
+      return { data: json };
+    }).catch((error) => {
+      return { error: error?.message || 'Network error. Please try again.' };
+    }),
+
   updateStatus: (id: string, isActive: boolean) =>
     fetchApi(`/users/${id}/status`, {
       method: 'PATCH',

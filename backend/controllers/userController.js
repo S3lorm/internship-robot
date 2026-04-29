@@ -1,4 +1,7 @@
 const { User } = require('../models');
+const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
+const { sendTemporaryPasswordEmail } = require('../services/emailService');
 
 function parsePagination(req) {
   const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
@@ -105,5 +108,125 @@ async function exportCsv(_req, res) {
   return res.send(csv);
 }
 
-module.exports = { list, getById, update, updateStatus, remove, exportCsv };
+function normalizeEmail(email) {
+  return String(email || '').trim().toLowerCase();
+}
+
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+}
+
+function generateTemporaryPassword() {
+  // Keep it easy to type while still strong enough for one-time use.
+  const alpha = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+  const digits = '23456789';
+  const symbols = '@#$%!';
+  const all = alpha + digits + symbols;
+
+  let password = '';
+  password += alpha[crypto.randomInt(0, alpha.length)];
+  password += alpha[crypto.randomInt(0, alpha.length)];
+  password += digits[crypto.randomInt(0, digits.length)];
+  password += symbols[crypto.randomInt(0, symbols.length)];
+  for (let i = 0; i < 8; i += 1) {
+    password += all[crypto.randomInt(0, all.length)];
+  }
+  return password
+    .split('')
+    .sort(() => Math.random() - 0.5)
+    .join('');
+}
+
+async function createStaff(req, res) {
+  try {
+    const normalizedEmail = normalizeEmail(req.body.email);
+    const firstName = String(req.body.firstName || '').trim();
+    const lastName = String(req.body.lastName || '').trim();
+    const department = String(req.body.department || '').trim();
+    const role = String(req.body.role || '').trim().toLowerCase();
+
+    if (!isValidEmail(normalizedEmail)) {
+      return res.status(400).json({ message: 'A valid email is required.' });
+    }
+    if (!firstName || !lastName) {
+      return res.status(400).json({ message: 'First name and last name are required.' });
+    }
+    if (!department) {
+      return res.status(400).json({ message: 'Department is required.' });
+    }
+    if (!['hod', 'secutuary'].includes(role)) {
+      return res.status(400).json({ message: 'Role must be either hod or secutuary.' });
+    }
+
+    const existingActiveInDepartment = await User.findOne({
+      where: {
+        role,
+        department,
+        isActive: true,
+      },
+    });
+    if (existingActiveInDepartment) {
+      const roleLabel = role === 'hod' ? 'HOD' : 'Secutuary';
+      return res.status(409).json({
+        message: `An active ${roleLabel} already exists for ${department}. Deactivate the existing account before creating a new one.`,
+      });
+    }
+
+    const existing = await User.findOne({ where: { email: normalizedEmail } });
+    if (existing) {
+      return res.status(409).json({ message: 'An account with this email already exists.' });
+    }
+
+    const temporaryPassword = generateTemporaryPassword();
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
+
+    const created = await User.create({
+      email: normalizedEmail,
+      password: hashedPassword,
+      firstName,
+      lastName,
+      role,
+      department,
+      isActive: true,
+      isEmailVerified: true,
+      mustChangePassword: true,
+    });
+
+    const safeUser = created.toJSON();
+    delete safeUser.password;
+
+    try {
+      await sendTemporaryPasswordEmail(
+        {
+          ...safeUser,
+          role,
+          firstName,
+        },
+        temporaryPassword
+      );
+      return res.status(201).json({
+        message: `Staff account created. Temporary password has been sent to ${normalizedEmail}.`,
+        user: safeUser,
+      });
+    } catch (emailError) {
+      console.error('Failed to send temporary password email:', emailError);
+      return res.status(201).json({
+        message:
+          'Staff account created, but email delivery failed. Share this temporary password manually and ask the user to change it on first login.',
+        user: safeUser,
+        emailSent: false,
+        temporaryPassword,
+      });
+    }
+  } catch (error) {
+    console.error('Error creating staff account:', error);
+    const combined = `${error?.message || ''} ${error?.details || ''}`.toLowerCase();
+    if (error?.code === '23505' || combined.includes('duplicate key') || combined.includes('unique constraint')) {
+      return res.status(409).json({ message: 'An account with this email already exists.' });
+    }
+    return res.status(500).json({ message: 'Failed to create staff account.' });
+  }
+}
+
+module.exports = { list, getById, update, updateStatus, remove, exportCsv, createStaff };
 

@@ -212,7 +212,11 @@ async function login(req, res) {
     safeUser.role = 'hod';
   }
 
-  return res.json({ token, user: safeUser });
+  return res.json({
+    token,
+    user: safeUser,
+    requiresPasswordChange: Boolean(safeUser.mustChangePassword),
+  });
 }
 
 const loginHodValidators = [body('department').notEmpty(), body('password').notEmpty()];

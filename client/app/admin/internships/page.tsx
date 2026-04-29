@@ -45,7 +45,6 @@ import {
   CheckCircle,
   XCircle,
   Briefcase,
-  Construction,
   Loader2,
 } from "lucide-react"
 import { Internship } from "@/types"
@@ -100,12 +99,8 @@ export default function InternshipsManagementPage() {
 
   useEffect(() => {
     if (!user) return
-    if (user.role === "admin") {
+    if (user.role === "admin" || user.role === "hod") {
       router.replace("/admin")
-      return
-    }
-    if (user.role === "hod") {
-      setIsLoading(false)
       return
     }
     async function fetchInternships() {
@@ -369,38 +364,7 @@ export default function InternshipsManagementPage() {
     </div>
   )
 
-  if (user?.role === "admin") {
-    return (
-      <div className="flex justify-center py-16">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  if (user?.role === "hod") {
-    return (
-      <div className="space-y-6">
-        <Card className="border-amber-200 bg-amber-50/90 dark:bg-amber-950/25">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-amber-950 dark:text-amber-50">
-              <Construction className="h-5 w-5" />
-              Upcoming upgrade
-            </CardTitle>
-            <CardDescription className="text-amber-950/85 dark:text-amber-50/85">
-              Posting and managing internships from the Head of Department portal is not enabled in this
-              version. You can browse this screen as a preview; publishing and edits will arrive in a future
-              release.
-            </CardDescription>
-          </CardHeader>
-        </Card>
-        <Card>
-          <CardContent className="py-14 text-center text-muted-foreground text-sm">
-            Internship publishing tools for HODs are coming soon.
-          </CardContent>
-        </Card>
-      </div>
-    )
-  }
+  if (user?.role === "admin" || user?.role === "hod") return null
 
   if (isLoading) {
     return (

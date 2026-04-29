@@ -41,6 +41,10 @@ export default function LoginPage() {
       const storedUser = localStorage.getItem("rmu_user");
       if (storedUser) {
         const user = JSON.parse(storedUser);
+        if (user.mustChangePassword) {
+          router.push("/force-password-change");
+          return;
+        }
         if (user.role === "admin" || user.role === "hod") {
           router.push("/admin");
         } else {
