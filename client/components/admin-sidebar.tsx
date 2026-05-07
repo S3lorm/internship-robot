@@ -19,6 +19,8 @@ import {
   Anchor,
   ClipboardCheck,
   MapPinned,
+  BookOpen,
+  PenLine,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
@@ -27,6 +29,8 @@ const hodNavItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
   { href: "/admin/letter-requests", label: "Letter Requests", icon: FileCheck },
   { href: "/admin/official-placement-management", label: "Official placements", icon: MapPinned },
+  { href: "/admin/weekly-logbooks", label: "Weekly logbooks", icon: BookOpen },
+  { href: "/admin/signature", label: "Digital signature", icon: PenLine },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/evaluations", label: "Evaluations", icon: ClipboardCheck },
 ];

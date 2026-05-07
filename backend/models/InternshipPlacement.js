@@ -28,6 +28,7 @@ function mapPlacementFromSupabase(row) {
     evaluationSubmittedAt: row.evaluation_submitted_at,
     midpointDate: row.midpoint_date,
     supervisorEmail: row.supervisor_email,
+    signatureSnapshot: row.signature_snapshot,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     toJSON() { return { ...this }; },
@@ -63,6 +64,7 @@ function mapPlacementToSupabase(placement) {
   if (placement.evaluationSubmittedAt !== undefined) mapped.evaluation_submitted_at = placement.evaluationSubmittedAt;
   if (placement.midpointDate !== undefined) mapped.midpoint_date = placement.midpointDate;
   if (placement.supervisorEmail !== undefined) mapped.supervisor_email = placement.supervisorEmail;
+  if (placement.signatureSnapshot !== undefined) mapped.signature_snapshot = placement.signatureSnapshot;
   return mapped;
 }
 

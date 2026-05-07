@@ -280,11 +280,70 @@ async function sendTemporaryPasswordEmail(user, temporaryPassword) {
   });
 }
 
+async function sendWeeklyLogbookReviewEmail({ to, supervisorName, student, placement, token }) {
+  if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+    const error = new Error('SMTP not configured. Please set SMTP_USER and SMTP_PASS in backend/.env');
+    console.error('Cannot send weekly logbook review email:', error.message);
+    throw error;
+  }
+
+  if (!to) {
+    throw new Error('Supervisor email is required before sending a weekly logbook review link.');
+  }
+
+  const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
+  const reviewUrl = `${frontend}/weekly-log-review/${encodeURIComponent(token)}`;
+  const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER}>`;
+  const studentName = `${student?.firstName || ''} ${student?.lastName || ''}`.trim() || 'the student';
+
+  await transporter.sendMail({
+    from: emailFrom,
+    to,
+    subject: 'Weekly Log Sheet Book Review Required',
+    html: `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="utf-8">
+        <style>
+          body { font-family: Arial, sans-serif; line-height: 1.6; color: #334155; }
+          .container { max-width: 640px; margin: 0 auto; padding: 20px; }
+          .header { background-color: #0f766e; color: white; padding: 22px; text-align: center; }
+          .content { padding: 22px; background-color: #f8fafc; }
+          .button { display: inline-block; padding: 12px 20px; background-color: #0f766e; color: white; text-decoration: none; border-radius: 6px; margin: 18px 0; }
+          .note { background: #ecfdf5; border-left: 4px solid #0f766e; padding: 12px; }
+          .footer { text-align: center; padding: 18px; color: #64748b; font-size: 12px; }
+        </style>
+      </head>
+      <body>
+        <div class="container">
+          <div class="header">
+            <h1>Weekly Log Sheet Book Review</h1>
+          </div>
+          <div class="content">
+            <p>Dear ${supervisorName || 'Supervisor'},</p>
+            <p>${studentName} has finalized a Weekly Log Sheet Book for institutional internship documentation.</p>
+            <p><strong>Organization:</strong> ${placement?.organizationName || placement?.organization_name || 'N/A'}<br>
+            <strong>Internship period:</strong> ${placement?.internshipStartDate || placement?.internship_start_date || 'N/A'} to ${placement?.internshipEndDate || placement?.internship_end_date || 'N/A'}</p>
+            <p style="text-align:center"><a class="button" href="${reviewUrl}">Open secure review page</a></p>
+            <p class="note">This link is temporary, one-time use, and only allows acknowledgment and remarks. It is not the supervisor evaluation form.</p>
+            <p>Copy and paste this link if the button does not work:<br>${reviewUrl}</p>
+          </div>
+          <div class="footer">Regional Maritime University Internship Portal</div>
+        </div>
+      </body>
+      </html>
+    `,
+    text: `Dear ${supervisorName || 'Supervisor'},\n\n${studentName} has finalized a Weekly Log Sheet Book.\n\nOpen the secure review page: ${reviewUrl}\n\nThis link is temporary, one-time use, and is not the supervisor evaluation form.`,
+  });
+}
+
 module.exports = {
   sendVerificationEmail,
   sendPasswordResetEmail,
   sendPasswordResetOtp,
   sendApplicationStatusEmail,
   sendTemporaryPasswordEmail,
+  sendWeeklyLogbookReviewEmail,
 };
 

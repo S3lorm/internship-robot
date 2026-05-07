@@ -24,6 +24,7 @@ async function createPlacement(req, res) {
       organizationAddress,
       organizationEmail,
       supervisorName,
+      supervisorEmail,
       supervisorPosition,
       supervisorContact,
       internshipStartDate,
@@ -57,6 +58,7 @@ async function createPlacement(req, res) {
       organizationAddress,
       organizationEmail,
       supervisorName,
+      supervisorEmail,
       supervisorPosition,
       supervisorContact,
       internshipStartDate,
@@ -290,6 +292,18 @@ async function updatePlacementStatus(req, res) {
       updateData.officialLetterUrl = `/api/placements/${id}/download-letter`;
       updateData.officialLetterGeneratedAt = new Date().toISOString();
 
+      try {
+        const { User: UserModel } = require('../models');
+        const { resolveOfficialPlacementSignature } = require('../services/officialPlacementLetterSignature');
+        const { signatureSnapshot } = require('../services/staffSignatureService');
+        const student = await UserModel.findOne({ id: placement.studentId });
+        if (student) {
+          updateData.signatureSnapshot = signatureSnapshot(await resolveOfficialPlacementSignature({ ...placement, reviewedBy: user.id }, student));
+        }
+      } catch (signatureErr) {
+        console.error('Official placement signature snapshot failed:', signatureErr.message || signatureErr);
+      }
+
       // Generate secure evaluation token using SHA-256
       const tokenRaw = `${id}-${placement.studentId}-${Date.now()}-${crypto.randomBytes(32).toString('hex')}`;
       const tokenHash = crypto.createHash('sha256').update(tokenRaw).digest('hex');
@@ -499,7 +513,8 @@ async function downloadOfficialLetter(req, res) {
     }
 
     const { resolveOfficialPlacementSignature } = require('../services/officialPlacementLetterSignature');
-    const signature = await resolveOfficialPlacementSignature(placement, student);
+    const { signatureFromSnapshot } = require('../services/staffSignatureService');
+    const signature = signatureFromSnapshot(placement.signatureSnapshot, student) || await resolveOfficialPlacementSignature(placement, student);
 
     const pdfBuffer = await generateOfficialLetterPDF(placement, student, signature);
 

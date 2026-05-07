@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   Briefcase,
   FileText,
+  BookOpen,
   Bell,
   User,
   LogOut,
@@ -30,6 +31,7 @@ const overviewItems: NavItem[] = [
 
 const workspaceItems: NavItem[] = [
   { name: "Internships", href: "/dashboard/internships", icon: Briefcase },
+  { name: "Weekly Logbook", href: "/dashboard/weekly-logbook", icon: BookOpen },
   { name: "Evaluations", href: "/dashboard/evaluations", icon: ClipboardCheck },
   { name: "Letter Requests", href: "/dashboard/letter-requests", icon: FileText },
 ];

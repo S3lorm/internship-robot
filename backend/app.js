@@ -27,6 +27,9 @@ const securityRoutes = require('./routes/security');
 const dashboardRoutes = require('./routes/dashboard');
 const placementRoutes = require('./routes/placements');
 const supervisorEvaluationRoutes = require('./routes/supervisorEvaluation');
+const weeklyLogbookRoutes = require('./routes/weeklyLogbooks');
+const weeklyLogReviewRoutes = require('./routes/weeklyLogReview');
+const staffSignatureRoutes = require('./routes/staffSignatures');
 const activityLogger = require('./middleware/activityLogger');
 const { apiLimiter } = require('./middleware/security');
 
@@ -102,9 +105,12 @@ app.use('/api/feedback', feedbackAcknowledgmentRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/placements', placementRoutes);
+app.use('/api/weekly-logbooks', weeklyLogbookRoutes);
+app.use('/api/staff-signatures', staffSignatureRoutes);
 
 // Public routes (no auth required)
 app.use('/api/evaluate', supervisorEvaluationRoutes);
+app.use('/api/weekly-log-review', weeklyLogReviewRoutes);
 
 // Public document verification
 const { verifyDocument } = require('./controllers/placementController');

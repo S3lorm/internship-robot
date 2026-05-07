@@ -113,22 +113,11 @@ async function generateOfficialLetterPDF(placement, student, signature) {
       doc.moveDown(1.5);
 
       // -- SIGNATURE --
+      const { drawSignatureOnPdf } = require('./staffSignatureService');
       doc.text('Yours faithfully,');
-      doc.moveDown(2);
-
-      // Try to load signature image
-      const sigPath = signature.imagePath
-        ? path.resolve(signature.imagePath)
-        : path.join(__dirname, '..', 'public', 'signatures', 'default-signature.png');
-
-      if (fs.existsSync(sigPath)) {
-        try {
-          doc.image(sigPath, { width: 150 });
-          doc.moveDown(0.5);
-        } catch (e) {
-          // If image fails, silently continue with text signature
-        }
-      }
+      doc.moveDown(0.8);
+      drawSignatureOnPdf(doc, signature, { width: 150, height: 48, fontSize: 20 });
+      doc.moveDown(0.7);
 
       doc.moveTo(doc.x, doc.y).lineTo(doc.x + 200, doc.y).stroke();
       doc.moveDown(0.3);
@@ -161,4 +150,100 @@ async function generateOfficialLetterPDF(placement, student, signature) {
   });
 }
 
-module.exports = { generateOfficialLetterPDF };
+async function generateWeeklyLogbookPDF(bundle) {
+  return new Promise((resolve, reject) => {
+    try {
+      const doc = new PDFDocument({ size: 'A4', margin: 48 });
+      const chunks = [];
+      doc.on('data', (chunk) => chunks.push(chunk));
+      doc.on('end', () => resolve(Buffer.concat(chunks)));
+      doc.on('error', reject);
+
+      const student = bundle.student || {};
+      const placement = bundle.placement || {};
+      const logbook = bundle.logbook || {};
+      const review = bundle.review || {};
+
+      const drawHeader = () => {
+        const logoPath = path.join(__dirname, '..', 'public', 'rmu-crest.png');
+        if (fs.existsSync(logoPath)) {
+          try {
+            doc.image(logoPath, (doc.page.width - 58) / 2, doc.y, { width: 58 });
+            doc.moveDown(3.8);
+          } catch {
+            doc.moveDown(0.5);
+          }
+        }
+        doc.fontSize(15).font('Helvetica-Bold').text('REGIONAL MARITIME UNIVERSITY', { align: 'center' });
+        doc.moveDown(0.3);
+        doc.fontSize(12).text('WEEKLY LOG SHEET BOOK', { align: 'center' });
+        doc.moveDown(0.4);
+        doc.fontSize(9).font('Helvetica').text('Internship / Industrial Training Documentation', { align: 'center' });
+        doc.moveDown(0.8);
+        doc.moveTo(48, doc.y).lineTo(547, doc.y).stroke('#1f2937');
+        doc.moveDown(0.8);
+      };
+
+      const line = (label, value) => {
+        doc.font('Helvetica-Bold').text(`${label}: `, { continued: true });
+        doc.font('Helvetica').text(value || 'N/A');
+      };
+
+      drawHeader();
+      doc.fontSize(10);
+      line('Student', `${student.firstName || ''} ${student.lastName || ''}`.trim());
+      line('Student ID', student.studentId);
+      line('Programme', student.program);
+      line('Department', student.department);
+      line('Organization', placement.organization_name);
+      line('Department / Office', placement.department_role);
+      line('Supervisor', placement.supervisor_name);
+      line('Internship Duration', `${placement.internship_start_date || 'N/A'} to ${placement.internship_end_date || 'N/A'}`);
+      line('Status', String(logbook.status || '').replace(/_/g, ' '));
+      doc.moveDown();
+
+      for (const entry of bundle.entries || []) {
+        if (doc.y > 650) {
+          doc.addPage();
+          drawHeader();
+        }
+        doc.fontSize(11).font('Helvetica-Bold').text(`Week ${entry.weekNumber}: ${entry.weekBeginning} to ${entry.weekEnding}`);
+        doc.moveDown(0.4);
+        doc.fontSize(9);
+        for (const activity of entry.activities || []) {
+          doc.font('Helvetica-Bold').text(`${activity.day || ''} ${activity.date || ''}`.trim() || 'Day', { continued: true });
+          doc.font('Helvetica').text(` - ${activity.activity || ''}`);
+        }
+        doc.moveDown(0.3);
+        line('Student Remark', entry.studentRemark);
+        doc.moveDown(0.7);
+      }
+
+      doc.addPage();
+      drawHeader();
+      doc.fontSize(12).font('Helvetica-Bold').text('Supervisor Acknowledgment');
+      doc.moveDown(0.5);
+      doc.fontSize(10);
+      line('Confirmed Name', review.supervisorFullName);
+      line('Remark', review.supervisorRemark);
+      line('Recommendation', review.supervisorRecommendation);
+      line('Reviewed At', logbook.supervisorReviewedAt);
+      doc.moveDown();
+      doc.fontSize(12).font('Helvetica-Bold').text('Institutional Approval');
+      doc.moveDown(0.5);
+      doc.fontSize(10);
+      line('Decision', review.hodDecision || (logbook.status === 'hod_approved' ? 'approved' : 'pending'));
+      line('HOD / Secretary Remark', review.hodRemark || logbook.hodDecisionNote);
+      line('Approved / Reviewed At', logbook.hodReviewedAt);
+      line('Archive Reference', logbook.archiveReference);
+      doc.moveDown(1.5);
+      doc.fontSize(8).fillColor('#64748b').text('This official record documents weekly internship activities and supervisor acknowledgment only. Evaluation and grading are handled separately.', { align: 'center' });
+
+      doc.end();
+    } catch (err) {
+      reject(err);
+    }
+  });
+}
+
+module.exports = { generateOfficialLetterPDF, generateWeeklyLogbookPDF };

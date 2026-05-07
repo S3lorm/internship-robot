@@ -26,6 +26,7 @@ function mapLetterRequestFromSupabase(row) {
     verificationCode: row.verification_code,
     pdfUrl: row.pdf_url,
     pdfGeneratedAt: row.pdf_generated_at,
+    signatureSnapshot: row.signature_snapshot,
     emailSent: row.email_sent,
     emailSentAt: row.email_sent_at,
     downloadCount: row.download_count,
@@ -67,6 +68,7 @@ function mapLetterRequestToSupabase(request) {
   if (request.verificationCode !== undefined) mapped.verification_code = request.verificationCode;
   if (request.pdfUrl !== undefined) mapped.pdf_url = request.pdfUrl;
   if (request.pdfGeneratedAt !== undefined) mapped.pdf_generated_at = request.pdfGeneratedAt;
+  if (request.signatureSnapshot !== undefined) mapped.signature_snapshot = request.signatureSnapshot;
   if (request.emailSent !== undefined) mapped.email_sent = request.emailSent;
   if (request.emailSentAt !== undefined) mapped.email_sent_at = request.emailSentAt;
   if (request.downloadCount !== undefined) mapped.download_count = request.downloadCount;

@@ -73,6 +73,7 @@ export default function OfficialPlacementsPage() {
     organizationAddress: "",
     organizationEmail: "",
     supervisorName: "",
+    supervisorEmail: "",
     supervisorPosition: "",
     supervisorContact: "",
     internshipStartDate: "",
@@ -157,6 +158,7 @@ export default function OfficialPlacementsPage() {
           organizationAddress: "",
           organizationEmail: "",
           supervisorName: "",
+          supervisorEmail: "",
           supervisorPosition: "",
           supervisorContact: "",
           internshipStartDate: "",
@@ -294,7 +296,7 @@ export default function OfficialPlacementsPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                      <p className="text-xs text-muted-foreground mt-1 text-blue-600 flex items-center gap-1">
+                      <p className="text-xs mt-1 text-blue-600 flex items-center gap-1">
                         <Info className="h-3 w-3" />
                          This links your placement to your initial application context.
                       </p>
@@ -385,6 +387,22 @@ export default function OfficialPlacementsPage() {
                           placeholder="e.g., HR Manager or Senior Engineer"
                         />
                       </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="supervisorEmail">
+                          Supervisor Email
+                        </Label>
+                        <Input
+                          id="supervisorEmail"
+                          name="supervisorEmail"
+                          type="email"
+                          value={formData.supervisorEmail}
+                          onChange={handleChange}
+                          placeholder="supervisor@company.com"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Used later for Weekly Log Sheet Book acknowledgment links.
+                        </p>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -458,6 +476,7 @@ export default function OfficialPlacementsPage() {
                           organizationAddress: "",
                           organizationEmail: "",
                           supervisorName: "",
+                          supervisorEmail: "",
                           supervisorPosition: "",
                           supervisorContact: "",
                           internshipStartDate: "",

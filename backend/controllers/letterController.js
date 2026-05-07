@@ -75,26 +75,20 @@ function formatDepartmentLabel(department) {
 }
 
 async function resolveLetterSignature(user) {
-  const base = programSignatures[user.program] || defaultSignature;
-  const department = String(user.department || '').trim();
+  const { resolveDepartmentSignature } = require('../services/staffSignatureService');
+  const signature = await resolveDepartmentSignature(user);
+  return {
+    ...signature,
+    signature: signature.signatureDataUrl,
+  };
+}
 
-  if (!department) return base;
-
-  const hod =
-    (await User.findOne({ where: { role: 'hod', department, isActive: true } })) ||
-    (await User.findOne({ where: { role: 'secutuary', department, isActive: true } }));
-
-  if (!hod) {
-    return { ...base, department };
+function renderSignatureHtml(signature) {
+  if (signature.signatureDataUrl) {
+    return `<img src="${signature.signatureDataUrl}" alt="Digital signature" class="signature-img" />`;
   }
 
-  const fullName = `${hod.firstName || ''} ${hod.lastName || ''}`.trim();
-  return {
-    ...base,
-    name: fullName || base.name,
-    title: hod.role === 'secutuary' ? 'Secutuary' : 'Head of Department',
-    department,
-  };
+  return `<div style="font-family:'Brush Script MT','Segoe Script',cursive;font-size:32px;line-height:1.1;margin:6px 0;color:#1f2937;">${signature.signatureText || signature.name}</div>`;
 }
 
 function generateLetterHTML(user, internship = null, letterRequest = null, resolvedSignature = null) {
@@ -324,8 +318,7 @@ function generateLetterHTML(user, internship = null, letterRequest = null, resol
 
   <div class="signature-section">
     <p>Yours faithfully,</p>
-    <!-- <img src="${signature.signature}" alt="Signature" class="signature-img" onerror="this.style.display='none';" /> -->
-    <br><br>
+    ${renderSignatureHtml(signature)}
     <div class="signature-name">${signature.name}</div>
     <div class="signature-title">[${signature.title.toUpperCase()} - ${signatureDepartmentLabel.toUpperCase()}]</div>
   </div>
@@ -372,6 +365,7 @@ async function generatePDFBuffer(user, letterRequest, resolvedSignature = null) 
 
       const signature = resolvedSignature || programSignatures[user.program] || defaultSignature;
       const signatureDepartmentLabel = formatDepartmentLabel(signature.department);
+      const { drawSignatureOnPdf } = require('../services/staffSignatureService');
       const currentDate = new Date().toLocaleDateString('en-GB', {
         day: 'numeric',
         month: 'long',
@@ -457,7 +451,9 @@ async function generatePDFBuffer(user, letterRequest, resolvedSignature = null) 
 
       // --- Signature ---
       doc.text('Yours faithfully,');
-      doc.moveDown(4);
+      doc.moveDown(0.8);
+      drawSignatureOnPdf(doc, signature, { width: 150, height: 48, fontSize: 20 });
+      doc.moveDown(0.8);
       doc.font('Helvetica-Bold').text(signature.name);
       doc.font('Helvetica-Bold').text(`[${signature.title.toUpperCase()} - ${signatureDepartmentLabel.toUpperCase()}]`);
 
@@ -806,6 +802,12 @@ async function updateRequestStatus(req, res) {
     // If approved, generate PDF
     if (status === 'approved' && !request.pdfUrl) {
       try {
+        const { User } = require('../models');
+        const { signatureSnapshot } = require('../services/staffSignatureService');
+        const student = await User.findOne({ id: request.studentId });
+        if (student) {
+          updateData.signatureSnapshot = signatureSnapshot(await resolveLetterSignature(student));
+        }
         const pdfData = await generateLetterPDF(request);
         updateData.pdfUrl = pdfData.url;
         updateData.pdfGeneratedAt = new Date().toISOString();
@@ -1106,7 +1108,8 @@ async function downloadLetterPDF(req, res) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const signature = await resolveLetterSignature(student);
+    const { signatureFromSnapshot } = require('../services/staffSignatureService');
+    const signature = signatureFromSnapshot(request.signatureSnapshot, student) || await resolveLetterSignature(student);
     const html = generateLetterHTML(student, null, request, signature);
 
     // Log document download
@@ -1196,7 +1199,8 @@ async function viewLetterHTML(req, res) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const signature = await resolveLetterSignature(student);
+    const { signatureFromSnapshot } = require('../services/staffSignatureService');
+    const signature = signatureFromSnapshot(request.signatureSnapshot, student) || await resolveLetterSignature(student);
     const html = generateLetterHTML(student, null, request, signature);
 
     // Return HTML (inline)

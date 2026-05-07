@@ -333,6 +333,7 @@ export interface InternshipPlacement {
   organizationAddress?: string;
   organizationEmail: string;
   supervisorName: string;
+  supervisorEmail?: string;
   supervisorPosition?: string;
   supervisorContact?: string;
   internshipStartDate?: string;
@@ -376,4 +377,66 @@ export interface EmailLog {
   deliveryStatus: 'sent' | 'delivered' | 'failed' | 'bounced';
   tokenId?: string;
   createdAt: string;
+}
+
+export type WeeklyLogbookStatus =
+  | 'draft'
+  | 'ongoing'
+  | 'submitted_final'
+  | 'supervisor_reviewed'
+  | 'hod_approved'
+  | 'rejected';
+
+export interface WeeklyLogActivity {
+  day: string;
+  date: string;
+  activity: string;
+}
+
+export interface WeeklyLogEntry {
+  id: string;
+  logbookId: string;
+  weekNumber: number;
+  weekBeginning: string;
+  weekEnding: string;
+  activities: WeeklyLogActivity[];
+  studentRemark?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WeeklyLogReview {
+  id: string;
+  logbookId: string;
+  supervisorFullName: string;
+  supervisorRemark: string;
+  supervisorRecommendation?: string;
+  hodDecision?: 'approved' | 'rejected';
+  hodRemark?: string;
+  hodReviewedBy?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WeeklyLogbook {
+  id: string;
+  studentId: string;
+  placementId: string;
+  status: WeeklyLogbookStatus;
+  finalizedAt?: string;
+  supervisorReviewedAt?: string;
+  hodReviewedAt?: string;
+  hodReviewedBy?: string;
+  hodDecisionNote?: string;
+  archiveReference?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WeeklyLogbookBundle {
+  logbook: WeeklyLogbook;
+  placement: Record<string, any>;
+  student: User;
+  entries: WeeklyLogEntry[];
+  review?: WeeklyLogReview | null;
 }

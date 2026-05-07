@@ -161,7 +161,8 @@ async function sendOfficialLetterAndEvaluationToOrganization(placementId) {
 
   try {
     const { resolveOfficialPlacementSignature } = require('./officialPlacementLetterSignature');
-    const signature = await resolveOfficialPlacementSignature(placement, student);
+    const { signatureFromSnapshot } = require('./staffSignatureService');
+    const signature = signatureFromSnapshot(placement.signatureSnapshot, student) || await resolveOfficialPlacementSignature(placement, student);
     const pdfBuffer = await generateOfficialLetterPDF(placement, student, signature);
     mailOptions.attachments = [
       {

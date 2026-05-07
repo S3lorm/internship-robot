@@ -72,6 +72,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                pathname.includes("/notices") ? "Notices" :
                pathname.includes("/notifications") ? "Notifications" :
                pathname.includes("/evaluations") ? "Evaluations" :
+               pathname.includes("/signature") ? "Digital signature" :
                pathname.includes("/letter-requests") ? "Letter Requests" :
                pathname.includes("/letter") ? "Application Letter" :
                pathname.includes("/analytics") ? "Analytics" : user.role === "hod" ? (isSecutuary ? "Secutuary" : "HOD") : "Admin"}

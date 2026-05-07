@@ -597,6 +597,56 @@ export const logbooksApi = {
   acknowledgeFeedback: (id: string) => fetchApi(`/logbooks/${id}/acknowledge-feedback`, { method: 'PATCH' }),
 };
 
+// Weekly Log Sheet Book API
+export const weeklyLogbooksApi = {
+  getMyCurrent: (placementId?: string) => {
+    const query = placementId ? `?placementId=${encodeURIComponent(placementId)}` : '';
+    return fetchApi(`/weekly-logbooks/my/current${query}`);
+  },
+
+  getById: (id: string) => fetchApi(`/weekly-logbooks/${id}`),
+
+  saveWeek: (id: string, data: Record<string, unknown>) =>
+    fetchApi(`/weekly-logbooks/${id}/weeks`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  finalize: (id: string) =>
+    fetchApi(`/weekly-logbooks/${id}/finalize`, {
+      method: 'POST',
+    }),
+
+  listForStaff: (status = 'supervisor_reviewed') =>
+    fetchApi(`/weekly-logbooks/staff/reviews?status=${encodeURIComponent(status)}`),
+
+  institutionalReview: (id: string, decision: 'approved' | 'rejected', remark?: string) =>
+    fetchApi(`/weekly-logbooks/${id}/institutional-review`, {
+      method: 'PATCH',
+      body: JSON.stringify({ decision, remark }),
+    }),
+
+  getSupervisorReview: (token: string) =>
+    fetchApi(`/weekly-log-review/${encodeURIComponent(token)}`),
+
+  submitSupervisorReview: (token: string, data: Record<string, unknown>) =>
+    fetchApi(`/weekly-log-review/${encodeURIComponent(token)}`, {
+      method: 'POST',
+      body: JSON.stringify(data),
+    }),
+
+  pdfUrl: (id: string) => `${API_BASE_URL}/weekly-logbooks/${id}/pdf`,
+};
+
+export const staffSignaturesApi = {
+  getMine: () => fetchApi('/staff-signatures/me'),
+  saveMine: (data: Record<string, unknown>) =>
+    fetchApi('/staff-signatures/me', {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    }),
+};
+
 // Reports API
 export const reportsApi = {
   getAll: () => fetchApi('/reports'),
