@@ -1,11 +1,6 @@
 // API base URL - configure this for your backend
 // In browser, NEXT_PUBLIC_* vars are available at runtime
 const getApiBaseUrl = () => {
-  if (typeof window !== 'undefined') {
-    // Browser: use the env var from .env.local (set at build time)
-    return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-  }
-  // Server-side: use env var or default
   return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 };
 

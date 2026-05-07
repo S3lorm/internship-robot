@@ -9,14 +9,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { formatStatusLabel } from "@/lib/utils";
 import { toast } from "sonner";
 import { BookOpen, CalendarDays, FileCheck2, Loader2, Lock, Send } from "lucide-react";
 
 const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
-
-function statusLabel(status?: string) {
-  return (status || "ongoing").replace(/_/g, " ");
-}
 
 export default function WeeklyLogbookPage() {
   const [bundle, setBundle] = useState<WeeklyLogbookBundle | null>(null);
@@ -129,7 +126,7 @@ export default function WeeklyLogbookPage() {
           </p>
         </div>
         <Badge className="w-fit capitalize" variant={bundle.logbook.status === "rejected" ? "destructive" : "secondary"}>
-          {statusLabel(bundle.logbook.status)}
+          {formatStatusLabel(bundle.logbook.status, "ongoing")}
         </Badge>
       </div>
 

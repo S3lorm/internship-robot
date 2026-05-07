@@ -11,14 +11,11 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { formatStatusLabel } from "@/lib/utils";
 import { toast } from "sonner";
 import { BookOpen, Download, Eye, Loader2 } from "lucide-react";
 
 const statuses = ["supervisor_reviewed", "hod_approved", "rejected", "submitted_final", "all"];
-
-function statusLabel(status?: string) {
-  return (status || "").replace(/_/g, " ");
-}
 
 export default function WeeklyLogbooksAdminPage() {
   const { user } = useAuth();
@@ -109,7 +106,7 @@ export default function WeeklyLogbooksAdminPage() {
           </SelectTrigger>
           <SelectContent>
             {statuses.map((item) => (
-              <SelectItem key={item} value={item}>{statusLabel(item)}</SelectItem>
+              <SelectItem key={item} value={item}>{formatStatusLabel(item)}</SelectItem>
             ))}
           </SelectContent>
         </Select>
@@ -151,7 +148,7 @@ export default function WeeklyLogbooksAdminPage() {
                       </td>
                       <td className="p-3">{item.placement?.organization_name || "N/A"}</td>
                       <td className="p-3">{item.entries.length}</td>
-                      <td className="p-3"><Badge variant="secondary" className="capitalize">{statusLabel(item.logbook.status)}</Badge></td>
+                      <td className="p-3"><Badge variant="secondary" className="capitalize">{formatStatusLabel(item.logbook.status)}</Badge></td>
                       <td className="p-3">
                         <div className="flex flex-wrap gap-2">
                           <Button size="sm" variant="secondary" onClick={() => setSelected(item)}>
