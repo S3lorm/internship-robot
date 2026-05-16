@@ -9,13 +9,6 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -47,7 +40,7 @@ import {
   MessageSquare,
   Award,
 } from "lucide-react";
-import { evaluationsApi, usersApi, internshipsApi } from "@/lib/api";
+import { evaluationsApi, hodApi } from "@/lib/api";
 import { toast } from "sonner";
 
 interface Evaluation {
@@ -90,22 +83,13 @@ interface User {
   studentId?: string;
 }
 
-interface Internship {
-  id: string;
-  title: string;
-  company: string;
-}
-
 export default function EvaluationsManagementPage() {
   const { user } = useAuth();
   const router = useRouter();
   const [evaluations, setEvaluations] = useState<Evaluation[]>([]);
   const [students, setStudents] = useState<User[]>([]);
-  const [internships, setInternships] = useState<Internship[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [typeFilter, setTypeFilter] = useState<string>("all");
-  const [recommendationFilter, setRecommendationFilter] = useState<string>("all");
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
   const [selectedEvaluation, setSelectedEvaluation] = useState<Evaluation | null>(null);
@@ -137,15 +121,13 @@ export default function EvaluationsManagementPage() {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [evalsResult, studentsResult, internshipsResult] = await Promise.all([
+      const [evalsResult, deptResult] = await Promise.all([
         evaluationsApi.getAll(),
-        usersApi.getAll({ role: "student" }),
-        internshipsApi.getAll(),
+        hodApi.getDepartmentStudents(),
       ]);
 
       if (evalsResult.error) throw new Error(evalsResult.error);
-      if (studentsResult.error) throw new Error(studentsResult.error);
-      if (internshipsResult.error) throw new Error(internshipsResult.error);
+      if (deptResult.error) throw new Error(deptResult.error);
 
       const evals = Array.isArray((evalsResult as any).data?.evaluations)
         ? (evalsResult as any).data.evaluations
@@ -154,19 +136,11 @@ export default function EvaluationsManagementPage() {
           : [];
       setEvaluations(evals);
 
-      const studs = Array.isArray((studentsResult as any).data?.data)
-        ? (studentsResult as any).data.data
-        : Array.isArray((studentsResult as any).data)
-          ? (studentsResult as any).data
-          : [];
+      const groups = (deptResult as any).data?.groups;
+      const studs: User[] = Array.isArray(groups)
+        ? groups.flatMap((g: { students?: User[] }) => g.students || [])
+        : [];
       setStudents(studs);
-
-      const ints = Array.isArray((internshipsResult as any).data?.data)
-        ? (internshipsResult as any).data.data
-        : Array.isArray((internshipsResult as any).data)
-          ? (internshipsResult as any).data
-          : [];
-      setInternships(ints);
     } catch (err) {
       console.error("Error fetching data:", err);
       toast.error(err instanceof Error ? err.message : "Failed to load data");
@@ -266,7 +240,10 @@ export default function EvaluationsManagementPage() {
   };
 
   const hasSubmittedScores = (evaluation: Evaluation) => {
-    return evaluation.submittedAt && evaluation.workEthicRating !== undefined && evaluation.workEthicRating !== null;
+    return Boolean(
+      evaluation.submittedAt ||
+        (evaluation.workEthicRating !== undefined && evaluation.workEthicRating !== null)
+    );
   };
 
   // Rating bar component
@@ -299,41 +276,27 @@ export default function EvaluationsManagementPage() {
     );
   };
 
-  const filteredEvaluations = evaluations.filter((evaluation) => {
-    const studentName = getStudentName(evaluation.studentId).toLowerCase();
-    const supervisorName = (evaluation.supervisorName || "").toLowerCase();
-    
-    // Find internship safely
-    let companyName = "";
-    if (evaluation.internshipId) {
-      const internship = internships.find((i) => i.id === evaluation.internshipId);
-      if (internship) companyName = internship.company.toLowerCase();
-    }
+  const filteredEvaluations = evaluations
+    .filter((evaluation) => {
+      const studentName = getStudentName(evaluation.studentId).toLowerCase();
+      const supervisorName = (evaluation.supervisorName || "").toLowerCase();
+      const searchLower = searchQuery.toLowerCase();
 
-    const searchLower = searchQuery.toLowerCase();
+      if (!searchQuery) return true;
 
-    const matchesSearch =
-      !searchQuery ||
-      evaluation.title.toLowerCase().includes(searchLower) ||
-      (evaluation.description?.toLowerCase().includes(searchLower) ?? false) ||
-      studentName.includes(searchLower) ||
-      supervisorName.includes(searchLower) ||
-      companyName.includes(searchLower) ||
-      (evaluation.supervisorComments?.toLowerCase().includes(searchLower) ?? false);
-
-    const matchesType = typeFilter === "all" || evaluation.evaluationType === typeFilter;
-    
-    let matchesRecommendation = true;
-    if (recommendationFilter !== "all") {
-      if (recommendationFilter === "pending") {
-        matchesRecommendation = !evaluation.finalRecommendation;
-      } else {
-        matchesRecommendation = evaluation.finalRecommendation === recommendationFilter;
-      }
-    }
-
-    return matchesSearch && matchesType && matchesRecommendation;
-  });
+      return (
+        evaluation.title.toLowerCase().includes(searchLower) ||
+        (evaluation.description?.toLowerCase().includes(searchLower) ?? false) ||
+        studentName.includes(searchLower) ||
+        supervisorName.includes(searchLower) ||
+        (evaluation.supervisorComments?.toLowerCase().includes(searchLower) ?? false)
+      );
+    })
+    .sort((a, b) => {
+      const aTime = a.submittedAt ? new Date(a.submittedAt).getTime() : 0;
+      const bTime = b.submittedAt ? new Date(b.submittedAt).getTime() : 0;
+      return bTime - aTime;
+    });
 
   if (!user || user.role === "admin") {
     return (
@@ -370,41 +333,14 @@ export default function EvaluationsManagementPage() {
       {/* Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Search by student, company, or comments..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={typeFilter} onValueChange={setTypeFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by type" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="initial">Initial</SelectItem>
-                <SelectItem value="midterm">Midterm</SelectItem>
-                <SelectItem value="supervisor">Supervisor</SelectItem>
-                <SelectItem value="final">Final</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={recommendationFilter} onValueChange={setRecommendationFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Filter by Recommendation" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Recommendations</SelectItem>
-                <SelectItem value="Excellent">Excellent</SelectItem>
-                <SelectItem value="Good">Good</SelectItem>
-                <SelectItem value="Average">Average</SelectItem>
-                <SelectItem value="Needs Improvement">Needs Improvement</SelectItem>
-                <SelectItem value="pending">Pending</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search by student, supervisor, or comments..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
           </div>
         </CardContent>
       </Card>
@@ -412,7 +348,7 @@ export default function EvaluationsManagementPage() {
       {/* Evaluations Table */}
       <Card>
         <CardHeader>
-          <CardTitle>All Evaluations</CardTitle>
+          <CardTitle>Supervisor evaluations</CardTitle>
           <CardDescription>
             {filteredEvaluations.length} evaluation{filteredEvaluations.length !== 1 ? "s" : ""}{" "}
             found
@@ -431,8 +367,7 @@ export default function EvaluationsManagementPage() {
                   <TableHead>Title</TableHead>
                   <TableHead>Student</TableHead>
                   <TableHead>Supervisor</TableHead>
-                  <TableHead>Type</TableHead>
-                  <TableHead className="hidden md:table-cell max-w-[250px]">Compliments/Comments</TableHead>
+                  <TableHead className="hidden md:table-cell max-w-[250px]">Comments</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>Submitted</TableHead>
                   <TableHead>Actions</TableHead>
@@ -444,12 +379,6 @@ export default function EvaluationsManagementPage() {
                     <TableCell className="font-medium">{evaluation.title}</TableCell>
                     <TableCell>{getStudentName(evaluation.studentId)}</TableCell>
                     <TableCell>{evaluation.supervisorName || "—"}</TableCell>
-                    <TableCell>
-                      <Badge variant="outline">
-                        {evaluation.evaluationType.charAt(0).toUpperCase() +
-                          evaluation.evaluationType.slice(1)}
-                      </Badge>
-                    </TableCell>
                     <TableCell className="hidden md:table-cell max-w-[250px] truncate" title={evaluation.supervisorComments || "No comments"}>
                       {evaluation.supervisorComments ? (
                         <div className="flex items-center gap-2 text-sm text-muted-foreground cursor-help">
@@ -616,34 +545,6 @@ export default function EvaluationsManagementPage() {
                     <div className="bg-muted/50 rounded-lg p-4 text-sm leading-relaxed whitespace-pre-wrap">
                       {reviewEvaluation.supervisorComments}
                     </div>
-                  </CardContent>
-                </Card>
-              )}
-
-              {/* Final Recommendation */}
-              {reviewEvaluation.finalRecommendation && (
-                <Card>
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      Final Recommendation
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <Badge
-                      className={
-                        reviewEvaluation.finalRecommendation.toLowerCase().includes("excellent") ||
-                        reviewEvaluation.finalRecommendation.toLowerCase().includes("outstanding")
-                          ? "bg-green-600 text-white text-sm px-3 py-1"
-                          : reviewEvaluation.finalRecommendation.toLowerCase().includes("good")
-                          ? "bg-blue-600 text-white text-sm px-3 py-1"
-                          : reviewEvaluation.finalRecommendation.toLowerCase().includes("satisfactory")
-                          ? "bg-yellow-600 text-white text-sm px-3 py-1"
-                          : "bg-gray-600 text-white text-sm px-3 py-1"
-                      }
-                    >
-                      {reviewEvaluation.finalRecommendation}
-                    </Badge>
                   </CardContent>
                 </Card>
               )}

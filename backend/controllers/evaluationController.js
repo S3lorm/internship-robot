@@ -1,4 +1,5 @@
 const { Evaluation, User } = require('../models');
+const { studentBelongsToHodDepartment } = require('../constants/departmentCatalog');
 
 // Get all evaluations for current user
 async function getEvaluations(req, res) {
@@ -17,14 +18,23 @@ async function getEvaluations(req, res) {
     });
 
     if (user.role === 'hod') {
-      const filtered = [];
-      for (const ev of evaluations) {
-        const st = await User.findByPk(ev.studentId);
-        if (st && st.department === user.department) {
-          filtered.push(ev);
+      if (!user.department) {
+        evaluations = [];
+      } else {
+        const studentCache = new Map();
+        const filtered = [];
+        for (const ev of evaluations) {
+          let st = studentCache.get(ev.studentId);
+          if (!st) {
+            st = await User.findByPk(ev.studentId);
+            if (st) studentCache.set(ev.studentId, st);
+          }
+          if (st && studentBelongsToHodDepartment(st, user.department)) {
+            filtered.push(ev);
+          }
         }
+        evaluations = filtered;
       }
-      evaluations = filtered;
     }
 
     res.json({ evaluations });
@@ -55,7 +65,7 @@ async function getEvaluationById(req, res) {
 
     if (user.role === 'hod') {
       const st = await User.findByPk(evaluation.studentId);
-      if (!st || st.department !== user.department) {
+      if (!st || !studentBelongsToHodDepartment(st, user.department)) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -240,7 +250,7 @@ async function updateEvaluation(req, res) {
 
     if (user.role === 'hod') {
       const st = await User.findByPk(evaluation.studentId);
-      if (!st || st.department !== user.department) {
+      if (!st || !studentBelongsToHodDepartment(st, user.department)) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
