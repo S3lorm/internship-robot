@@ -17,7 +17,7 @@ import { dashboardApi, lettersApi } from "@/lib/api";
 import { usePortalStatus } from "@/hooks/use-portal-status";
 import { PortalStatusBanner } from "@/components/portal-status-banner";
 import { toast } from "sonner";
-import type { Application, Internship, Notice, Notification, LetterRequest } from "@/types";
+import type { Application, Notice, Notification, LetterRequest, InternshipPlacement } from "@/types";
 import {
   FileText,
   Clock,
@@ -29,6 +29,8 @@ import {
   Download,
   Printer,
   FileCheck2,
+  Building2,
+  MapPin,
 } from "lucide-react";
 
 const getStatusIcon = (status: string) => {
@@ -38,6 +40,7 @@ const getStatusIcon = (status: string) => {
     case "rejected":
       return <XCircle className="h-4 w-4 text-red-600" />;
     case "under_review":
+    case "modification_requested":
       return <Eye className="h-4 w-4 text-blue-600" />;
     default:
       return <Clock className="h-4 w-4 text-yellow-600" />;
@@ -50,18 +53,32 @@ const getStatusBadge = (status: string) => {
     under_review: "default",
     approved: "default",
     rejected: "destructive",
+    modification_requested: "outline",
   };
   const labels: Record<string, string> = {
     pending: "Pending",
     under_review: "Under Review",
     approved: "Approved",
     rejected: "Rejected",
+    modification_requested: "Modifications requested",
   };
   return (
     <Badge variant={variants[status] || "secondary"}>
-      {labels[status] || status}
+      {labels[status] || status.replace(/_/g, " ")}
     </Badge>
   );
+};
+
+const formatPlacementDates = (start?: string, end?: string) => {
+  if (!start && !end) return "Dates not set";
+  const fmt = (d: string) =>
+    new Date(d).toLocaleDateString("en-GB", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  if (start && end) return `${fmt(start)} – ${fmt(end)}`;
+  return start ? fmt(start) : end ? fmt(end) : "Dates not set";
 };
 
 type ApplicationStats = {
@@ -76,14 +93,11 @@ type ApplicationStats = {
   letterRequestsPendingCount?: number;
 };
 
-function getInternshipFromApplication(application: Application): Internship | undefined {
-  return application.internship ?? application.Internship;
-}
-
 export default function DashboardPage() {
   const { user } = useAuth();
   const { portal, loading: portalLoading } = usePortalStatus();
   const [applications, setApplications] = useState<Application[]>([]);
+  const [placements, setPlacements] = useState<InternshipPlacement[]>([]);
   const [notices, setNotices] = useState<Notice[]>([]);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [letterRequests, setLetterRequests] = useState<LetterRequest[]>([]);
@@ -116,6 +130,7 @@ export default function DashboardPage() {
         setNotices(Array.isArray(data?.notices) ? data.notices : []);
         setNotifications(Array.isArray(data?.notifications) ? data.notifications : []);
         setLetterRequests(Array.isArray(data?.letterRequests) ? data.letterRequests : []);
+        setPlacements(Array.isArray(data?.placements) ? data.placements : []);
       } catch (err) {
         console.error("Error fetching dashboard data:", err);
         setError(err instanceof Error ? err.message : "Failed to load dashboard data");
@@ -319,53 +334,68 @@ export default function DashboardPage() {
           <Card className="h-full border-0 bg-transparent shadow-none">
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
-              <CardTitle className="text-lg">Recent applications</CardTitle>
-              <CardDescription>Internship listings you applied to</CardDescription>
+              <CardTitle className="text-lg flex items-center gap-2">
+                <Building2 className="h-5 w-5 text-primary" />
+                Official placement
+              </CardTitle>
+              <CardDescription>Stage 2 placement requests you have submitted</CardDescription>
             </div>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard/applications">View all</Link>
+              <Link href="/dashboard/letter-requests/official">View all</Link>
             </Button>
           </CardHeader>
           <CardContent>
             {loading ? (
               <div className="py-8 text-center">
                 <Loader2 className="mx-auto mb-3 h-8 w-8 animate-spin text-muted-foreground" />
-                <p className="text-muted-foreground">Loading applications...</p>
+                <p className="text-muted-foreground">Loading placements...</p>
               </div>
             ) : error ? (
               <div className="py-8 text-center">
                 <p className="text-destructive">{error}</p>
               </div>
-            ) : applications.length === 0 ? (
+            ) : placements.length === 0 ? (
               <div className="py-8 text-center">
-                <FileText className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
-                <p className="text-muted-foreground">No applications yet</p>
+                <Building2 className="mx-auto mb-3 h-12 w-12 text-muted-foreground/50" />
+                <p className="text-muted-foreground">No official placement requests yet</p>
+                <Button variant="outline" size="sm" className="mt-4" asChild>
+                  <Link href="/dashboard/letter-requests/official">Request official placement</Link>
+                </Button>
               </div>
             ) : (
               <div className="space-y-4">
-                {applications.slice(0, 5).map((application) => {
-                  const internship = getInternshipFromApplication(application);
-                  const applied =
-                    application.appliedAt ||
-                    (application as Application & { createdAt?: string }).createdAt;
-                  return (
+                {placements.slice(0, 5).map((placement) => (
                     <div
-                      key={application.id}
+                      key={placement.id}
                       className="flex flex-col gap-3 rounded-lg border border-border p-4 sm:flex-row sm:items-start sm:justify-between"
                     >
                       <div className="flex min-w-0 flex-1 items-start gap-3">
-                        {getStatusIcon(application.status)}
+                        {getStatusIcon(placement.status)}
                         <div className="min-w-0">
                           <p className="font-medium break-words">
-                            {internship?.title || "Internship application"}
+                            {placement.organizationName || "Organisation"}
                           </p>
-                          <p className="text-sm text-muted-foreground">
-                            {internship?.company || "—"}
+                          {placement.departmentRole && (
+                            <p className="text-sm text-muted-foreground">
+                              Role: {placement.departmentRole}
+                            </p>
+                          )}
+                          <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
+                            <MapPin className="h-3 w-3 shrink-0" />
+                            {formatPlacementDates(
+                              placement.internshipStartDate,
+                              placement.internshipEndDate
+                            )}
                           </p>
+                          {placement.supervisorName && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                              Supervisor: {placement.supervisorName}
+                            </p>
+                          )}
                           <p className="mt-1 text-xs text-muted-foreground">
-                            Applied{" "}
-                            {applied
-                              ? new Date(applied).toLocaleDateString("en-GB", {
+                            Submitted{" "}
+                            {placement.createdAt
+                              ? new Date(placement.createdAt).toLocaleDateString("en-GB", {
                                   day: "numeric",
                                   month: "short",
                                   year: "numeric",
@@ -375,11 +405,10 @@ export default function DashboardPage() {
                         </div>
                       </div>
                       <div className="shrink-0 self-start sm:self-auto">
-                        {getStatusBadge(application.status)}
+                        {getStatusBadge(placement.status)}
                       </div>
                     </div>
-                  );
-                })}
+                ))}
               </div>
             )}
           </CardContent>

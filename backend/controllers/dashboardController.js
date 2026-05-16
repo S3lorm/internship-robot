@@ -1,4 +1,4 @@
-const { Application, Internship, Notice, Notification, LetterRequest } = require('../models');
+const { Application, Internship, Notice, Notification, LetterRequest, InternshipPlacement } = require('../models');
 const supabase = require('../config/supabase');
 
 const DASHBOARD_APPLICATIONS_LIMIT = 25;
@@ -6,6 +6,7 @@ const DASHBOARD_NOTICES_LIMIT = 40;
 const DASHBOARD_NOTIFICATIONS_LIMIT = 80;
 const DASHBOARD_LETTER_REQUESTS_LIMIT = 50;
 const DASHBOARD_INTERNSHIP_REQUESTS_LIMIT = 20;
+const DASHBOARD_PLACEMENTS_LIMIT = 25;
 
 function mapInternshipRequestRow(row) {
     if (!row) return null;
@@ -76,7 +77,8 @@ async function getStudentDashboard(req, res) {
             internshipsResult,
             noticesResult,
             notificationsResult,
-            letterRequestsResult
+            letterRequestsResult,
+            placementsResult,
         ] = await Promise.all([
             Application.findAndCountAll({
                 where: { studentId },
@@ -111,7 +113,12 @@ async function getStudentDashboard(req, res) {
                 where: { studentId },
                 order: [['createdAt', 'DESC']],
                 limit: DASHBOARD_LETTER_REQUESTS_LIMIT
-            })
+            }),
+            InternshipPlacement.findAll({
+                where: { studentId },
+                order: [['createdAt', 'DESC']],
+                limit: DASHBOARD_PLACEMENTS_LIMIT,
+            }),
         ]);
 
         const [pending, underReview, approved, rejected] = statusCountResults;
@@ -189,6 +196,7 @@ async function getStudentDashboard(req, res) {
                 notifications,
                 letterRequests: letterRequestsResult.rows || letterRequestsResult || [],
                 internshipRequests,
+                placements: Array.isArray(placementsResult) ? placementsResult : [],
             }
         });
     } catch (error) {
