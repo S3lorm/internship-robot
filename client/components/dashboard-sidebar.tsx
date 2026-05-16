@@ -45,12 +45,14 @@ function NavGroup({
   pathname,
   unreadCount,
   onNavigate,
+  onNavItemClick,
 }: {
   label: string;
   items: NavItem[];
   pathname: string | null;
   unreadCount: number;
   onNavigate?: () => void;
+  onNavItemClick?: (item: NavItem) => void;
 }) {
   return (
     <div className="space-y-1">
@@ -65,7 +67,10 @@ function NavGroup({
           <Link
             key={item.name}
             href={item.href}
-            onClick={onNavigate}
+            onClick={() => {
+              onNavItemClick?.(item);
+              onNavigate?.();
+            }}
             className={cn(
               "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200",
               isActive
@@ -80,7 +85,9 @@ function NavGroup({
               )}
             />
             <span className="truncate">{item.name}</span>
-            {item.name === "Notifications" && unreadCount > 0 && (
+            {item.name === "Notifications" &&
+              unreadCount > 0 &&
+              !pathname?.startsWith("/dashboard/notifications") && (
               <Badge
                 variant="secondary"
                 className="ml-auto h-5 min-w-5 px-1.5 text-xs bg-primary text-primary-foreground"
@@ -174,6 +181,25 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
     };
   }, [fetchUnreadCount]);
 
+  const markNotificationsRead = useCallback(async () => {
+    setUnreadCount(0);
+    window.dispatchEvent(new Event("notifications-updated"));
+    try {
+      await Promise.all([notificationsApi.markAllAsRead(), noticesApi.markAllAsRead()]);
+    } catch {
+      // Keep badge cleared in UI even if API fails; page will retry on load
+    }
+  }, []);
+
+  const handleNavItemClick = useCallback(
+    (item: NavItem) => {
+      if (item.href === "/dashboard/notifications") {
+        void markNotificationsRead();
+      }
+    },
+    [markNotificationsRead]
+  );
+
   const handleLogout = () => {
     logout();
     onNavigate?.();
@@ -202,6 +228,7 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
           pathname={pathname}
           unreadCount={unreadCount}
           onNavigate={onNavigate}
+          onNavItemClick={handleNavItemClick}
         />
         <NavGroup
           label="Workspace"
@@ -209,6 +236,7 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
           pathname={pathname}
           unreadCount={unreadCount}
           onNavigate={onNavigate}
+          onNavItemClick={handleNavItemClick}
         />
         <Separator className="bg-sidebar-border" />
         <NavGroup
@@ -217,6 +245,7 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
           pathname={pathname}
           unreadCount={unreadCount}
           onNavigate={onNavigate}
+          onNavItemClick={handleNavItemClick}
         />
       </nav>
 
