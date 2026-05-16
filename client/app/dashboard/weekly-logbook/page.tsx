@@ -4,15 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { weeklyLogbooksApi } from "@/lib/api";
 import { entryToSheetValues, sheetHeaderFromBundle } from "@/lib/weekly-logbook-ui";
 import {
-  buildWeekDraftsFromBundle,
+  buildPageDraftsFromBundle,
+  type WeeklyLogPageDraft,
   type WeeklyLogSchedule,
 } from "@/lib/weekly-logbook-schedule";
+import { computeWeekRange, countWeeksInPeriod } from "@/lib/weekly-logbook-weeks";
 import type { WeeklyLogbookBundle } from "@/types";
-import {
-  WeeklyLogSheet,
-  emptyWeeklyActivities,
-  type WeeklyLogSheetValues,
-} from "@/components/weekly-log-sheet";
+import { WeeklyLogSheet, type WeeklyLogSheetValues } from "@/components/weekly-log-sheet";
+import { formatWeekRangeLabel } from "@/lib/weekly-logbook-weeks";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -28,26 +27,27 @@ export default function WeeklyLogbookPage() {
   const [loading, setLoading] = useState(true);
   const [savingWeek, setSavingWeek] = useState<number | null>(null);
   const [finalizing, setFinalizing] = useState(false);
-  const [weekNumber, setWeekNumber] = useState(1);
-  const [weekDrafts, setWeekDrafts] = useState<Record<number, WeeklyLogSheetValues>>({});
-  const [draft, setDraft] = useState<WeeklyLogSheetValues>({
-    weekBeginning: "",
-    weekEnding: "",
-    studentRemark: "",
-    activities: emptyWeeklyActivities(),
-  });
+  const [pageDrafts, setPageDrafts] = useState<WeeklyLogPageDraft[]>([]);
 
   const editable = bundle ? editableStatuses.includes(bundle.logbook.status) : false;
   const bypassAllWeeks = schedule?.bypassWeekSchedule === true;
   const header = useMemo(() => (bundle ? sheetHeaderFromBundle(bundle) : null), [bundle]);
 
-  const nextWeek = useMemo(() => (bundle?.entries?.length || 0) + 1, [bundle]);
-  const openWeekItem = useMemo(() => {
-    if (!schedule || schedule.bypassWeekSchedule) return null;
-    if (schedule.currentOpenWeek) {
-      return schedule.weeks.find((w) => w.weekNumber === schedule.currentOpenWeek) || null;
+  const placementPeriod = useMemo(() => {
+    if (!bundle?.placement) return { start: "", end: "" };
+    const p = bundle.placement;
+    return {
+      start: p.internship_start_date || p.internshipStartDate || "",
+      end: p.internship_end_date || p.internshipEndDate || "",
+    };
+  }, [bundle]);
+
+  const editableWeekNumbers = useMemo(() => {
+    if (!schedule) return [];
+    if (schedule.bypassWeekSchedule) {
+      return schedule.weeks.map((w) => w.weekNumber);
     }
-    return schedule.weeks.find((w) => w.isOpen) || null;
+    return schedule.weeks.filter((w) => w.isOpen).map((w) => w.weekNumber);
   }, [schedule]);
 
   useEffect(() => {
@@ -55,25 +55,30 @@ export default function WeeklyLogbookPage() {
   }, []);
 
   useEffect(() => {
-    if (!bundle || !schedule) return;
-    if (schedule.bypassWeekSchedule) {
-      setWeekDrafts(buildWeekDraftsFromBundle(bundle, schedule));
+    if (!bundle) return;
+    if (schedule) {
+      setPageDrafts(buildPageDraftsFromBundle(bundle, schedule));
       return;
     }
-    const targetWeek = openWeekItem?.weekNumber ?? nextWeek;
-    setWeekNumber(targetWeek);
-    const existing = bundle.entries.find((e) => e.weekNumber === targetWeek);
-    if (existing) {
-      setDraft(entryToSheetValues(existing));
-    } else if (openWeekItem) {
-      setDraft({
-        weekBeginning: openWeekItem.weekBeginning,
-        weekEnding: openWeekItem.weekEnding,
-        studentRemark: "",
-        activities: emptyWeeklyActivities(),
-      });
+    const { start, end } = placementPeriod;
+    if (!start || !end) {
+      setPageDrafts([]);
+      return;
     }
-  }, [bundle, schedule, openWeekItem, nextWeek]);
+    const totalWeeksFromPlacement = countWeeksInPeriod(start, end);
+    if (totalWeeksFromPlacement < 1) {
+      setPageDrafts([]);
+      return;
+    }
+    setPageDrafts(
+      buildPageDraftsFromBundle(bundle, {
+        bypassWeekSchedule: false,
+        totalWeeks: totalWeeksFromPlacement,
+        currentOpenWeek: null,
+        weeks: [],
+      })
+    );
+  }, [bundle, schedule, placementPeriod]);
 
   const load = async () => {
     setLoading(true);
@@ -88,39 +93,57 @@ export default function WeeklyLogbookPage() {
     setLoading(false);
   };
 
-  const validateDraft = (values: WeeklyLogSheetValues) => {
-    const hasActivity = values.activities.some(
-      (row) => row.activity.trim() || row.date.trim() || row.day.trim()
-    );
-    return values.weekBeginning && values.weekEnding && hasActivity;
-  };
-
-  const saveWeekByNumber = async (targetWeek: number, values: WeeklyLogSheetValues) => {
+  const saveLogPage = async (page: WeeklyLogPageDraft) => {
     if (!bundle) return;
-    if (!validateDraft(values)) {
-      toast.error("Week dates and at least one activity row are required.");
+    const ps = page.values.weekBeginning;
+    const pe = page.values.weekEnding;
+    if (!ps || !pe) {
+      toast.error("Internship starting and ending dates are required.");
       return;
     }
 
-    setSavingWeek(targetWeek);
-    const result = await weeklyLogbooksApi.saveWeek(bundle.logbook.id, {
-      weekNumber: targetWeek,
-      weekBeginning: values.weekBeginning,
-      weekEnding: values.weekEnding,
-      studentRemark: values.studentRemark,
-      activities: values.activities,
-    });
-    if (result.error) {
-      toast.error(result.error);
-    } else {
-      toast.success(`Week ${targetWeek} saved`);
-      await load();
-    }
-    setSavingWeek(null);
-  };
+    const toSave: { weekNumber: number; values: WeeklyLogSheetValues }[] = [];
+    for (let i = 0; i < page.values.activities.length; i += 1) {
+      const weekNumber = page.firstWeekNumber + i;
+      const row = page.values.activities[i];
+      if (!editableWeekNumbers.includes(weekNumber)) continue;
+      if (!row.activity.trim() || !row.date || !row.day) continue;
 
-  const saveCurrentWeek = async () => {
-    await saveWeekByNumber(weekNumber, draft);
+      const range = computeWeekRange(ps, weekNumber, pe);
+      toSave.push({
+        weekNumber,
+        values: {
+          weekBeginning: range?.start || row.date,
+          weekEnding: range?.end || row.day,
+          studentRemark: page.values.studentRemark,
+          activities: [{ date: row.date, day: row.day, activity: row.activity }],
+        },
+      });
+    }
+
+    if (toSave.length === 0) {
+      toast.error("Enter activities for at least one open week on this page.");
+      return;
+    }
+
+    setSavingWeek(page.pageNumber);
+    for (const item of toSave) {
+      const result = await weeklyLogbooksApi.saveWeek(bundle.logbook.id, {
+        weekNumber: item.weekNumber,
+        weekBeginning: item.values.weekBeginning,
+        weekEnding: item.values.weekEnding,
+        studentRemark: item.values.studentRemark,
+        activities: item.values.activities,
+      });
+      if (result.error) {
+        toast.error(`Week ${item.weekNumber}: ${result.error}`);
+        setSavingWeek(null);
+        return;
+      }
+    }
+    toast.success(`Saved ${toSave.length} week(s) on page ${page.pageNumber}`);
+    await load();
+    setSavingWeek(null);
   };
 
   const finalize = async () => {
@@ -179,9 +202,9 @@ export default function WeeklyLogbookPage() {
             Weekly Log Sheet Book
           </h1>
           <p className="text-muted-foreground">
-            {bypassAllWeeks
-              ? "Testing mode: fill every weekly sheet now, then submit the complete book to your supervisor."
-              : "Fill the weekly sheet for the current internship week. Supervisor fields unlock after you submit the book."}
+            Fill in your weekly log sheet like the official RMU form: five weeks per page with
+            day/date ranges and activities. Save each page, then submit the book to your
+            supervisor.
           </p>
         </div>
         <Badge
@@ -192,12 +215,18 @@ export default function WeeklyLogbookPage() {
         </Badge>
       </div>
 
-      {bypassAllWeeks && editable && (
+      {editable && placementPeriod.start && placementPeriod.end && (
         <Card className="border-blue-200 bg-blue-50/80 dark:border-blue-900 dark:bg-blue-950/30">
           <CardContent className="pt-6 text-sm text-blue-950 dark:text-blue-100">
-            All {totalWeeks} week forms are open. Save each week, then use{" "}
-            <strong>Submit book to supervisor</strong> so they can add remarks and send the book to
-            HOD.
+            Internship period:{" "}
+            <strong>
+              {formatWeekRangeLabel(placementPeriod.start, placementPeriod.end)}
+            </strong>
+            . {totalWeeks} week{totalWeeks === 1 ? "" : "s"} total
+            {!bypassAllWeeks && editableWeekNumbers.length === 1
+              ? ` — you can edit week ${editableWeekNumbers[0]} now`
+              : ""}
+            .
           </CardContent>
         </Card>
       )}
@@ -220,47 +249,73 @@ export default function WeeklyLogbookPage() {
         </Card>
       )}
 
-      {editable && bypassAllWeeks && schedule && (
+      {editable && schedule && pageDrafts.length > 0 && (
         <div className="space-y-6">
-          {schedule.weeks.map((week) => {
-            const values = weekDrafts[week.weekNumber];
-            if (!values) return null;
-            const isSaving = savingWeek === week.weekNumber;
-            const isSaved = bundle.entries.some((e) => e.weekNumber === week.weekNumber);
+          {pageDrafts.map((page) => {
+            const lastWeekOnPage = page.firstWeekNumber + page.weekCount - 1;
+            const weekLabel =
+              page.weekCount === 1
+                ? `Week ${page.firstWeekNumber}`
+                : `Weeks ${page.firstWeekNumber}–${lastWeekOnPage}`;
+            const isSaving = savingWeek === page.pageNumber;
+            const pageWeekNumbers = Array.from(
+              { length: page.weekCount },
+              (_, i) => page.firstWeekNumber + i
+            );
+            const savedOnPage = pageWeekNumbers.filter((wn) =>
+              bundle.entries.some((e) => e.weekNumber === wn)
+            ).length;
+            const openOnPage = pageWeekNumbers.filter((wn) =>
+              editableWeekNumbers.includes(wn)
+            ).length;
 
             return (
-              <Card key={week.weekNumber}>
+              <Card key={page.pageNumber}>
                 <CardHeader>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <CardTitle>Week {week.weekNumber}</CardTitle>
-                    {isSaved && (
+                    <CardTitle>
+                      Weekly log sheet — Page {page.pageNumber} ({weekLabel})
+                    </CardTitle>
+                    {savedOnPage > 0 && (
                       <Badge variant="secondary" className="bg-emerald-100 text-emerald-800">
-                        Saved
+                        {savedOnPage} week{savedOnPage === 1 ? "" : "s"} saved
                       </Badge>
                     )}
                   </div>
                   <CardDescription>
-                    {week.weekBeginning && week.weekEnding
-                      ? `${week.weekBeginning} — ${week.weekEnding}`
-                      : "Enter week dates and daily activities"}
+                    Matches the official log sheet: Day/Date and Activities Undertaken columns,
+                    with week ranges filled in automatically.
+                    {!bypassAllWeeks && openOnPage === 0
+                      ? " No weeks on this page are open for editing yet."
+                      : !bypassAllWeeks && openOnPage < pageWeekNumbers.length
+                        ? ` You can edit ${openOnPage} open week${openOnPage === 1 ? "" : "s"} on this page.`
+                        : ""}
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   <WeeklyLogSheet
                     mode="student-edit"
                     header={header}
-                    weekLabel={`Week ${week.weekNumber}`}
-                    values={values}
+                    weekLabel={weekLabel}
+                    values={page.values}
+                    firstWeekNumber={page.firstWeekNumber}
+                    weekCount={page.weekCount}
+                    lockPeriodDates={Boolean(placementPeriod.start && placementPeriod.end)}
+                    editableWeekNumbers={editableWeekNumbers}
                     onChange={(next) =>
-                      setWeekDrafts((prev) => ({ ...prev, [week.weekNumber]: next }))
+                      setPageDrafts((prev) =>
+                        prev.map((p) =>
+                          p.pageNumber === page.pageNumber ? { ...p, values: next } : p
+                        )
+                      )
                     }
                   />
                   <Button
-                    onClick={() => void saveWeekByNumber(week.weekNumber, values)}
-                    disabled={isSaving}
+                    onClick={() => void saveLogPage(page)}
+                    disabled={isSaving || openOnPage === 0}
                   >
                     {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save week {week.weekNumber}
+                    Save page {page.pageNumber}
                   </Button>
                 </CardContent>
               </Card>
@@ -290,71 +345,64 @@ export default function WeeklyLogbookPage() {
         </div>
       )}
 
-      {editable && !bypassAllWeeks && (
+      {editable && (!schedule || pageDrafts.length === 0) && (
         <Card>
-          <CardHeader>
-            <CardTitle>
-              {openWeekItem
-                ? `Weekly sheet — Week ${openWeekItem.weekNumber}`
-                : `New weekly sheet — Week ${weekNumber}`}
-            </CardTitle>
-            <CardDescription>
-              {openWeekItem
-                ? "Only the current calendar week is open for editing."
-                : "No week is open right now based on your internship dates."}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {openWeekItem ? (
-              <>
-                <WeeklyLogSheet
-                  mode="student-edit"
-                  header={header}
-                  weekLabel={`Week ${weekNumber}`}
-                  values={draft}
-                  onChange={setDraft}
-                />
-                <div className="flex flex-wrap gap-3">
-                  <Button onClick={saveCurrentWeek} disabled={savingWeek !== null}>
-                    {savingWeek !== null && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save week {weekNumber}
-                  </Button>
-                  <Button
-                    variant="default"
-                    className="bg-primary"
-                    onClick={finalize}
-                    disabled={finalizing || savedWeekCount === 0}
-                  >
-                    {finalizing ? (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    ) : (
-                      <Send className="mr-2 h-4 w-4" />
-                    )}
-                    Submit book to supervisor
-                  </Button>
-                </div>
-              </>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Check back when your internship reaches the next weekly period.
-              </p>
-            )}
+          <CardContent className="pt-6">
+            <p className="text-sm text-muted-foreground">
+              Weekly sheets could not be generated. Ensure your official placement has internship
+              starting and ending dates set.
+            </p>
           </CardContent>
         </Card>
       )}
 
-      {locked && bundle.entries.length > 0 && (
+      {locked && pageDrafts.length > 0 && (
+        <div className="space-y-6">
+          <h2 className="text-lg font-semibold">Submitted weekly log sheets</h2>
+          {pageDrafts.map((page) => {
+            const lastWeekOnPage = page.firstWeekNumber + page.weekCount - 1;
+            const weekLabel =
+              page.weekCount === 1
+                ? `Week ${page.firstWeekNumber}`
+                : `Weeks ${page.firstWeekNumber}–${lastWeekOnPage}`;
+
+            return (
+              <WeeklyLogSheet
+                key={page.pageNumber}
+                mode="student-locked"
+                header={header}
+                weekLabel={`Page ${page.pageNumber} (${weekLabel})`}
+                values={page.values}
+                firstWeekNumber={page.firstWeekNumber}
+                weekCount={page.weekCount}
+                lockPeriodDates={Boolean(placementPeriod.start && placementPeriod.end)}
+              />
+            );
+          })}
+        </div>
+      )}
+
+      {locked && pageDrafts.length === 0 && bundle.entries.length > 0 && (
         <div className="space-y-6">
           <h2 className="text-lg font-semibold">Submitted weekly sheets</h2>
-          {bundle.entries.map((entry) => (
-            <WeeklyLogSheet
-              key={entry.id}
-              mode="student-locked"
-              header={header}
-              weekLabel={`Week ${entry.weekNumber}`}
-              values={entryToSheetValues(entry)}
-            />
-          ))}
+          {bundle.entries.map((entry) => {
+            const sheetValues = entryToSheetValues(entry);
+            return (
+              <WeeklyLogSheet
+                key={entry.id}
+                mode="student-locked"
+                header={header}
+                weekLabel={`Week ${entry.weekNumber}`}
+                values={{
+                  ...sheetValues,
+                  weekBeginning: placementPeriod.start || sheetValues.weekBeginning,
+                  weekEnding: placementPeriod.end || sheetValues.weekEnding,
+                }}
+                firstWeekNumber={entry.weekNumber}
+                weekCount={1}
+              />
+            );
+          })}
         </div>
       )}
     </div>

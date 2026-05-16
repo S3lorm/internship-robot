@@ -25,9 +25,20 @@ export function entryToSheetValues(entry: WeeklyLogEntry): WeeklyLogSheetValues 
     activities.push({ day: "", date: "", activity: "" });
   }
 
+  const wb = toDateInputValue(entry.weekBeginning);
+  const we = toDateInputValue(entry.weekEnding);
+  const activityText = entry.activities
+    .map((a) => a.activity.trim())
+    .filter(Boolean)
+    .join("\n\n");
+
+  if (wb && we && activities[0]) {
+    activities[0] = { date: wb, day: we, activity: activityText };
+  }
+
   return {
-    weekBeginning: toDateInputValue(entry.weekBeginning),
-    weekEnding: toDateInputValue(entry.weekEnding),
+    weekBeginning: wb,
+    weekEnding: we,
     activities: activities.slice(0, WEEKLY_LOG_ACTIVITY_ROWS),
     studentRemark: entry.studentRemark || "",
     supervisorRemark: entry.supervisorRemark,
