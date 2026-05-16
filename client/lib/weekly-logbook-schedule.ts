@@ -1,5 +1,5 @@
 import type { WeeklyLogSheetValues } from "@/components/weekly-log-sheet";
-import { emptyWeeklyActivities } from "@/components/weekly-log-sheet";
+import { emptyWeeklyActivities, toDateInputValue } from "@/components/weekly-log-sheet";
 import type { WeeklyLogEntry, WeeklyLogbookBundle } from "@/types";
 import { entryToSheetValues } from "@/lib/weekly-logbook-ui";
 
@@ -30,8 +30,8 @@ export function buildWeekDraftsFromBundle(
       drafts[week.weekNumber] = entryToSheetValues(existing);
     } else {
       drafts[week.weekNumber] = {
-        weekBeginning: week.weekBeginning,
-        weekEnding: week.weekEnding,
+        weekBeginning: toDateInputValue(week.weekBeginning),
+        weekEnding: toDateInputValue(week.weekEnding),
         studentRemark: "",
         activities: emptyWeeklyActivities(),
       };

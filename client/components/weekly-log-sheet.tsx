@@ -51,9 +51,25 @@ export function emptyWeeklyActivities(): WeeklyLogActivity[] {
   }));
 }
 
+/** Normalizes API/DB values to yyyy-MM-dd for date inputs. */
+export function toDateInputValue(value?: string | null): string {
+  if (!value) return "";
+  const trimmed = String(value).trim();
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed;
+  const iso = trimmed.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const parsed = new Date(trimmed);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const y = parsed.getFullYear();
+  const m = String(parsed.getMonth() + 1).padStart(2, "0");
+  const day = String(parsed.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 function formatDisplayDate(value: string) {
   if (!value) return "";
-  const parsed = new Date(value);
+  const iso = toDateInputValue(value);
+  const parsed = iso ? new Date(`${iso}T12:00:00`) : new Date(value);
   if (Number.isNaN(parsed.getTime())) return value;
   return parsed.toLocaleDateString("en-GB", {
     day: "numeric",
@@ -110,14 +126,15 @@ export function WeeklyLogSheet({
   });
 
   const underlineInput =
-    "h-8 border-0 border-b border-dashed border-foreground/50 rounded-none bg-transparent px-0 shadow-none focus-visible:ring-0";
+    "relative z-20 h-9 min-h-9 w-full min-w-[9.5rem] cursor-pointer border-0 border-b border-dashed border-foreground/50 rounded-none bg-white px-1 text-foreground shadow-none [color-scheme:light] focus-visible:ring-2 focus-visible:ring-primary/30";
+  const dateInputClass = cn(underlineInput, "pr-1");
   const underlineTextarea =
     "min-h-[72px] resize-none border-0 border-b border-dashed border-foreground/50 rounded-none bg-transparent px-0 shadow-none focus-visible:ring-0";
 
   return (
     <article
       className={cn(
-        "relative mx-auto max-w-4xl overflow-hidden border-2 border-foreground bg-white text-foreground shadow-lg print:shadow-none",
+        "relative mx-auto max-w-4xl overflow-x-auto overflow-y-visible border-2 border-foreground bg-white text-foreground shadow-lg print:shadow-none",
         className
       )}
     >
@@ -185,9 +202,9 @@ export function WeeklyLogSheet({
               {studentEditable ? (
                 <Input
                   type="date"
-                  value={values.weekBeginning}
+                  value={toDateInputValue(values.weekBeginning)}
                   onChange={(e) => patch({ weekBeginning: e.target.value })}
-                  className={underlineInput}
+                  className={dateInputClass}
                 />
               ) : (
                 <p className="min-h-8 border-b border-dashed border-foreground/60 pb-1">
@@ -199,9 +216,9 @@ export function WeeklyLogSheet({
               {studentEditable ? (
                 <Input
                   type="date"
-                  value={values.weekEnding}
+                  value={toDateInputValue(values.weekEnding)}
                   onChange={(e) => patch({ weekEnding: e.target.value })}
-                  className={underlineInput}
+                  className={dateInputClass}
                 />
               ) : (
                 <p className="min-h-8 border-b border-dashed border-foreground/60 pb-1">
@@ -228,13 +245,14 @@ export function WeeklyLogSheet({
                   <td className="border-r border-foreground/70 p-2 align-top">
                     {studentEditable ? (
                       <Input
-                        value={activity.date || activity.day}
-                        placeholder="e.g. 14th July – 18th July"
+                        type="date"
+                        value={toDateInputValue(activity.date || activity.day)}
                         onChange={(e) => {
                           patchActivity(index, "date", e.target.value);
                           patchActivity(index, "day", "");
                         }}
-                        className={underlineInput}
+                        className={dateInputClass}
+                        title="Select the day for this activity"
                       />
                     ) : (
                       <p className="min-h-8 whitespace-pre-wrap">

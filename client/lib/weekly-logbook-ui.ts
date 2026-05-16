@@ -1,4 +1,4 @@
-import { WEEKLY_LOG_ACTIVITY_ROWS } from "@/components/weekly-log-sheet";
+import { WEEKLY_LOG_ACTIVITY_ROWS, toDateInputValue } from "@/components/weekly-log-sheet";
 import type { WeeklyLogSheetHeader, WeeklyLogSheetValues } from "@/components/weekly-log-sheet";
 import type { WeeklyLogEntry, WeeklyLogbookBundle } from "@/types";
 
@@ -26,8 +26,8 @@ export function entryToSheetValues(entry: WeeklyLogEntry): WeeklyLogSheetValues 
   }
 
   return {
-    weekBeginning: entry.weekBeginning,
-    weekEnding: entry.weekEnding,
+    weekBeginning: toDateInputValue(entry.weekBeginning),
+    weekEnding: toDateInputValue(entry.weekEnding),
     activities: activities.slice(0, WEEKLY_LOG_ACTIVITY_ROWS),
     studentRemark: entry.studentRemark || "",
     supervisorRemark: entry.supervisorRemark,
