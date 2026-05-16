@@ -89,7 +89,7 @@ const Application = {
              lastName: row.user_profiles.last_name,
              email: row.user_profiles.email,
              department: row.user_profiles.department,
-             level: row.user_profiles.level
+             yearOfStudy: row.user_profiles.year_of_study
          };
       }
       if (row.internships) {
@@ -151,7 +151,7 @@ const Application = {
              lastName: row.user_profiles.last_name,
              email: row.user_profiles.email,
              department: row.user_profiles.department,
-             level: row.user_profiles.level
+             yearOfStudy: row.user_profiles.year_of_study
          };
       }
       if (row.internships) {

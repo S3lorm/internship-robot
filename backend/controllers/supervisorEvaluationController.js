@@ -1,4 +1,9 @@
 const crypto = require('crypto');
+const {
+  getDaysUntilInternshipEnd,
+  isEvaluationSubmitWindowOpen,
+  SUBMIT_WINDOW_DAYS,
+} = require('../utils/evaluationSubmitWindow');
 
 /**
  * Public controller for supervisor evaluation form.
@@ -36,20 +41,8 @@ async function getEvaluationForm(req, res) {
     // Load student data
     const student = await User.findByPk(placement.studentId);
 
-    // Submission is only allowed within 14 days of internship end (enforced on POST).
-    // GET always returns form metadata so supervisors can open links sent at approval time.
-    const now = new Date();
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    let isSubmitWindowOpen = true;
-    let daysUntilEnd = 0;
-    if (placement.internshipEndDate) {
-      const endDate = new Date(placement.internshipEndDate);
-      endDate.setHours(0, 0, 0, 0);
-      daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysUntilEnd > 14) {
-        isSubmitWindowOpen = false;
-      }
-    }
+    const daysUntilEnd = getDaysUntilInternshipEnd(placement);
+    const isSubmitWindowOpen = isEvaluationSubmitWindowOpen(placement);
 
     res.json({
       placement: {
@@ -66,7 +59,7 @@ async function getEvaluationForm(req, res) {
       } : null,
       tokenValid: true,
       isSubmitWindowOpen,
-      daysUntilEnd: placement.internshipEndDate ? daysUntilEnd : null,
+      daysUntilEnd,
     });
   } catch (error) {
     console.error('Error loading evaluation form:', error);
@@ -124,22 +117,11 @@ async function submitEvaluation(req, res) {
       return res.status(404).json({ message: 'Placement not found.' });
     }
 
-    // Enforce 14-day lock on submission
-    const now = new Date();
-    // Start of today for exact comparisons
-    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-
-    if (placement.internshipEndDate) {
-      const endDate = new Date(placement.internshipEndDate);
-      endDate.setHours(0, 0, 0, 0);
-      const daysUntilEnd = Math.ceil((endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      
-      // Lock if more than 14 days remaining
-      if (daysUntilEnd > 14) {
-        return res.status(403).json({ 
-          message: `This evaluation form will automatically open 2 weeks before the student's internship ends. (Currently ${daysUntilEnd} days remaining)` 
-        });
-      }
+    if (!isEvaluationSubmitWindowOpen(placement)) {
+      const daysUntilEnd = getDaysUntilInternshipEnd(placement);
+      return res.status(403).json({
+        message: `This evaluation form opens ${SUBMIT_WINDOW_DAYS} days before the internship ends.${daysUntilEnd != null ? ` (${daysUntilEnd} days remaining)` : ''}`,
+      });
     }
 
     // Create the evaluation record

@@ -1,5 +1,6 @@
 const { v4: uuidv4 } = require('uuid');
 const { supabase } = require('./supabase');
+const { resolveCatalogDepartment } = require('../constants/departmentCatalog');
 
 function mapSignature(row) {
   if (!row) return null;
@@ -40,6 +41,53 @@ const StaffSignature = {
 
     if (error && error.code !== 'PGRST116') throw error;
     return mapSignature(data);
+  },
+
+  /** Match student/HOD department strings against catalog names and aliases. */
+  async findActiveByDepartmentFlexible(departmentInput) {
+    const names = new Set();
+    const raw = String(departmentInput || '').trim();
+    if (raw) names.add(raw);
+
+    const catalog = resolveCatalogDepartment(raw);
+    if (catalog) {
+      names.add(catalog.name);
+      for (const alias of catalog.aliases || []) {
+        if (alias) names.add(alias);
+      }
+    }
+
+    for (const name of names) {
+      const sig = await this.findActiveByDepartment(name);
+      if (sig) return sig;
+    }
+
+    const { data: rows, error } = await supabase
+      .from('staff_signatures')
+      .select('*')
+      .eq('is_active', true)
+      .eq('role', 'hod')
+      .order('updated_at', { ascending: false });
+
+    if (error && error.code !== 'PGRST116') throw error;
+    if (!rows?.length) return null;
+
+    const norm = (s) =>
+      String(s || '')
+        .trim()
+        .toLowerCase()
+        .replace(/\s+/g, ' ');
+
+    const targets = [...names].map(norm).filter(Boolean);
+    for (const row of rows) {
+      const rowNorm = norm(row.department);
+      if (targets.includes(rowNorm)) return mapSignature(row);
+      for (const t of targets) {
+        if (rowNorm.includes(t) || t.includes(rowNorm)) return mapSignature(row);
+      }
+    }
+
+    return null;
   },
 
   async findMine(userId) {

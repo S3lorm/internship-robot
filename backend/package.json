@@ -11,6 +11,7 @@
     "smtp:configure": "node scripts/configure-smtp.js",
     "smtp:fix": "node scripts/fix-smtp-config.js",
     "email:test": "node scripts/test-email.js",
+    "letters:backfill-refs": "node scripts/backfill-letter-references.js",
     "start": "node server.js",
     "dev": "nodemon server.js"
   },
@@ -29,6 +30,7 @@
     "node-cron": "^4.2.1",
     "nodemailer": "^6.9.15",
     "pdfkit": "^0.18.0",
+    "qrcode": "^1.5.4",
     "uuid": "^9.0.1"
   },
   "devDependencies": {

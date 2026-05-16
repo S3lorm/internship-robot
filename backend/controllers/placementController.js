@@ -1,11 +1,49 @@
 const crypto = require('crypto');
-const { normalizeDepartmentName } = require('../constants/departments');
+const { studentBelongsToHodDepartment } = require('../constants/departmentCatalog');
+const { isEmailVerifiedStudent } = require('../utils/verifiedStudent');
 
-function departmentMatch(a, b) {
-  const na = normalizeDepartmentName(a) || (a && String(a).trim()) || '';
-  const nb = normalizeDepartmentName(b) || (b && String(b).trim()) || '';
-  if (!na || !nb) return false;
-  return na.toLowerCase() === nb.toLowerCase();
+function hodCanAccessStudent(student, hodDepartment) {
+  return (
+    Boolean(student) &&
+    isEmailVerifiedStudent(student) &&
+    studentBelongsToHodDepartment(student, hodDepartment)
+  );
+}
+
+function isApprovedPlacementInternshipActive(placement) {
+  if (!placement || placement.status !== 'approved') return false;
+  if (!placement.internshipEndDate) return true;
+  const end = new Date(placement.internshipEndDate);
+  if (Number.isNaN(end.getTime())) return true;
+  end.setHours(23, 59, 59, 999);
+  return Date.now() <= end.getTime();
+}
+
+function todayInputDateMin() {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+}
+
+function validateInternshipDateRange(start, end) {
+  if (!start || !end) {
+    return 'Confirmed start and end dates are required.';
+  }
+  const startStr = String(start).slice(0, 10);
+  const endStr = String(end).slice(0, 10);
+  const today = todayInputDateMin();
+  if (startStr < today) {
+    return 'Start date cannot be in the past. Choose today or a future date.';
+  }
+  if (endStr < today) {
+    return 'End date cannot be in the past. Choose today or a future date.';
+  }
+  if (endStr < startStr) {
+    return 'End date must be on or after the start date.';
+  }
+  return null;
 }
 
 // Create a new internship placement (Stage 2 - after general request approved)
@@ -13,9 +51,19 @@ async function createPlacement(req, res) {
   try {
     const user = req.user;
     const { LetterRequest, InternshipPlacement } = require('../models');
+    const { assertPortalOpenForStudentRequest, CLOSED_MESSAGE } = require('../services/internshipPortalService');
 
     if (!user || user.role !== 'student') {
       return res.status(403).json({ message: 'Only students can create placement requests' });
+    }
+
+    try {
+      await assertPortalOpenForStudentRequest();
+    } catch (portalErr) {
+      return res.status(portalErr.statusCode || 403).json({
+        message: portalErr.message || CLOSED_MESSAGE,
+        code: portalErr.code || 'PORTAL_CLOSED',
+      });
     }
 
     const {
@@ -39,6 +87,11 @@ async function createPlacement(req, res) {
       });
     }
 
+    const dateError = validateInternshipDateRange(internshipStartDate, internshipEndDate);
+    if (dateError) {
+      return res.status(400).json({ message: dateError });
+    }
+
     // Verify the general request exists and is approved
     const generalRequest = await LetterRequest.findByPk(generalRequestId);
     if (!generalRequest) {
@@ -49,6 +102,28 @@ async function createPlacement(req, res) {
     }
     if (generalRequest.status !== 'approved') {
       return res.status(400).json({ message: 'General request must be approved before submitting official placement' });
+    }
+
+    const existingPlacements = await InternshipPlacement.findAll({ where: { studentId: user.id } });
+    const blockingPlacement = existingPlacements.find((p) =>
+      p.status === 'pending' || p.status === 'modification_requested'
+    );
+    if (blockingPlacement) {
+      const msg =
+        blockingPlacement.status === 'modification_requested'
+          ? 'You have a placement that needs changes. Resolve it before registering another official placement.'
+          : 'You already have an official placement awaiting review. You cannot submit another until it is processed.';
+      return res.status(409).json({ message: msg });
+    }
+
+    const approvedPlacement = existingPlacements.find((p) => p.status === 'approved');
+    if (approvedPlacement && isApprovedPlacementInternshipActive(approvedPlacement)) {
+      const endLabel = approvedPlacement.internshipEndDate
+        ? new Date(approvedPlacement.internshipEndDate).toLocaleDateString('en-GB')
+        : 'your internship end date';
+      return res.status(409).json({
+        message: `Your official placement was approved by HOD or Secretary and is locked until your internship ends (${endLabel}). You cannot submit another registration until then.`,
+      });
     }
 
     const placement = await InternshipPlacement.create({
@@ -84,15 +159,16 @@ async function createPlacement(req, res) {
     }
 
     const hods = await User.findAll({ where: { role: 'hod' } });
-    for (const hod of hods) {
-      if (!departmentMatch(hod.department, user.department)) continue;
+    const secutuaries = await User.findAll({ where: { role: 'secutuary' } });
+    for (const staff of [...hods, ...secutuaries]) {
+      if (!studentBelongsToHodDepartment(user, staff.department)) continue;
       await createNotification({
-        userId: hod.id,
+        userId: staff.id,
         type: 'letter_request',
         title: 'Official placement request — your department',
         message: `${user.firstName} ${user.lastName} (${user.studentId || 'student'}) submitted an official placement for ${organizationName}. Approve or deny with a reason; if approved, the official letter and evaluation link are emailed to the organization.`,
         relatedId: placement.id,
-        link: '/admin/internship-tracking',
+        link: '/admin/official-placement-management',
       });
     }
 
@@ -134,7 +210,9 @@ async function getPlacements(req, res) {
 
     if (user.role === 'hod') {
       placements = placements.filter(
-        (p) => p.student && departmentMatch(p.student.department, user.department)
+        (p) =>
+          p.student &&
+          hodCanAccessStudent(p.student, user.department)
       );
     }
 
@@ -164,7 +242,7 @@ async function getPlacementById(req, res) {
     if (placement.studentId) {
       const student = await UserModel.findOne({ id: placement.studentId });
       if (student) placement.student = student;
-      if (user.role === 'hod' && (!student || !departmentMatch(student.department, user.department))) {
+      if (user.role === 'hod' && !hodCanAccessStudent(student, user.department)) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -235,7 +313,7 @@ async function updatePlacementStatus(req, res) {
     if (user.role === 'hod') {
       const { User: UserModel } = require('../models');
       const st = await UserModel.findOne({ id: placement.studentId });
-      if (!st || !departmentMatch(st.department, user.department)) {
+      if (!st || !hodCanAccessStudent(st, user.department)) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -452,7 +530,7 @@ async function sendToOrganization(req, res) {
     if (user.role === 'hod') {
       const { User: UserModel } = require('../models');
       const st = await UserModel.findOne({ id: placement.studentId });
-      if (!st || !departmentMatch(st.department, user.department)) {
+      if (!st || !hodCanAccessStudent(st, user.department)) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -508,7 +586,7 @@ async function downloadOfficialLetter(req, res) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    if (user.role === 'hod' && !departmentMatch(student.department, user.department)) {
+    if (user.role === 'hod' && !hodCanAccessStudent(student, user.department)) {
       return res.status(403).json({ message: 'Access denied' });
     }
 
@@ -545,7 +623,7 @@ async function getTrackingData(req, res) {
       // Get student info
       const student = await UserModel.findOne({ id: placement.studentId });
 
-      if (user.role === 'hod' && (!student || !departmentMatch(student.department, user.department))) {
+      if (user.role === 'hod' && !hodCanAccessStudent(student, user.department)) {
         continue;
       }
       
@@ -580,35 +658,60 @@ async function getTrackingData(req, res) {
   }
 }
 
-// Public: verify a document by verification code
+// Public: verify a document by verification code (official placement or internship request letter)
 async function verifyDocument(req, res) {
   try {
-    const { code } = req.params;
-    const { InternshipPlacement, User } = require('../models');
+    const code = String(req.params.code || '').trim();
+    if (!code) {
+      return res.json({ valid: false, message: 'Verification code is required.' });
+    }
 
-    // Search by verification code
+    const { InternshipPlacement, LetterRequest, User } = require('../models');
+
     const placement = await InternshipPlacement.findOne({ verificationCode: code });
-    if (!placement) {
+    if (placement) {
+      const student = await User.findByPk(placement.studentId);
       return res.json({
-        valid: false,
-        message: 'No document found with this verification code.',
+        valid: placement.status === 'approved',
+        documentType: 'Official placement letter',
+        document: {
+          studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
+          studentId: student?.studentId || undefined,
+          program: student?.program || undefined,
+          department: student?.department || undefined,
+          organisationName: placement.organizationName,
+          dateIssued: placement.officialLetterGeneratedAt
+            ? new Date(placement.officialLetterGeneratedAt).toLocaleDateString('en-GB')
+            : 'N/A',
+          referenceNumber: placement.referenceNumber,
+          status: placement.status === 'approved' ? 'Valid' : 'Invalid',
+        },
       });
     }
 
-    // Load student data
-    const student = await User.findByPk(placement.studentId);
+    const letter = await LetterRequest.findOne({ verificationCode: code });
+    if (letter) {
+      const student = await User.findByPk(letter.studentId);
+      const issuedAt = letter.pdfGeneratedAt || letter.reviewedAt || letter.createdAt;
+      return res.json({
+        valid: letter.status === 'approved',
+        documentType: 'Internship request letter',
+        document: {
+          studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
+          studentId: student?.studentId || undefined,
+          program: student?.program || undefined,
+          department: student?.department || undefined,
+          organisationName: letter.companyName || 'General internship letter',
+          dateIssued: issuedAt ? new Date(issuedAt).toLocaleDateString('en-GB') : 'N/A',
+          referenceNumber: letter.referenceNumber,
+          status: letter.status === 'approved' ? 'Valid' : 'Invalid',
+        },
+      });
+    }
 
-    res.json({
-      valid: true,
-      document: {
-        studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
-        organisationName: placement.organizationName,
-        dateIssued: placement.officialLetterGeneratedAt
-          ? new Date(placement.officialLetterGeneratedAt).toLocaleDateString('en-GB')
-          : 'N/A',
-        referenceNumber: placement.referenceNumber,
-        status: placement.status === 'approved' ? 'Valid' : 'Invalid',
-      },
+    return res.json({
+      valid: false,
+      message: 'No document found with this verification code.',
     });
   } catch (error) {
     console.error('Error verifying document:', error);

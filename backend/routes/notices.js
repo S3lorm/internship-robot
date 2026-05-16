@@ -5,6 +5,9 @@ const noticeController = require('../controllers/noticeController');
 
 const router = express.Router();
 
+// Public homepage announcements (admin-created only)
+router.get('/public/homepage', noticeController.listPublicHomepage);
+
 // list can optionally use auth to tailor audience filtering
 router.get('/', auth, noticeController.list);
 

@@ -2,7 +2,7 @@ import React from "react"
 import type { Metadata, Viewport } from 'next'
 import { Quicksand } from 'next/font/google'
 import { Toaster } from 'sonner'
-import { AuthProvider } from '@/contexts/auth-context'
+import { AppProviders } from '@/components/app-providers'
 import { AnalyticsClient } from '@/components/analytics-client'
 import './globals.css'
 
@@ -52,10 +52,10 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body className={`${quicksand.variable} font-sans antialiased`}>
-        <AuthProvider>
+        <AppProviders>
           {children}
           <Toaster position="top-right" richColors />
-        </AuthProvider>
+        </AppProviders>
         <AnalyticsClient />
       </body>
     </html>

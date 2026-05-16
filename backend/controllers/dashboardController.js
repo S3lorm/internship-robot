@@ -145,6 +145,7 @@ async function getStudentDashboard(req, res) {
         const now = Date.now();
         const noticesRaw = noticesResult.rows || noticesResult || [];
         const notices = noticesRaw.filter((n) => {
+            if (n.homepageOnly) return false;
             if (n.expiresAt && new Date(n.expiresAt).getTime() <= now) return false;
             if (n.targetDepartment && n.targetDepartment !== req.user.department) return false;
             return true;

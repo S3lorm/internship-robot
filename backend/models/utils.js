@@ -37,6 +37,8 @@ function mapKeyToSupabase(key) {
     targetAudience: 'target_audience',
     targetDepartment: 'target_department',
     isActive: 'is_active',
+    showOnHomepage: 'show_on_homepage',
+    homepageOnly: 'homepage_only',
     expiresAt: 'expires_at',
     isRead: 'is_read',
     relatedId: 'related_id',

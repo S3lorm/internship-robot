@@ -43,6 +43,7 @@ import {
   Info,
   CheckCircle2,
   Megaphone,
+  Home,
 } from "lucide-react"
 import { Notice } from "@/types"
 import { noticesApi } from "@/lib/api"
@@ -55,6 +56,23 @@ const priorityConfig = {
   urgent: { label: "Urgent", color: "bg-red-100 text-red-800 border-red-200", icon: Megaphone },
 }
 
+type PublishScope = "portal" | "homepage" | "both";
+
+const AUDIENCE_LABELS: Record<Notice["targetAudience"], string> = {
+  all: "All users",
+  students: "Students only",
+  secutuary: "Secretary only",
+  hod: "HOD only",
+  admins: "Admins only",
+  students_and_secretary: "Students & Secretary",
+};
+
+function publishScopeFromNotice(notice: Notice): PublishScope {
+  if (notice.homepageOnly) return "homepage";
+  if (notice.showOnHomepage) return "both";
+  return "portal";
+}
+
 const emptyNotice = {
   title: "",
   content: "",
@@ -62,6 +80,7 @@ const emptyNotice = {
   targetAudience: "all" as Notice["targetAudience"],
   expiresAt: "",
   isActive: true,
+  publishScope: "portal" as PublishScope,
 }
 
 const NoticeForm = ({ formData, setFormData }: { formData: any, setFormData: any }) => (
@@ -87,9 +106,8 @@ const NoticeForm = ({ formData, setFormData }: { formData: any, setFormData: any
       />
     </div>
 
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-      <div className="space-y-2">
-        <Label htmlFor="priority">Priority</Label>
+    <div className="space-y-2 max-w-xs">
+      <Label htmlFor="priority">Priority</Label>
         <Select
           value={formData.priority}
           onValueChange={(value: Notice["priority"]) =>
@@ -106,31 +124,78 @@ const NoticeForm = ({ formData, setFormData }: { formData: any, setFormData: any
             <SelectItem value="urgent">Urgent</SelectItem>
           </SelectContent>
         </Select>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="audience">Target Audience</Label>
-        <Select
-          value={formData.targetAudience}
-          onValueChange={(value: Notice["targetAudience"]) =>
-            setFormData({ ...formData, targetAudience: value })
-          }
-        >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Users</SelectItem>
-            <SelectItem value="students">Students Only</SelectItem>
-            <SelectItem value="hod">HOD Only</SelectItem>
-            <SelectItem value="secutuary">Secutuary Only</SelectItem>
-            <SelectItem value="admins">Admins Only</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
     </div>
 
-    <div className="space-y-2">
+    <div className="space-y-4 sm:col-span-2 rounded-lg border border-primary/20 bg-primary/5 p-4">
+      <Label htmlFor="publishScope" className="flex items-center gap-2">
+        <Home className="h-4 w-4 text-primary" />
+        Where to publish
+      </Label>
+      <Select
+        value={formData.publishScope}
+        onValueChange={(value: PublishScope) =>
+          setFormData({
+            ...formData,
+            publishScope: value,
+            targetAudience: value === "homepage" ? "all" : formData.targetAudience,
+          })
+        }
+      >
+        <SelectTrigger id="publishScope">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="portal">Student portal only</SelectItem>
+          <SelectItem value="homepage">Public homepage only</SelectItem>
+          <SelectItem value="both">Homepage and student portal</SelectItem>
+        </SelectContent>
+      </Select>
+      <p className="text-xs text-muted-foreground">
+        {formData.publishScope === "portal" &&
+          "In-app notifications on the portal. Email is sent only when the audience includes students."}
+        {formData.publishScope === "homepage" &&
+          "Landing page only — no portal notifications or emails."}
+        {formData.publishScope === "both" &&
+          "Public homepage plus portal notifications. Email when the audience includes students."}
+      </p>
+
+      {formData.publishScope !== "homepage" && (
+        <div className="space-y-2 pt-2 border-t border-primary/10">
+          <Label htmlFor="audience">Who receives this?</Label>
+          <Select
+            value={formData.targetAudience}
+            onValueChange={(value: Notice["targetAudience"]) =>
+              setFormData({ ...formData, targetAudience: value })
+            }
+          >
+            <SelectTrigger id="audience">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="students">Students only</SelectItem>
+              <SelectItem value="secutuary">Secretary only</SelectItem>
+              <SelectItem value="students_and_secretary">Students & Secretary</SelectItem>
+              <SelectItem value="hod">HOD only</SelectItem>
+              <SelectItem value="admins">Admins only</SelectItem>
+              <SelectItem value="all">All users (students, HOD, Secretary, admins)</SelectItem>
+            </SelectContent>
+          </Select>
+          <p className="text-xs text-muted-foreground">
+            {formData.targetAudience === "students" &&
+              "Verified students: dashboard notice + email."}
+            {formData.targetAudience === "secutuary" &&
+              "Department Secretaries: portal notification only (no student email)."}
+            {formData.targetAudience === "students_and_secretary" &&
+              "Students (dashboard + email) and Secretaries (portal notification)."}
+            {formData.targetAudience === "hod" && "Heads of Department: admin portal notification."}
+            {formData.targetAudience === "admins" && "System administrators only."}
+            {formData.targetAudience === "all" && "Everyone with portal access."}
+          </p>
+        </div>
+      )}
+    </div>
+
+    <div className="space-y-2 sm:col-span-2">
       <Label htmlFor="expiresAt">Expiration Date (optional)</Label>
       <Input
         id="expiresAt"
@@ -156,6 +221,7 @@ const NoticeForm = ({ formData, setFormData }: { formData: any, setFormData: any
         onCheckedChange={(checked) => setFormData({ ...formData, isActive: checked })}
       />
     </div>
+
   </div>
 )
 
@@ -213,7 +279,17 @@ export default function NoticesManagementPage() {
       }
       setCreateDialog(false)
       setFormData(emptyNotice)
-      toast.success("Notice created successfully")
+      const emailStats = (result.data as { emailDelivery?: { sent?: number; failed?: number } })
+        ?.emailDelivery;
+      if (emailStats && typeof emailStats.sent === "number") {
+        toast.success(
+          `Notice published. Email sent to ${emailStats.sent} verified student(s)${
+            emailStats.failed ? ` (${emailStats.failed} failed)` : ""
+          }.`
+        );
+      } else {
+        toast.success("Notice created successfully");
+      }
       fetchNotices()
     } catch (error) {
       toast.error("Failed to create notice")
@@ -285,6 +361,7 @@ export default function NoticesManagementPage() {
       targetAudience: notice.targetAudience,
       expiresAt: (notice as any).expiresAt ? (notice as any).expiresAt.split("T")[0] : "",
       isActive: notice.isActive,
+      publishScope: publishScopeFromNotice(notice),
     })
     setEditDialog({ open: true, notice })
   }
@@ -312,7 +389,7 @@ export default function NoticesManagementPage() {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Notices & Announcements</h1>
           <p className="text-muted-foreground">
-            Manage announcements and notifications for students
+            Choose where each notice appears: student portal, public homepage only, or both.
           </p>
         </div>
         <Dialog open={createDialog} onOpenChange={setCreateDialog}>
@@ -442,15 +519,7 @@ export default function NoticesManagementPage() {
                             {priority.label}
                           </Badge>
                           <Badge variant="outline">
-                            {notice.targetAudience === "all"
-                              ? "All Users"
-                              : notice.targetAudience === "students"
-                                ? "Students"
-                                : notice.targetAudience === "hod"
-                                  ? "HOD"
-                                  : notice.targetAudience === "secutuary"
-                                    ? "Secutuary"
-                                : "Admins"}
+                            {AUDIENCE_LABELS[notice.targetAudience] || notice.targetAudience}
                           </Badge>
                           {!notice.isActive && (
                             <Badge variant="outline" className="bg-gray-100 text-gray-800">
@@ -460,6 +529,17 @@ export default function NoticesManagementPage() {
                           {isExpired && (
                             <Badge variant="outline" className="bg-red-100 text-red-800">
                               Expired
+                            </Badge>
+                          )}
+                          {notice.isActive && notice.homepageOnly && (
+                            <Badge variant="outline" className="bg-sky-100 text-sky-800 border-sky-200">
+                              <Home className="h-3 w-3 mr-1" />
+                              Homepage only
+                            </Badge>
+                          )}
+                          {notice.isActive && notice.showOnHomepage && !notice.homepageOnly && (
+                            <Badge variant="outline" className="bg-indigo-100 text-indigo-800 border-indigo-200">
+                              Homepage + portal
                             </Badge>
                           )}
                         </div>

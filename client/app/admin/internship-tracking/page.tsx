@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/auth-context";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
@@ -31,12 +31,17 @@ import {
   Loader2,
   Eye,
   Search,
-  Filter,
-  Check,
   Send,
-  MoreVertical,
-  MapPin
+  MapPin,
 } from "lucide-react";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { cn } from "@/lib/utils";
+import { getStudentProgramGroup, groupByProgram } from "@/lib/department-catalog";
 import {
   Dialog,
   DialogContent,
@@ -46,21 +51,39 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 
-const statusConfig = {
-  pending: { label: "Pending Review", color: "bg-amber-100 text-amber-800 border-amber-200", icon: Clock },
-  approved: { label: "Approved", color: "bg-green-100 text-green-800 border-green-200", icon: CheckCircle2 },
-  rejected: { label: "Rejected", color: "bg-red-100 text-red-800 border-red-200", icon: XCircle },
-  modification_requested: { label: "Modifications Requested", color: "bg-blue-100 text-blue-800 border-blue-200", icon: AlertCircle },
+const statusConfig: Record<
+  InternshipPlacement["status"],
+  { label: string; className: string; icon: typeof Clock }
+> = {
+  pending: { label: "Pending", className: "bg-amber-100 text-amber-900 border-amber-200", icon: Clock },
+  approved: { label: "Approved", className: "bg-emerald-100 text-emerald-900 border-emerald-200", icon: CheckCircle2 },
+  rejected: { label: "Rejected", className: "bg-red-100 text-red-900 border-red-200", icon: XCircle },
+  modification_requested: {
+    label: "Changes requested",
+    className: "bg-blue-100 text-blue-900 border-blue-200",
+    icon: AlertCircle,
+  },
 };
+
+function departmentKey(p: InternshipPlacement) {
+  return p.student?.department?.trim() || "Unassigned";
+}
+
+function sortDepts(keys: string[]) {
+  const sorted = keys.filter((k) => k !== "Unassigned").sort((a, b) => a.localeCompare(b));
+  if (keys.includes("Unassigned")) sorted.push("Unassigned");
+  return sorted;
+}
 
 export default function InternshipTrackingPage() {
   const { user } = useAuth();
   const [placements, setPlacements] = useState<InternshipPlacement[]>([]);
-  const [filteredPlacements, setFilteredPlacements] = useState<InternshipPlacement[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [selectedPlacement, setSelectedPlacement] = useState<InternshipPlacement | null>(null);
-  
+  const [detailLoading, setDetailLoading] = useState(false);
+
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [deptFilter, setDeptFilter] = useState<string>("all");
   const [emailFilter, setEmailFilter] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState("");
   
@@ -70,52 +93,119 @@ export default function InternshipTrackingPage() {
 
   useEffect(() => {
     if (!user) return;
-    if (user.role === "admin") return;
-    if (user.role !== "hod") return;
+    if (user.role !== "admin" && user.role !== "hod") return;
     void loadPlacements();
   }, [user]);
-
-  useEffect(() => {
-    let filtered = placements;
-
-    if (statusFilter !== "all") {
-      filtered = filtered.filter((p) => p.status === statusFilter);
-    }
-    
-    if (emailFilter !== "all") {
-      filtered = filtered.filter((p) => {
-        if (emailFilter === "sent") return p.emailSent === true;
-        if (emailFilter === "pending") return p.emailSent === false && p.status === 'approved';
-        return true;
-      });
-    }
-
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (p) =>
-          p.organizationName.toLowerCase().includes(q) ||
-          p.student?.firstName?.toLowerCase().includes(q) ||
-          p.student?.lastName?.toLowerCase().includes(q) ||
-          p.student?.studentId?.toLowerCase().includes(q) ||
-          (p.referenceNumber && p.referenceNumber.toLowerCase().includes(q))
-      );
-    }
-
-    setFilteredPlacements(filtered);
-  }, [placements, statusFilter, emailFilter, searchQuery]);
 
   const loadPlacements = async () => {
     setIsLoading(true);
     try {
       const result = await placementsApi.getTrackingData();
-      if (result.data) {
-        setPlacements(result.data.trackingData || []);
+      if (result.error) {
+        toast.error(result.error);
+        setPlacements([]);
+        return;
       }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to load placements");
+      const payload = result.data as { trackingData?: InternshipPlacement[] };
+      setPlacements(Array.isArray(payload?.trackingData) ? payload.trackingData : []);
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to load placements");
+      setPlacements([]);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const isHodView = user?.role === "hod";
+
+  const departmentOptions = useMemo(() => {
+    const s = new Set<string>();
+    for (const p of placements) s.add(departmentKey(p));
+    return sortDepts(Array.from(s));
+  }, [placements]);
+
+  const filteredPlacements = useMemo(() => {
+    let list = [...placements];
+
+    if (deptFilter !== "all") {
+      list = list.filter((p) => departmentKey(p) === deptFilter);
+    }
+
+    if (statusFilter !== "all") {
+      list = list.filter((p) => p.status === statusFilter);
+    }
+
+    if (emailFilter !== "all") {
+      list = list.filter((p) => {
+        if (emailFilter === "sent") return p.emailSent === true;
+        if (emailFilter === "pending") return p.emailSent === false && p.status === "approved";
+        return true;
+      });
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.organizationName.toLowerCase().includes(q) ||
+          p.organizationEmail?.toLowerCase().includes(q) ||
+          p.student?.firstName?.toLowerCase().includes(q) ||
+          p.student?.lastName?.toLowerCase().includes(q) ||
+          p.student?.studentId?.toLowerCase().includes(q) ||
+          p.student?.department?.toLowerCase().includes(q) ||
+          (p.referenceNumber && p.referenceNumber.toLowerCase().includes(q))
+      );
+    }
+
+    return list;
+  }, [placements, deptFilter, statusFilter, emailFilter, searchQuery]);
+
+  const byDepartment = useMemo(() => {
+    const map = new Map<string, InternshipPlacement[]>();
+    for (const p of filteredPlacements) {
+      const d = departmentKey(p);
+      if (!map.has(d)) map.set(d, []);
+      map.get(d)!.push(p);
+    }
+    for (const arr of map.values()) {
+      arr.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    return map;
+  }, [filteredPlacements]);
+
+  const orderedDepts = useMemo(() => sortDepts(Array.from(byDepartment.keys())), [byDepartment]);
+
+  const hodProgramSections = useMemo(() => {
+    if (!isHodView || !user?.department) return null;
+    return groupByProgram(filteredPlacements, user.department, (p) => p.student || {});
+  }, [filteredPlacements, isHodView, user?.department]);
+
+  const accordionSections = useMemo(() => {
+    if (hodProgramSections && hodProgramSections.length > 0) {
+      return hodProgramSections.map((g) => ({ key: g.program, rows: g.items }));
+    }
+    return orderedDepts.map((dept) => ({ key: dept, rows: byDepartment.get(dept) || [] }));
+  }, [hodProgramSections, orderedDepts, byDepartment]);
+
+  const accordionDefault = useMemo(
+    () => accordionSections.map((s) => s.key),
+    [accordionSections]
+  );
+
+  const openDetail = async (p: InternshipPlacement) => {
+    setDetailLoading(true);
+    setSelectedPlacement(p);
+    setAdminNotes("");
+    try {
+      const res = await placementsApi.getById(p.id);
+      if (res.error) {
+        toast.error(res.error);
+        return;
+      }
+      const pl = (res.data as { placement?: InternshipPlacement })?.placement;
+      if (pl) setSelectedPlacement(pl);
+    } finally {
+      setDetailLoading(false);
     }
   };
 
@@ -191,120 +281,95 @@ export default function InternshipTrackingPage() {
     }
   };
 
-  const stats = {
-    total: placements.length,
-    pending: placements.filter((p) => p.status === "pending").length,
-    approved: placements.filter((p) => p.status === "approved").length,
-    emailsSent: placements.filter((p) => p.emailSent).length,
-  };
+  const stats = useMemo(
+    () => ({
+      total: filteredPlacements.length,
+      pending: filteredPlacements.filter((p) => p.status === "pending").length,
+      approved: filteredPlacements.filter((p) => p.status === "approved").length,
+      emailsSent: filteredPlacements.filter((p) => p.emailSent).length,
+    }),
+    [filteredPlacements]
+  );
 
   if (!user || (user.role !== "admin" && user.role !== "hod")) {
     return null;
   }
 
-  const isHodView = user.role === "hod";
-
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-5">
       <div>
-        <h1 className="text-2xl font-bold text-foreground md:text-3xl flex items-center gap-2">
-          <Briefcase className="h-7 w-7 text-primary" />
-          Stage 2: Official Internship Tracking
-        </h1>
-        <p className="text-muted-foreground mt-1">
+        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Official internship tracking</h1>
+        <p className="mt-1 max-w-3xl text-muted-foreground">
           {isHodView
-            ? "Review official placement requests from students in your department. When you approve, the official letter (PDF) and supervisor evaluation link are emailed to the host organization automatically."
-            : "Review, approve, and track official placements across the institution. Upon approval, official letters and unique evaluation tokens are generated and can be emailed to organizations."}
+            ? "Stage 2 placement requests in your department, grouped by course. Use View for full detail and actions."
+            : "Stage 2 placement requests across the institution, grouped by department. Use View for full detail and actions."}
         </p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Badge variant="secondary">{stats.total} shown</Badge>
+          <Badge variant="outline" className="border-amber-200 bg-amber-50 text-amber-900">
+            {stats.pending} pending
+          </Badge>
+          <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-emerald-900">
+            {stats.approved} approved
+          </Badge>
+          <Badge variant="outline" className="border-blue-200 bg-blue-50 text-blue-900">
+            {stats.emailsSent} emails sent
+          </Badge>
+        </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-              <Briefcase className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-sm text-muted-foreground">Total Placements</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-100">
-              <Clock className="h-6 w-6 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.pending}</p>
-              <p className="text-sm text-muted-foreground">Pending Review</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.approved}</p>
-              <p className="text-sm text-muted-foreground">Approved</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-blue-100">
-              <Mail className="h-6 w-6 text-blue-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.emailsSent}</p>
-              <p className="text-sm text-muted-foreground">Outbound Emails</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Filters */}
       <Card>
-        <CardContent className="p-4">
-          <div className="flex flex-col sm:flex-row gap-4">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Filters & search</CardTitle>
+          <CardDescription>Refine the list, then open a row with View for full detail and actions.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex flex-col gap-4 lg:flex-row">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="Search organization, student name, ID, or Reference Code..."
+                placeholder="Search student, ID, department, company, email, or reference…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
+                className="pl-9"
               />
             </div>
-            <div className="flex items-center gap-2">
-              <Filter className="h-4 w-4 text-muted-foreground" />
+            <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+              {!isHodView && (
+                <Select value={deptFilter} onValueChange={setDeptFilter}>
+                  <SelectTrigger className="w-full sm:w-[220px]">
+                    <SelectValue placeholder="Department" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All departments</SelectItem>
+                    {departmentOptions.map((d) => (
+                      <SelectItem key={d} value={d}>
+                        {d}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
               <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="w-[160px]">
+                <SelectTrigger className="w-full sm:w-[160px]">
                   <SelectValue placeholder="Status" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="all">All statuses</SelectItem>
                   <SelectItem value="pending">Pending</SelectItem>
                   <SelectItem value="approved">Approved</SelectItem>
                   <SelectItem value="rejected">Rejected</SelectItem>
-                  <SelectItem value="modification_requested">Needs Changes</SelectItem>
+                  <SelectItem value="modification_requested">Changes requested</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={emailFilter} onValueChange={setEmailFilter}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue placeholder="Email Status" />
+                <SelectTrigger className="w-full sm:w-[160px]">
+                  <SelectValue placeholder="Email" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All Email Status</SelectItem>
-                  <SelectItem value="sent">Email Sent</SelectItem>
-                  <SelectItem value="pending">Pending Send</SelectItem>
+                  <SelectItem value="all">All email status</SelectItem>
+                  <SelectItem value="sent">Email sent</SelectItem>
+                  <SelectItem value="pending">Pending send</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -314,111 +379,118 @@ export default function InternshipTrackingPage() {
 
       {/* List */}
       {isLoading ? (
-        <div className="flex items-center justify-center py-12">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <div className="flex justify-center py-16">
+          <Loader2 className="h-9 w-9 animate-spin text-primary" />
         </div>
       ) : filteredPlacements.length === 0 ? (
         <Card>
-          <CardContent className="py-12 text-center">
-            <Building2 className="mx-auto mb-4 h-12 w-12 text-muted-foreground/50" />
-            <h3 className="mb-2 text-lg font-medium">No placements found</h3>
-            <p className="text-muted-foreground">
-              {placements.length === 0
-                ? "No official intern placement requests have been submitted by students yet."
-                : "No placements match your current search and filters."}
-            </p>
+          <CardContent className="py-12 text-center text-muted-foreground">
+            <Building2 className="mx-auto mb-3 h-10 w-10 opacity-40" />
+            {placements.length === 0
+              ? "No official placement requests have been submitted yet."
+              : "No placements match your filters."}
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          {filteredPlacements.map((placement) => {
-            const status = statusConfig[placement.status];
-            const StatusIcon = status.icon;
-
-            return (
-              <Card key={placement.id} className="hover:border-primary/50 transition-colors border-l-4" style={{ 
-                borderLeftColor: placement.status === 'approved' ? (placement.emailSent ? '#3b82f6' : '#22c55e') : 
-                                  placement.status === 'pending' ? '#f59e0b' : 
-                                  placement.status === 'modification_requested' ? '#6366f1' : '#ef4444' 
-              }}>
-                <CardContent className="p-5">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                        <Badge variant="outline" className={status.color}>
-                          <StatusIcon className="h-3 w-3 mr-1 text-current" />
-                          {status.label}
-                        </Badge>
-                        {placement.status === 'approved' && (
-                           <Badge variant={placement.emailSent ? "secondary" : "destructive"} className={placement.emailSent ? "bg-blue-50 text-blue-700" : ""}>
-                             <Mail className="h-3 w-3 mr-1"/>
-                             {placement.emailSent ? "Email Sent" : "Pending Send"}
-                           </Badge>
-                        )}
-                        {placement.referenceNumber && (
-                          <code className="text-xs font-mono bg-muted/50 px-1.5 py-0.5 rounded border ml-auto md:ml-2">
-                             Ref: {placement.referenceNumber}
-                          </code>
-                        )}
-                      </div>
-                      
-                      <h3 className="font-semibold text-base mb-1 truncate max-w-[300px]" title={placement.organizationName}>
-                        {placement.organizationName}
-                      </h3>
-                      
-                      <div className="space-y-1 mt-3 text-sm">
-                        <p className="flex items-center gap-2 text-muted-foreground">
-                          <User className="h-4 w-4 shrink-0" />
-                          <span className="font-medium text-foreground">{placement.student?.firstName} {placement.student?.lastName}</span>
-                          <span className="text-xs">({placement.student?.studentId})</span>
-                        </p>
-                        <p className="flex items-center gap-2 text-muted-foreground truncate w-full" title={placement.organizationEmail}>
-                          <Mail className="h-4 w-4 shrink-0" />
-                          {placement.organizationEmail}
-                        </p>
-                        <p className="flex items-center gap-2 text-muted-foreground truncate w-full">
-                          <Briefcase className="h-4 w-4 shrink-0" />
-                          {placement.departmentRole || 'General Placement'}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex flex-col gap-2 shrink-0 ml-4">
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        className="w-full"
-                        onClick={() => setSelectedPlacement(placement)}
-                      >
-                        <Eye className="mr-1.5 h-4 w-4" />
-                        Review
-                      </Button>
-                      
-                      {placement.status === 'approved' && (
-                        <Button
-                          variant={placement.emailSent ? "outline" : "default"}
-                          size="sm"
-                          disabled={isSendingEmail === placement.id}
-                          onClick={() => handleResendEmail(placement.id)}
-                          className={placement.emailSent ? "" : "bg-blue-600 hover:bg-blue-700"}
-                        >
-                          {isSendingEmail === placement.id ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                          ) : (
-                            <>
-                              <Send className="mr-1.5 h-3.5 w-3.5" />
-                              {placement.emailSent ? "Resend Email" : "Send Email"}
-                            </>
-                          )}
-                        </Button>
-                      )}
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+        <Accordion type="multiple" defaultValue={accordionDefault} className="space-y-2">
+          {accordionSections.map(({ key, rows }) => (
+            <AccordionItem key={key} value={key} className="rounded-lg border border-border/80 bg-card px-1">
+              <AccordionTrigger className="px-3 py-3 text-left hover:no-underline">
+                <div className="flex flex-1 items-center justify-between gap-2 pr-2">
+                  <span className="font-semibold text-sm md:text-base">{key}</span>
+                  <Badge variant="secondary" className="shrink-0">
+                    {rows.length} request{rows.length === 1 ? "" : "s"}
+                  </Badge>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent>
+                <div className="overflow-x-auto border-t">
+                  <table className="w-full min-w-[880px] text-sm">
+                    <thead>
+                      <tr className="border-b bg-muted/40 text-left text-xs font-medium text-muted-foreground">
+                        <th className="p-2.5">Submitted</th>
+                        <th className="p-2.5">Student</th>
+                        <th className="p-2.5">{isHodView ? "ID / Course" : "ID / Program"}</th>
+                        <th className="p-2.5">Organisation</th>
+                        <th className="p-2.5">Status</th>
+                        <th className="p-2.5 w-[88px]" />
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {rows.map((p) => {
+                        const st = statusConfig[p.status];
+                        const Ic = st.icon;
+                        const dept = p.student?.department || "";
+                        return (
+                          <tr
+                            key={p.id}
+                            className="border-b border-border/50 transition-colors hover:bg-muted/20"
+                          >
+                            <td className="p-2.5 whitespace-nowrap text-xs text-muted-foreground">
+                              {new Date(p.createdAt).toLocaleString("en-GB", {
+                                day: "2-digit",
+                                month: "short",
+                                year: "2-digit",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </td>
+                            <td className="p-2.5">
+                              <span className="font-medium">
+                                {p.student?.firstName} {p.student?.lastName}
+                              </span>
+                            </td>
+                            <td className="p-2.5">
+                              <div className="font-mono text-xs">{p.student?.studentId}</div>
+                              <div className="text-xs text-muted-foreground line-clamp-1">
+                                {isHodView && user?.department
+                                  ? getStudentProgramGroup(p.student || {}, user.department)
+                                  : getStudentProgramGroup(p.student || {}, dept) || p.student?.program || "—"}
+                              </div>
+                            </td>
+                            <td className="p-2.5 max-w-[200px]">
+                              <div className="font-medium truncate text-xs">{p.organizationName}</div>
+                              {p.referenceNumber && (
+                                <code className="text-[10px] text-muted-foreground">{p.referenceNumber}</code>
+                              )}
+                            </td>
+                            <td className="p-2.5">
+                              <div className="flex flex-col gap-1">
+                                <Badge variant="outline" className={cn("w-fit gap-1 text-xs", st.className)}>
+                                  <Ic className="h-3 w-3" />
+                                  {st.label}
+                                </Badge>
+                                {p.status === "approved" && (
+                                  <Badge
+                                    variant="outline"
+                                    className={cn(
+                                      "w-fit text-[10px]",
+                                      p.emailSent
+                                        ? "bg-blue-50 text-blue-700 border-blue-200"
+                                        : "bg-amber-50 text-amber-800 border-amber-200"
+                                    )}
+                                  >
+                                    {p.emailSent ? "Email sent" : "Email pending"}
+                                  </Badge>
+                                )}
+                              </div>
+                            </td>
+                            <td className="p-2.5">
+                              <Button size="sm" variant="secondary" onClick={() => void openDetail(p)}>
+                                <Eye className="mr-1 h-3.5 w-3.5" />
+                                View
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
       )}
 
       {/* Review Dialog */}
@@ -451,7 +523,7 @@ export default function InternshipTrackingPage() {
                       })}
                     </DialogDescription>
                   </div>
-                  <Badge variant="outline" className={`${statusConfig[selectedPlacement.status].color} text-sm px-3 py-1`}>
+                  <Badge variant="outline" className={`${statusConfig[selectedPlacement.status].className} text-sm px-3 py-1`}>
                     {statusConfig[selectedPlacement.status].label}
                   </Badge>
                 </div>

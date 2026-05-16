@@ -50,6 +50,8 @@ export interface Internship {
   applicationsCount: number;
   status: InternshipStatus;
   category: string;
+  /** RMU department this opportunity is showcased for on the homepage. */
+  targetDepartment?: string;
   /** Hero image on cards (path under /public or absolute URL). */
   coverImage?: string;
   type?: string;
@@ -109,13 +111,17 @@ export interface Notice {
   content: string;
   type: NoticeType;
   priority: NoticePriority;
-  targetAudience: 'all' | 'students' | 'admins' | 'hod' | 'secutuary';
+  targetAudience: 'all' | 'students' | 'admins' | 'hod' | 'secutuary' | 'students_and_secretary';
   /** When set, only students in this department see the notice on the dashboard. */
   targetDepartment?: string | null;
   publishDate: string;
   expiryDate?: string;
   isPinned: boolean;
   isActive: boolean;
+  /** When true (admin only), shown on the public homepage announcements section. */
+  showOnHomepage?: boolean;
+  /** When true, visible on homepage only (not student dashboard / emails). */
+  homepageOnly?: boolean;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -226,10 +232,13 @@ export interface NoticeFormData {
   content: string;
   type: NoticeType;
   priority: NoticePriority;
-  targetAudience: 'all' | 'students' | 'admins' | 'hod' | 'secutuary';
+  targetAudience: 'all' | 'students' | 'admins' | 'hod' | 'secutuary' | 'students_and_secretary';
   publishDate: string;
   expiryDate?: string;
   isPinned: boolean;
+  showOnHomepage?: boolean;
+  homepageOnly?: boolean;
+  publishScope?: 'portal' | 'homepage' | 'both';
 }
 
 // Filter types
@@ -401,6 +410,9 @@ export interface WeeklyLogEntry {
   weekEnding: string;
   activities: WeeklyLogActivity[];
   studentRemark?: string;
+  supervisorRemark?: string;
+  supervisorName?: string;
+  supervisorStatus?: string;
   createdAt: string;
   updatedAt: string;
 }

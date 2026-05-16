@@ -13,12 +13,13 @@ import { Separator } from "@/components/ui/separator";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
+import { useTheme } from "next-themes";
 import { authApi } from "@/lib/api";
+import { SettingsNotificationPreferences } from "@/components/settings-notification-preferences";
 import {
   Settings as SettingsIcon,
   Bell,
   Shield,
-  Mail,
   Moon,
   Sun,
   Globe,
@@ -31,7 +32,8 @@ import {
 } from "lucide-react";
 
 export default function SettingsPage() {
-  const { user, updateUser } = useAuth();
+  const { user } = useAuth();
+  const { setTheme, resolvedTheme } = useTheme();
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingPrefs, setIsLoadingPrefs] = useState(true);
   const [notifications, setNotifications] = useState({
@@ -83,14 +85,17 @@ export default function SettingsPage() {
             letterRequestUpdates: prefs.letterRequestUpdates ?? true,
             evaluationUpdates: prefs.evaluationUpdates ?? true,
           });
+          const theme =
+            prefs.theme === "dark" || prefs.theme === "light" ? prefs.theme : "light";
           setPreferences({
-            theme: prefs.theme ?? "light",
+            theme,
             language: prefs.language ?? "en",
             timezone: prefs.timezone ?? "GMT",
             profileVisibility: prefs.profileVisibility ?? "public",
             showEmail: prefs.showEmail ?? false,
             showPhone: prefs.showPhone ?? false,
           });
+          setTheme(theme);
         }
       } catch (error: any) {
         console.error("Failed to load preferences:", error);
@@ -101,7 +106,19 @@ export default function SettingsPage() {
     };
 
     loadPreferences();
-  }, []);
+  }, [setTheme]);
+
+  const applyTheme = (theme: "light" | "dark") => {
+    setPreferences((prev) => ({ ...prev, theme }));
+    setTheme(theme);
+  };
+
+  const activeTheme =
+    preferences.theme === "dark" || preferences.theme === "light"
+      ? preferences.theme
+      : resolvedTheme === "dark"
+        ? "dark"
+        : "light";
 
   const handleNotificationChange = (key: keyof typeof notifications) => {
     setNotifications((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -208,153 +225,14 @@ export default function SettingsPage() {
 
         {/* Notifications */}
         <TabsContent value="notifications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>
-                Choose how you want to be notified about updates and activities
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="email-notifications" className="flex items-center gap-2">
-                      <Mail className="h-4 w-4" />
-                      Email Notifications
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive notifications via email
-                    </p>
-                  </div>
-                  <Switch
-                    id="email-notifications"
-                    checked={notifications.emailNotifications}
-                    onCheckedChange={() => handleNotificationChange("emailNotifications")}
-                    disabled={isLoadingPrefs}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="push-notifications">Push Notifications</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Receive browser push notifications
-                    </p>
-                  </div>
-                  <Switch
-                    id="push-notifications"
-                    checked={notifications.pushNotifications}
-                    onCheckedChange={() => handleNotificationChange("pushNotifications")}
-                    disabled={isLoadingPrefs}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="application-updates">Application Updates</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified when your application status changes
-                    </p>
-                  </div>
-                  <Switch
-                    id="application-updates"
-                    checked={notifications.applicationUpdates}
-                    onCheckedChange={() => handleNotificationChange("applicationUpdates")}
-                    disabled={isLoadingPrefs}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="new-internships">New Internships</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Notify me about new internship opportunities
-                    </p>
-                  </div>
-                  <Switch
-                    id="new-internships"
-                    checked={notifications.newInternships}
-                    onCheckedChange={() => handleNotificationChange("newInternships")}
-                    disabled={isLoadingPrefs}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="deadline-reminders">Deadline Reminders</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Remind me before application deadlines
-                    </p>
-                  </div>
-                  <Switch
-                    id="deadline-reminders"
-                    checked={notifications.deadlineReminders}
-                    onCheckedChange={() => handleNotificationChange("deadlineReminders")}
-                    disabled={isLoadingPrefs}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="letter-request-updates">Letter Request Updates</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified about letter request status changes
-                    </p>
-                  </div>
-                  <Switch
-                    id="letter-request-updates"
-                    checked={notifications.letterRequestUpdates}
-                    onCheckedChange={() => handleNotificationChange("letterRequestUpdates")}
-                    disabled={isLoadingPrefs}
-                  />
-                </div>
-
-                <Separator />
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label htmlFor="evaluation-updates">Evaluation Updates</Label>
-                    <p className="text-sm text-muted-foreground">
-                      Get notified when new evaluations are available
-                    </p>
-                  </div>
-                  <Switch
-                    id="evaluation-updates"
-                    checked={notifications.evaluationUpdates}
-                    onCheckedChange={() => handleNotificationChange("evaluationUpdates")}
-                    disabled={isLoadingPrefs}
-                  />
-                </div>
-              </div>
-
-              <div className="flex justify-end">
-                <Button onClick={handleSaveNotifications} disabled={isLoading}>
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Saving...
-                    </>
-                  ) : (
-                    <>
-                      <Save className="mr-2 h-4 w-4" />
-                      Save Changes
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
+          <SettingsNotificationPreferences
+            notifications={notifications}
+            onToggle={handleNotificationChange}
+            isLoadingPrefs={isLoadingPrefs}
+            isSaving={isLoading}
+            onSave={handleSaveNotifications}
+            role={user?.role ?? "student"}
+          />
         </TabsContent>
 
         {/* Preferences */}
@@ -373,25 +251,28 @@ export default function SettingsPage() {
                     <Sun className="h-4 w-4" />
                     Theme
                   </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Applies immediately. Save preferences to remember on other devices.
+                  </p>
                   <div className="flex gap-2">
                     <Button
-                      variant={preferences.theme === "light" ? "default" : "outline"}
+                      type="button"
+                      variant={activeTheme === "light" ? "default" : "outline"}
                       size="sm"
-                      onClick={() =>
-                        setPreferences((prev) => ({ ...prev, theme: "light" }))
-                      }
+                      onClick={() => applyTheme("light")}
                       disabled={isLoadingPrefs}
+                      aria-pressed={activeTheme === "light"}
                     >
                       <Sun className="mr-2 h-4 w-4" />
                       Light
                     </Button>
                     <Button
-                      variant={preferences.theme === "dark" ? "default" : "outline"}
+                      type="button"
+                      variant={activeTheme === "dark" ? "default" : "outline"}
                       size="sm"
-                      onClick={() =>
-                        setPreferences((prev) => ({ ...prev, theme: "dark" }))
-                      }
+                      onClick={() => applyTheme("dark")}
                       disabled={isLoadingPrefs}
+                      aria-pressed={activeTheme === "dark"}
                     >
                       <Moon className="mr-2 h-4 w-4" />
                       Dark

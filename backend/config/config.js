@@ -18,6 +18,12 @@ const config = {
     ? 'http://localhost:3000'
     : 'https://internship-robot-omega.vercel.app'),
 
+  // Public URL on printed letters / QR codes (hosted site; not localhost)
+  publicAppUrl:
+    process.env.PUBLIC_APP_URL ||
+    process.env.LETTER_VERIFY_BASE_URL ||
+    'https://internship-robot-omega.vercel.app',
+
   // API URL — used when backend needs to reference itself
   apiUrl: process.env.API_URL || (isDev
     ? 'http://localhost:5000/api'
@@ -40,6 +46,10 @@ const config = {
   },
   emailFrom: process.env.EMAIL_FROM || `"RMU Internship Portal" <${(process.env.SMTP_USER || 'noreply@rmu.edu.gh').trim()}>`,
 
+  // Supervisor evaluation: when true, form accepts submissions anytime (testing).
+  // Set EVALUATION_BYPASS_SUBMIT_WINDOW=false to restore the final-14-days rule.
+  evaluationBypassSubmitWindow: process.env.EVALUATION_BYPASS_SUBMIT_WINDOW !== 'false',
+
   // CORS — allowed origins
   corsOrigins: [
     'http://localhost:3000',
@@ -54,6 +64,9 @@ if (isDev) {
   console.log(`   Frontend URL: ${config.frontendUrl}`);
   console.log(`   API URL:      ${config.apiUrl}`);
   console.log(`   Port:         ${config.port}`);
+  if (config.evaluationBypassSubmitWindow) {
+    console.log('   ⚠️  Evaluation submit window BYPASSED (supervisors can submit anytime)');
+  }
 } else {
   console.log(`🚀 [PROD] Server starting on port ${config.port}`);
 }

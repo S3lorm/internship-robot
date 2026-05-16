@@ -204,12 +204,7 @@ export default function AdminLetterRequestsPage() {
     }
   };
 
-  const stats = {
-    total: requests.length,
-    pending: requests.filter((r) => r.status === "pending").length,
-    approved: requests.filter((r) => r.status === "approved").length,
-    rejected: requests.filter((r) => r.status === "rejected").length,
-  };
+  const pendingCount = requests.filter((r) => r.status === "pending").length;
 
   const hodPrefixes = useMemo(() => {
     const pending = filteredRequests.filter((r) => r.status === "pending");
@@ -243,56 +238,6 @@ export default function AdminLetterRequestsPage() {
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-4">
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10">
-              <FileText className="h-6 w-6 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.total}</p>
-              <p className="text-sm text-muted-foreground">Total Requests</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-amber-100">
-              <Clock className="h-6 w-6 text-amber-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.pending}</p>
-              <p className="text-sm text-muted-foreground">Pending</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-green-100">
-              <CheckCircle2 className="h-6 w-6 text-green-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.approved}</p>
-              <p className="text-sm text-muted-foreground">Approved</p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="flex items-center gap-4 p-6">
-            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-red-100">
-              <XCircle className="h-6 w-6 text-red-600" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold">{stats.rejected}</p>
-              <p className="text-sm text-muted-foreground">Rejected</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {user?.role === "hod" && (
         <Card>
@@ -308,7 +253,7 @@ export default function AdminLetterRequestsPage() {
               <Button
                 type="button"
                 size="sm"
-                disabled={bulkBusy || stats.pending === 0}
+                disabled={bulkBusy || pendingCount === 0}
                 onClick={async () => {
                   setBulkBusy(true);
                   try {
@@ -330,7 +275,7 @@ export default function AdminLetterRequestsPage() {
                 type="button"
                 variant="destructive"
                 size="sm"
-                disabled={bulkBusy || stats.pending === 0}
+                disabled={bulkBusy || pendingCount === 0}
                 onClick={async () => {
                   setBulkBusy(true);
                   try {

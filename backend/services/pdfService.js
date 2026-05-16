@@ -137,8 +137,11 @@ async function generateOfficialLetterPDF(placement, student, signature) {
       doc.text(`     Verification Code: ${placement.verificationCode || 'N/A'}`);
       doc.moveDown(0.3);
 
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
-      doc.text(`Verify this document at: ${frontendUrl}/verify`);
+      const { getLetterVerifyUrl } = require('../utils/letterVerificationQr');
+      const verifyUrl = placement.verificationCode
+        ? getLetterVerifyUrl(placement.verificationCode)
+        : `${require('../config/config').publicAppUrl}/verify`;
+      doc.text(`Verify this document at: ${verifyUrl}`);
       doc.moveDown(0.3);
       doc.fontSize(8).fillColor('#666')
         .text('This is an official document from the Regional Maritime University. For verification, please contact: info@rmu.edu.gh');
@@ -216,6 +219,9 @@ async function generateWeeklyLogbookPDF(bundle) {
         }
         doc.moveDown(0.3);
         line('Student Remark', entry.studentRemark);
+        line('Supervisor Remark', entry.supervisorRemark);
+        line('Supervisor Name', entry.supervisorName);
+        line('Supervisor Status', entry.supervisorStatus);
         doc.moveDown(0.7);
       }
 

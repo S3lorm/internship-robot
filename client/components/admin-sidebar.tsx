@@ -21,15 +21,17 @@ import {
   MapPinned,
   BookOpen,
   PenLine,
+  Settings2,
 } from "lucide-react";
 
 type NavItem = { href: string; label: string; icon: React.ComponentType<{ className?: string }> };
 
 const hodNavItems: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/department-students", label: "Department students", icon: Users },
   { href: "/admin/letter-requests", label: "Letter Requests", icon: FileCheck },
   { href: "/admin/official-placement-management", label: "Official placements", icon: MapPinned },
-  { href: "/admin/weekly-logbooks", label: "Weekly logbooks", icon: BookOpen },
+  { href: "/admin/weekly-logbooks", label: "Logbook", icon: BookOpen },
   { href: "/admin/signature", label: "Digital signature", icon: PenLine },
   { href: "/admin/notifications", label: "Notifications", icon: Bell },
   { href: "/admin/evaluations", label: "Evaluations", icon: ClipboardCheck },
@@ -37,6 +39,7 @@ const hodNavItems: NavItem[] = [
 
 const systemAdminNav: NavItem[] = [
   { href: "/admin", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/admin/portal-management", label: "Portal management", icon: Settings2 },
   { href: "/admin/users", label: "User Management", icon: Users },
   { href: "/admin/internship-tracking", label: "Official placements", icon: MapPinned },
   { href: "/admin/notices", label: "Notices", icon: Bell },

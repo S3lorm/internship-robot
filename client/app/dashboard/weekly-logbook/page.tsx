@@ -2,41 +2,45 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { weeklyLogbooksApi } from "@/lib/api";
-import type { WeeklyLogbookBundle, WeeklyLogActivity } from "@/types";
+import { entryToSheetValues, sheetHeaderFromBundle } from "@/lib/weekly-logbook-ui";
+import type { WeeklyLogbookBundle } from "@/types";
+import {
+  WeeklyLogSheet,
+  emptyWeeklyActivities,
+  type WeeklyLogSheetValues,
+} from "@/components/weekly-log-sheet";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { formatStatusLabel } from "@/lib/utils";
 import { toast } from "sonner";
-import { BookOpen, CalendarDays, FileCheck2, Loader2, Lock, Send } from "lucide-react";
+import { BookOpen, Loader2, Lock, Send } from "lucide-react";
 
-const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday"];
+const editableStatuses = ["draft", "ongoing", "rejected"];
 
 export default function WeeklyLogbookPage() {
   const [bundle, setBundle] = useState<WeeklyLogbookBundle | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
-  const [form, setForm] = useState({
-    weekNumber: 1,
+  const [weekNumber, setWeekNumber] = useState(1);
+  const [draft, setDraft] = useState<WeeklyLogSheetValues>({
     weekBeginning: "",
     weekEnding: "",
     studentRemark: "",
-    activities: days.map((day) => ({ day, date: "", activity: "" })),
+    activities: emptyWeeklyActivities(),
   });
 
-  const editable = bundle ? ["draft", "ongoing", "rejected"].includes(bundle.logbook.status) : false;
+  const editable = bundle ? editableStatuses.includes(bundle.logbook.status) : false;
   const nextWeek = useMemo(() => (bundle?.entries?.length || 0) + 1, [bundle]);
+  const header = useMemo(() => (bundle ? sheetHeaderFromBundle(bundle) : null), [bundle]);
 
   useEffect(() => {
     void load();
   }, []);
 
   useEffect(() => {
-    setForm((current) => ({ ...current, weekNumber: nextWeek }));
+    setWeekNumber(nextWeek);
   }, [nextWeek]);
 
   const load = async () => {
@@ -45,32 +49,38 @@ export default function WeeklyLogbookPage() {
     if (result.error) {
       toast.error(result.error);
     } else {
-      setBundle((result.data as any).bundle);
+      setBundle((result.data as { bundle: WeeklyLogbookBundle }).bundle);
     }
     setLoading(false);
   };
 
-  const updateActivity = (index: number, key: keyof WeeklyLogActivity, value: string) => {
-    setForm((current) => ({
-      ...current,
-      activities: current.activities.map((item, i) => (i === index ? { ...item, [key]: value } : item)),
-    }));
-  };
-
   const saveWeek = async () => {
     if (!bundle) return;
+    const hasActivity = draft.activities.some(
+      (row) => row.activity.trim() || row.date.trim() || row.day.trim()
+    );
+    if (!draft.weekBeginning || !draft.weekEnding || !hasActivity) {
+      toast.error("Week dates and at least one activity row are required.");
+      return;
+    }
+
     setSaving(true);
-    const result = await weeklyLogbooksApi.saveWeek(bundle.logbook.id, form);
+    const result = await weeklyLogbooksApi.saveWeek(bundle.logbook.id, {
+      weekNumber,
+      weekBeginning: draft.weekBeginning,
+      weekEnding: draft.weekEnding,
+      studentRemark: draft.studentRemark,
+      activities: draft.activities,
+    });
     if (result.error) {
       toast.error(result.error);
     } else {
-      toast.success("Weekly entry saved");
-      setForm({
-        weekNumber: nextWeek + 1,
+      toast.success(`Week ${weekNumber} saved`);
+      setDraft({
         weekBeginning: "",
         weekEnding: "",
         studentRemark: "",
-        activities: days.map((day) => ({ day, date: "", activity: "" })),
+        activities: emptyWeeklyActivities(),
       });
       await load();
     }
@@ -79,14 +89,20 @@ export default function WeeklyLogbookPage() {
 
   const finalize = async () => {
     if (!bundle) return;
-    if (!confirm("Finalize this Weekly Log Sheet Book? You cannot edit it after final submission.")) return;
+    if (
+      !confirm(
+        "Submit the complete Weekly Log Sheet Book to your supervisor by email? Your entries and remarks will be locked and cannot be edited afterward."
+      )
+    ) {
+      return;
+    }
     setFinalizing(true);
     const result = await weeklyLogbooksApi.finalize(bundle.logbook.id);
     if (result.error) {
       toast.error(result.error);
     } else {
-      toast.success("Weekly Log Sheet Book finalized and sent to supervisor");
-      setBundle((result.data as any).bundle);
+      toast.success("Logbook sent to supervisor for remarks");
+      setBundle((result.data as { bundle: WeeklyLogbookBundle }).bundle);
     }
     setFinalizing(false);
   };
@@ -99,19 +115,21 @@ export default function WeeklyLogbookPage() {
     );
   }
 
-  if (!bundle) {
+  if (!bundle || !header) {
     return (
       <Card>
         <CardHeader>
           <CardTitle>Weekly Log Sheet Book</CardTitle>
-          <CardDescription>No approved official placement is available for logbook creation.</CardDescription>
+          <CardDescription>
+            No approved official placement is available. Complete your official placement approval
+            first.
+          </CardDescription>
         </CardHeader>
       </Card>
     );
   }
 
-  const placement = bundle.placement || {};
-  const student = bundle.student || ({} as any);
+  const locked = !editable;
 
   return (
     <div className="space-y-6">
@@ -122,36 +140,32 @@ export default function WeeklyLogbookPage() {
             Weekly Log Sheet Book
           </h1>
           <p className="text-muted-foreground">
-            Document weekly internship activities. This is not the supervisor evaluation form.
+            Fill each weekly sheet during internship. Supervisor sections stay locked until you
+            submit the complete book.
           </p>
         </div>
-        <Badge className="w-fit capitalize" variant={bundle.logbook.status === "rejected" ? "destructive" : "secondary"}>
+        <Badge
+          className="w-fit capitalize"
+          variant={bundle.logbook.status === "rejected" ? "destructive" : "secondary"}
+        >
           {formatStatusLabel(bundle.logbook.status, "ongoing")}
         </Badge>
       </div>
 
-      <Card className="print:shadow-none">
-        <CardHeader className="text-center">
-          <CardTitle className="uppercase tracking-wide">Weekly Log Sheet Book</CardTitle>
-          <CardDescription>Internship / Industrial Training Documentation</CardDescription>
-        </CardHeader>
-        <CardContent className="grid gap-3 md:grid-cols-2">
-          <div><span className="font-semibold">Student:</span> {student.firstName} {student.lastName}</div>
-          <div><span className="font-semibold">Student ID:</span> {student.studentId || "N/A"}</div>
-          <div><span className="font-semibold">Programme:</span> {student.program || "N/A"}</div>
-          <div><span className="font-semibold">Department:</span> {student.department || "N/A"}</div>
-          <div><span className="font-semibold">Organization:</span> {placement.organization_name || "N/A"}</div>
-          <div><span className="font-semibold">Office / Role:</span> {placement.department_role || "N/A"}</div>
-          <div><span className="font-semibold">Supervisor:</span> {placement.supervisor_name || "N/A"}</div>
-          <div><span className="font-semibold">Duration:</span> {placement.internship_start_date || "N/A"} to {placement.internship_end_date || "N/A"}</div>
-        </CardContent>
-      </Card>
-
-      {!editable && (
-        <Card className="border-emerald-200 bg-emerald-50">
-          <CardContent className="flex items-center gap-3 pt-6 text-emerald-900">
-            <Lock className="h-5 w-5" />
-            This logbook is locked after final submission.
+      {locked && (
+        <Card className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
+          <CardContent className="flex items-start gap-3 pt-6 text-amber-950 dark:text-amber-100">
+            <Lock className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-medium">Your entries are locked</p>
+              <p className="text-sm opacity-90">
+                {bundle.logbook.status === "submitted_final"
+                  ? "Awaiting supervisor remarks. You cannot change student fields or credentials."
+                  : bundle.logbook.status === "supervisor_reviewed"
+                    ? "With HOD / Secretary for institutional review and archiving."
+                    : "This logbook is read-only."}
+              </p>
+            </div>
           </CardContent>
         </Card>
       )}
@@ -159,101 +173,57 @@ export default function WeeklyLogbookPage() {
       {editable && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarDays className="h-5 w-5" />
-              Weekly Entry
-            </CardTitle>
-            <CardDescription>Save drafts throughout the internship, then finalize at the end.</CardDescription>
+            <CardTitle>New weekly sheet — Week {weekNumber}</CardTitle>
+            <CardDescription>
+              Match the official RMU form. Supervisor remark, name, and status fields are locked for
+              you.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="grid gap-4 md:grid-cols-3">
-              <div className="space-y-2">
-                <Label>Week Number</Label>
-                <Input type="number" min={1} value={form.weekNumber} onChange={(e) => setForm({ ...form, weekNumber: Number(e.target.value) })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Week Beginning</Label>
-                <Input type="date" value={form.weekBeginning} onChange={(e) => setForm({ ...form, weekBeginning: e.target.value })} />
-              </div>
-              <div className="space-y-2">
-                <Label>Week Ending</Label>
-                <Input type="date" value={form.weekEnding} onChange={(e) => setForm({ ...form, weekEnding: e.target.value })} />
-              </div>
-            </div>
-
-            <div className="overflow-x-auto rounded-lg border">
-              <table className="w-full min-w-[720px] border-collapse text-sm">
-                <thead className="bg-muted">
-                  <tr>
-                    <th className="border p-3 text-left">Day</th>
-                    <th className="border p-3 text-left">Date</th>
-                    <th className="border p-3 text-left">Activities Undertaken</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.activities.map((activity, index) => (
-                    <tr key={activity.day}>
-                      <td className="border p-2"><Input value={activity.day} onChange={(e) => updateActivity(index, "day", e.target.value)} /></td>
-                      <td className="border p-2"><Input type="date" value={activity.date} onChange={(e) => updateActivity(index, "date", e.target.value)} /></td>
-                      <td className="border p-2"><Textarea value={activity.activity} onChange={(e) => updateActivity(index, "activity", e.target.value)} /></td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Student Remark</Label>
-              <Textarea value={form.studentRemark} onChange={(e) => setForm({ ...form, studentRemark: e.target.value })} />
-            </div>
-
+          <CardContent className="space-y-4">
+            <WeeklyLogSheet
+              mode="student-edit"
+              header={header}
+              weekLabel={`Week ${weekNumber}`}
+              values={draft}
+              onChange={setDraft}
+            />
             <div className="flex flex-wrap gap-3">
               <Button onClick={saveWeek} disabled={saving}>
                 {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Weekly Draft
+                Save week {weekNumber}
               </Button>
-              <Button variant="destructive" onClick={finalize} disabled={finalizing || bundle.entries.length === 0}>
-                {finalizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
-                Finalize Weekly Log Sheet Book
+              <Button
+                variant="default"
+                className="bg-primary"
+                onClick={finalize}
+                disabled={finalizing || bundle.entries.length === 0}
+              >
+                {finalizing ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Send className="mr-2 h-4 w-4" />
+                )}
+                Submit book to supervisor
               </Button>
             </div>
           </CardContent>
         </Card>
       )}
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FileCheck2 className="h-5 w-5" />
-            Completed Weeks
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {bundle.entries.length === 0 && <p className="text-muted-foreground">No weekly entries have been saved yet.</p>}
+      {bundle.entries.length > 0 && (
+        <div className="space-y-6">
+          <h2 className="text-lg font-semibold">Saved weekly sheets</h2>
           {bundle.entries.map((entry) => (
-            <div key={entry.id} className="rounded-xl border p-4">
-              <h3 className="font-semibold">Week {entry.weekNumber}: {entry.weekBeginning} to {entry.weekEnding}</h3>
-              <div className="mt-3 overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
-                  <thead className="bg-muted">
-                    <tr><th className="border p-2 text-left">Day</th><th className="border p-2 text-left">Date</th><th className="border p-2 text-left">Activity</th></tr>
-                  </thead>
-                  <tbody>
-                    {entry.activities.map((activity, index) => (
-                      <tr key={`${entry.id}-${index}`}>
-                        <td className="border p-2">{activity.day}</td>
-                        <td className="border p-2">{activity.date}</td>
-                        <td className="border p-2">{activity.activity}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {entry.studentRemark && <p className="mt-3 text-sm"><span className="font-semibold">Student remark:</span> {entry.studentRemark}</p>}
-            </div>
+            <WeeklyLogSheet
+              key={entry.id}
+              mode={locked ? "student-locked" : "student-locked"}
+              header={header}
+              weekLabel={`Week ${entry.weekNumber}`}
+              values={entryToSheetValues(entry)}
+            />
           ))}
-        </CardContent>
-      </Card>
+        </div>
+      )}
     </div>
   );
 }

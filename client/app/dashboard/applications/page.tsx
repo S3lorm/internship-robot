@@ -15,7 +15,6 @@ import {
   Calendar,
   Clock,
   Search,
-  Eye,
   Download,
   CheckCircle2,
   XCircle,
@@ -216,11 +215,6 @@ export default function ApplicationsPage() {
                 ? "You haven't applied to any internships yet."
                 : "No applications match your current filters."}
             </p>
-            {applications.length === 0 && (
-              <Button asChild>
-                <Link href="/dashboard/internships">Browse Internships</Link>
-              </Button>
-            )}
           </CardContent>
         </Card>
       ) : (
@@ -277,12 +271,6 @@ export default function ApplicationsPage() {
 
                     {/* Actions */}
                     <div className="flex items-center gap-2 lg:flex-shrink-0">
-                      <Button variant="outline" size="sm" asChild>
-                        <Link href={`/dashboard/internships/${application.internshipId}`}>
-                          <Eye className="h-4 w-4 mr-1" />
-                          View Details
-                        </Link>
-                      </Button>
                       {application.cvUrl && (
                         <Button variant="ghost" size="sm">
                           <Download className="h-4 w-4" />

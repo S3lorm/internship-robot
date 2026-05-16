@@ -1,8 +1,13 @@
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use, useEffect, useMemo, useState } from "react";
 import { weeklyLogbooksApi } from "@/lib/api";
+import { entryToSheetValues, sheetHeaderFromBundle } from "@/lib/weekly-logbook-ui";
 import type { WeeklyLogbookBundle } from "@/types";
+import {
+  WeeklyLogSheet,
+  type WeeklyLogSheetValues,
+} from "@/components/weekly-log-sheet";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -10,7 +15,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CheckCircle2, Loader2, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Loader2, Lock, ShieldCheck } from "lucide-react";
 
 export default function WeeklyLogSupervisorReviewPage({
   params,
@@ -22,11 +27,11 @@ export default function WeeklyLogSupervisorReviewPage({
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
-  const [form, setForm] = useState({
-    supervisorFullName: "",
-    supervisorRemark: "",
-    supervisorRecommendation: "",
-  });
+  const [supervisorFullName, setSupervisorFullName] = useState("");
+  const [supervisorRecommendation, setSupervisorRecommendation] = useState("");
+  const [entryForms, setEntryForms] = useState<Record<string, WeeklyLogSheetValues>>({});
+
+  const header = useMemo(() => (bundle ? sheetHeaderFromBundle(bundle) : null), [bundle]);
 
   useEffect(() => {
     const load = async () => {
@@ -35,26 +40,53 @@ export default function WeeklyLogSupervisorReviewPage({
       if (result.error) {
         toast.error(result.error);
       } else {
-        const nextBundle = (result.data as any).bundle as WeeklyLogbookBundle;
+        const nextBundle = (result.data as { bundle: WeeklyLogbookBundle }).bundle;
         setBundle(nextBundle);
-        setForm((current) => ({
-          ...current,
-          supervisorFullName: nextBundle.placement?.supervisor_name || "",
-        }));
+        setSupervisorFullName(nextBundle.placement?.supervisor_name || "");
+        const forms: Record<string, WeeklyLogSheetValues> = {};
+        for (const entry of nextBundle.entries) {
+          forms[entry.id] = {
+            ...entryToSheetValues(entry),
+            supervisorName: entry.supervisorName || nextBundle.placement?.supervisor_name || "",
+            supervisorRemark: entry.supervisorRemark || "",
+            supervisorStatus: entry.supervisorStatus || "",
+          };
+        }
+        setEntryForms(forms);
       }
       setLoading(false);
     };
     void load();
   }, [token]);
 
+  const updateEntry = (entryId: string, values: WeeklyLogSheetValues) => {
+    setEntryForms((current) => ({ ...current, [entryId]: values }));
+  };
+
   const submit = async () => {
+    if (!bundle) return;
+    const entryReviews = bundle.entries.map((entry) => {
+      const form = entryForms[entry.id];
+      return {
+        entryId: entry.id,
+        weekNumber: entry.weekNumber,
+        supervisorRemark: form?.supervisorRemark || "",
+        supervisorName: form?.supervisorName || supervisorFullName,
+        supervisorStatus: form?.supervisorStatus || "",
+      };
+    });
+
     setSubmitting(true);
-    const result = await weeklyLogbooksApi.submitSupervisorReview(token, form);
+    const result = await weeklyLogbooksApi.submitSupervisorReview(token, {
+      supervisorFullName,
+      supervisorRecommendation,
+      entryReviews,
+    });
     if (result.error) {
       toast.error(result.error);
     } else {
       setSubmitted(true);
-      toast.success("Supervisor acknowledgment submitted");
+      toast.success("Supervisor section submitted to RMU for review");
     }
     setSubmitting(false);
   };
@@ -74,98 +106,89 @@ export default function WeeklyLogSupervisorReviewPage({
           <CardHeader className="text-center">
             <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" />
             <CardTitle>Thank you</CardTitle>
-            <CardDescription>Your acknowledgment has been submitted. This secure link is now inactive.</CardDescription>
+            <CardDescription>
+              Your remarks have been recorded. This secure link is now inactive and the logbook
+              has been forwarded to the HOD and Secretary for review.
+            </CardDescription>
           </CardHeader>
         </Card>
       </main>
     );
   }
 
-  if (!bundle) {
+  if (!bundle || !header) {
     return (
       <main className="mx-auto flex min-h-screen max-w-2xl items-center px-4">
         <Card>
           <CardHeader>
             <CardTitle>Review link unavailable</CardTitle>
-            <CardDescription>This link is invalid, expired, already used, or unavailable.</CardDescription>
+            <CardDescription>
+              This link is invalid, expired, already used, or unavailable.
+            </CardDescription>
           </CardHeader>
         </Card>
       </main>
     );
   }
 
-  const student = bundle.student || ({} as any);
-  const placement = bundle.placement || {};
-
   return (
-    <main className="min-h-screen bg-slate-50 px-4 py-8">
+    <main className="min-h-screen bg-slate-100 px-4 py-8">
       <div className="mx-auto max-w-5xl space-y-6">
         <Card>
           <CardHeader className="text-center">
             <Badge className="mx-auto mb-2 w-fit" variant="secondary">
               <ShieldCheck className="mr-1 h-3.5 w-3.5" />
-              Secure temporary review
+              Supervisor review
             </Badge>
-            <CardTitle className="text-2xl uppercase tracking-wide">Weekly Log Sheet Book</CardTitle>
-            <CardDescription>Supervisor acknowledgment only. This is not the evaluation form.</CardDescription>
+            <CardTitle className="text-xl">Weekly Log Sheet Book</CardTitle>
+            <CardDescription>
+              Student entries are locked. Complete only the supervisor remark, name, and status on
+              each sheet.
+            </CardDescription>
           </CardHeader>
-          <CardContent className="grid gap-3 md:grid-cols-2">
-            <div><span className="font-semibold">Student:</span> {student.firstName} {student.lastName}</div>
-            <div><span className="font-semibold">Programme:</span> {student.program || "N/A"}</div>
-            <div><span className="font-semibold">Organization:</span> {placement.organization_name || "N/A"}</div>
-            <div><span className="font-semibold">Department / Office:</span> {placement.department_role || "N/A"}</div>
-            <div><span className="font-semibold">Duration:</span> {placement.internship_start_date || "N/A"} to {placement.internship_end_date || "N/A"}</div>
+          <CardContent className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0" />
+            <p>
+              You cannot edit student activities, dates, credentials, or student remarks. Those
+              fields were locked when the student submitted this book.
+            </p>
           </CardContent>
         </Card>
 
         {bundle.entries.map((entry) => (
-          <Card key={entry.id}>
-            <CardHeader>
-              <CardTitle>Week {entry.weekNumber}: {entry.weekBeginning} to {entry.weekEnding}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[640px] text-sm">
-                  <thead className="bg-muted">
-                    <tr><th className="border p-2 text-left">Day</th><th className="border p-2 text-left">Date</th><th className="border p-2 text-left">Activities Undertaken</th></tr>
-                  </thead>
-                  <tbody>
-                    {entry.activities.map((activity, index) => (
-                      <tr key={`${entry.id}-${index}`}>
-                        <td className="border p-2">{activity.day}</td>
-                        <td className="border p-2">{activity.date}</td>
-                        <td className="border p-2">{activity.activity}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              {entry.studentRemark && <p className="text-sm"><span className="font-semibold">Student remark:</span> {entry.studentRemark}</p>}
-            </CardContent>
-          </Card>
+          <WeeklyLogSheet
+            key={entry.id}
+            mode="supervisor"
+            header={header}
+            weekLabel={`Week ${entry.weekNumber}`}
+            values={entryForms[entry.id] || entryToSheetValues(entry)}
+            onChange={(values) => updateEntry(entry.id, values)}
+          />
         ))}
 
         <Card>
           <CardHeader>
-            <CardTitle>Supervisor Remark</CardTitle>
-            <CardDescription>You cannot edit student entries, dates, or activities.</CardDescription>
+            <CardTitle>Final supervisor confirmation</CardTitle>
+            <CardDescription>Used for the institutional record and email trail.</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Full Name Confirmation</Label>
-              <Input value={form.supervisorFullName} onChange={(e) => setForm({ ...form, supervisorFullName: e.target.value })} />
+              <Label>Confirmed supervisor full name</Label>
+              <Input
+                value={supervisorFullName}
+                onChange={(e) => setSupervisorFullName(e.target.value)}
+              />
             </div>
             <div className="space-y-2">
-              <Label>Supervisor Remark</Label>
-              <Textarea value={form.supervisorRemark} onChange={(e) => setForm({ ...form, supervisorRemark: e.target.value })} />
+              <Label>Overall recommendation (optional)</Label>
+              <Textarea
+                value={supervisorRecommendation}
+                onChange={(e) => setSupervisorRecommendation(e.target.value)}
+              />
             </div>
-            <div className="space-y-2">
-              <Label>Optional Recommendation</Label>
-              <Textarea value={form.supervisorRecommendation} onChange={(e) => setForm({ ...form, supervisorRecommendation: e.target.value })} />
-            </div>
-            <Button onClick={submit} disabled={submitting}>
+            <Button onClick={submit} disabled={submitting} className="w-full sm:w-auto">
               {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Submit Acknowledgment
+              Submit supervisor section
             </Button>
           </CardContent>
         </Card>

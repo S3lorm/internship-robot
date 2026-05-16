@@ -188,30 +188,17 @@ const LetterRequest = {
   async create(requestData) {
     const { v4: uuidv4 } = require('uuid');
 
-    // Pre-generate reference_number and verification_code in JS
-    const now = new Date();
-    const datePart = now.getFullYear().toString() +
-      String(now.getMonth() + 1).padStart(2, '0') +
-      String(now.getDate()).padStart(2, '0');
-    const pattern = `LR-${datePart}-%`;
-
-    const { data: existingRefs } = await supabase
-      .from('letter_requests')
-      .select('reference_number')
-      .like('reference_number', pattern);
-
-    let seqNum = 1;
-    if (existingRefs && existingRefs.length > 0) {
-      const nums = existingRefs
-        .map(r => {
-          const match = r.reference_number?.match(/(\d+)$/);
-          return match ? parseInt(match[1], 10) : 0;
-        })
-        .filter(n => !isNaN(n));
-      seqNum = (nums.length > 0 ? Math.max(...nums) : 0) + 1;
+    const { generateLetterReferenceNumber } = require('../services/letterReferenceService');
+    let studentDepartment = requestData.studentDepartment;
+    if (!studentDepartment && requestData.studentId) {
+      const { data: student } = await supabase
+        .from('user_profiles')
+        .select('department')
+        .eq('id', requestData.studentId)
+        .maybeSingle();
+      studentDepartment = student?.department;
     }
-
-    const referenceNumber = `LR-${datePart}-${String(seqNum).padStart(5, '0')}`;
+    const referenceNumber = await generateLetterReferenceNumber(studentDepartment);
 
     let verificationCode;
     let isUnique = false;

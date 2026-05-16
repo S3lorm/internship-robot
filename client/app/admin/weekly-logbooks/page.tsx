@@ -12,6 +12,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { formatStatusLabel } from "@/lib/utils";
+import { entryToSheetValues, sheetHeaderFromBundle } from "@/lib/weekly-logbook-ui";
+import { WeeklyLogSheet } from "@/components/weekly-log-sheet";
 import { toast } from "sonner";
 import { BookOpen, Download, Eye, Loader2 } from "lucide-react";
 
@@ -43,16 +45,19 @@ export default function WeeklyLogbooksAdminPage() {
     if (result.error) {
       toast.error(result.error);
     } else {
-      setItems((result.data as any).logbooks || []);
+      setItems((result.data as { logbooks: WeeklyLogbookBundle[] }).logbooks || []);
     }
     setLoading(false);
   };
 
-  const stats = useMemo(() => ({
-    total: items.length,
-    pending: items.filter((item) => item.logbook.status === "supervisor_reviewed").length,
-    approved: items.filter((item) => item.logbook.status === "hod_approved").length,
-  }), [items]);
+  const stats = useMemo(
+    () => ({
+      total: items.length,
+      pending: items.filter((item) => item.logbook.status === "supervisor_reviewed").length,
+      approved: items.filter((item) => item.logbook.status === "hod_approved").length,
+    }),
+    [items]
+  );
 
   const decide = async (decision: "approved" | "rejected") => {
     if (!selected) return;
@@ -61,7 +66,11 @@ export default function WeeklyLogbooksAdminPage() {
       return;
     }
     setSubmitting(true);
-    const result = await weeklyLogbooksApi.institutionalReview(selected.logbook.id, decision, remark.trim());
+    const result = await weeklyLogbooksApi.institutionalReview(
+      selected.logbook.id,
+      decision,
+      remark.trim()
+    );
     if (result.error) {
       toast.error(result.error);
     } else {
@@ -96,9 +105,11 @@ export default function WeeklyLogbooksAdminPage() {
         <div>
           <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl">
             <BookOpen className="h-7 w-7 text-primary" />
-            Weekly Log Sheet Books
+            Logbook
           </h1>
-          <p className="text-muted-foreground">Review supervisor-acknowledged logbooks and apply institutional approval.</p>
+          <p className="text-muted-foreground">
+            Review supervisor-acknowledged logbooks. HOD and Secretary can approve and archive records.
+          </p>
         </div>
         <Select value={status} onValueChange={setStatus}>
           <SelectTrigger className="w-full md:w-64">
@@ -106,16 +117,33 @@ export default function WeeklyLogbooksAdminPage() {
           </SelectTrigger>
           <SelectContent>
             {statuses.map((item) => (
-              <SelectItem key={item} value={item}>{formatStatusLabel(item)}</SelectItem>
+              <SelectItem key={item} value={item}>
+                {formatStatusLabel(item)}
+              </SelectItem>
             ))}
           </SelectContent>
         </Select>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
-        <Card><CardHeader><CardTitle>{stats.total}</CardTitle><CardDescription>Visible records</CardDescription></CardHeader></Card>
-        <Card><CardHeader><CardTitle>{stats.pending}</CardTitle><CardDescription>Awaiting approval</CardDescription></CardHeader></Card>
-        <Card><CardHeader><CardTitle>{stats.approved}</CardTitle><CardDescription>Approved records</CardDescription></CardHeader></Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>{stats.total}</CardTitle>
+            <CardDescription>Visible records</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>{stats.pending}</CardTitle>
+            <CardDescription>Awaiting approval</CardDescription>
+          </CardHeader>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>{stats.approved}</CardTitle>
+            <CardDescription>Approved records</CardDescription>
+          </CardHeader>
+        </Card>
       </div>
 
       <Card>
@@ -124,9 +152,13 @@ export default function WeeklyLogbooksAdminPage() {
         </CardHeader>
         <CardContent>
           {loading ? (
-            <div className="flex justify-center py-12"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+            <div className="flex justify-center py-12">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
           ) : items.length === 0 ? (
-            <p className="py-8 text-center text-muted-foreground">No Weekly Log Sheet Books found for this status.</p>
+            <p className="py-8 text-center text-muted-foreground">
+              No logbooks found for this status.
+            </p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full min-w-[860px] text-sm">
@@ -143,12 +175,20 @@ export default function WeeklyLogbooksAdminPage() {
                   {items.map((item) => (
                     <tr key={item.logbook.id} className="border-b">
                       <td className="p-3">
-                        <div className="font-medium">{item.student?.firstName} {item.student?.lastName}</div>
-                        <div className="text-muted-foreground">{item.student?.studentId || item.student?.department}</div>
+                        <div className="font-medium">
+                          {item.student?.firstName} {item.student?.lastName}
+                        </div>
+                        <div className="text-muted-foreground">
+                          {item.student?.studentId || item.student?.department}
+                        </div>
                       </td>
                       <td className="p-3">{item.placement?.organization_name || "N/A"}</td>
                       <td className="p-3">{item.entries.length}</td>
-                      <td className="p-3"><Badge variant="secondary" className="capitalize">{formatStatusLabel(item.logbook.status)}</Badge></td>
+                      <td className="p-3">
+                        <Badge variant="secondary" className="capitalize">
+                          {formatStatusLabel(item.logbook.status)}
+                        </Badge>
+                      </td>
                       <td className="p-3">
                         <div className="flex flex-wrap gap-2">
                           <Button size="sm" variant="secondary" onClick={() => setSelected(item)}>
@@ -173,49 +213,40 @@ export default function WeeklyLogbooksAdminPage() {
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
         <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Weekly Log Sheet Book Review</DialogTitle>
-            <DialogDescription>Student records are read-only at this stage.</DialogDescription>
+            <DialogTitle>Logbook review</DialogTitle>
+            <DialogDescription>
+              Official RMU logbook — read-only for institutional review.
+            </DialogDescription>
           </DialogHeader>
           {selected && (
-            <div className="space-y-5">
-              <div className="grid gap-2 rounded-lg border p-4 md:grid-cols-2">
-                <div><span className="font-semibold">Student:</span> {selected.student?.firstName} {selected.student?.lastName}</div>
-                <div><span className="font-semibold">Programme:</span> {selected.student?.program || "N/A"}</div>
-                <div><span className="font-semibold">Organization:</span> {selected.placement?.organization_name || "N/A"}</div>
-                <div><span className="font-semibold">Supervisor:</span> {selected.placement?.supervisor_name || "N/A"}</div>
-              </div>
-
+            <div className="space-y-6">
               {selected.entries.map((entry) => (
-                <div key={entry.id} className="rounded-lg border p-4">
-                  <h3 className="font-semibold">Week {entry.weekNumber}: {entry.weekBeginning} to {entry.weekEnding}</h3>
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="w-full min-w-[620px] text-sm">
-                      <thead className="bg-muted"><tr><th className="border p-2 text-left">Day</th><th className="border p-2 text-left">Date</th><th className="border p-2 text-left">Activity</th></tr></thead>
-                      <tbody>
-                        {entry.activities.map((activity, index) => (
-                          <tr key={`${entry.id}-${index}`}>
-                            <td className="border p-2">{activity.day}</td>
-                            <td className="border p-2">{activity.date}</td>
-                            <td className="border p-2">{activity.activity}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {entry.studentRemark && <p className="mt-2 text-sm"><span className="font-semibold">Student remark:</span> {entry.studentRemark}</p>}
-                </div>
+                <WeeklyLogSheet
+                  key={entry.id}
+                  mode="readonly"
+                  header={sheetHeaderFromBundle(selected)}
+                  weekLabel={`Week ${entry.weekNumber}`}
+                  values={entryToSheetValues(entry)}
+                />
               ))}
 
-              <div className="rounded-lg border bg-muted/40 p-4">
-                <h3 className="font-semibold">Supervisor Remark</h3>
-                <p className="mt-2 text-sm"><span className="font-semibold">Name:</span> {selected.review?.supervisorFullName || "N/A"}</p>
-                <p className="mt-2 text-sm"><span className="font-semibold">Remark:</span> {selected.review?.supervisorRemark || "N/A"}</p>
-                <p className="mt-2 text-sm"><span className="font-semibold">Recommendation:</span> {selected.review?.supervisorRecommendation || "N/A"}</p>
-              </div>
+              {selected.review?.supervisorRecommendation && (
+                <div className="rounded-lg border bg-muted/40 p-4 text-sm">
+                  <p className="font-semibold">Overall supervisor recommendation</p>
+                  <p className="mt-2">{selected.review.supervisorRecommendation}</p>
+                </div>
+              )}
+
+              {selected.logbook.archiveReference && (
+                <p className="text-sm text-muted-foreground">
+                  Archive reference:{" "}
+                  <span className="font-mono font-medium">{selected.logbook.archiveReference}</span>
+                </p>
+              )}
 
               {selected.logbook.status === "supervisor_reviewed" && (
                 <div className="space-y-2">
-                  <label className="text-sm font-medium">Institutional Remark</label>
+                  <label className="text-sm font-medium">Institutional remark</label>
                   <Textarea value={remark} onChange={(e) => setRemark(e.target.value)} />
                 </div>
               )}
@@ -224,7 +255,9 @@ export default function WeeklyLogbooksAdminPage() {
           <DialogFooter className="gap-2 sm:gap-0">
             {selected?.logbook.status === "supervisor_reviewed" ? (
               <>
-                <Button variant="destructive" onClick={() => decide("rejected")} disabled={submitting}>Reject</Button>
+                <Button variant="destructive" onClick={() => decide("rejected")} disabled={submitting}>
+                  Reject
+                </Button>
                 <Button onClick={() => decide("approved")} disabled={submitting}>
                   {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Approve and Archive

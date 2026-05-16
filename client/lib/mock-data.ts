@@ -9,6 +9,7 @@ import type {
   User,
   RegionalCompany
 } from '@/types';
+import { coverImageForDepartment } from '@/lib/department-partner-images';
 
 // Companies by region - apply via email
 // Ghana's 16 Regions with companies relevant to maritime, engineering, and shipping
@@ -139,7 +140,8 @@ export const mockInternships: Internship[] = [
     applicationsCount: 23,
     status: 'published',
     category: 'Marine Engineering',
-    coverImage: '/assets/companies/logistics-containers.jpg',
+    targetDepartment: 'Marine Engineering',
+    coverImage: coverImageForDepartment('Marine Engineering'),
     isRemote: false,
     createdAt: '2026-01-10T10:00:00Z',
     updatedAt: '2026-01-10T10:00:00Z',
@@ -173,7 +175,8 @@ export const mockInternships: Internship[] = [
     applicationsCount: 45,
     status: 'published',
     category: 'Shipping & Logistics',
-    coverImage: '/assets/companies/cargo-shipping.jpg',
+    targetDepartment: 'Nautical Science',
+    coverImage: coverImageForDepartment('Nautical Science'),
     isRemote: false,
     createdAt: '2026-01-08T10:00:00Z',
     updatedAt: '2026-01-08T10:00:00Z',
@@ -241,7 +244,8 @@ export const mockInternships: Internship[] = [
     applicationsCount: 18,
     status: 'published',
     category: 'Safety & Security',
-    coverImage: '/assets/companies/cargo-shipping.jpg',
+    targetDepartment: 'Maritime Safety & Security',
+    coverImage: coverImageForDepartment('Maritime Safety & Security'),
     isRemote: false,
     createdAt: '2026-01-03T10:00:00Z',
     updatedAt: '2026-01-03T10:00:00Z',
@@ -275,12 +279,80 @@ export const mockInternships: Internship[] = [
     applicationsCount: 31,
     status: 'published',
     category: 'Information Technology',
-    coverImage: '/assets/companies/maritime-technology.jpg',
+    targetDepartment: 'Computer Science',
+    coverImage: coverImageForDepartment('Computer Science'),
     isRemote: true,
     createdAt: '2026-01-12T10:00:00Z',
     updatedAt: '2026-01-12T10:00:00Z',
     createdBy: '2'
-  }
+  },
+  {
+    id: '6',
+    title: 'Port Operations & Logistics Intern',
+    company: 'Meridian Port Services',
+    location: 'Tema, Ghana',
+    description:
+      'Work with terminal operations teams on berth planning, cargo documentation, and stakeholder coordination at one of Ghana\'s busiest ports.',
+    requirements: [
+      'Enrolled in Port & Shipping Administration or related program',
+      'Strong organizational and communication skills',
+      'Interest in port and supply-chain operations',
+    ],
+    responsibilities: [
+      'Support daily terminal operations reporting',
+      'Assist with shipping documentation',
+      'Coordinate with logistics partners',
+      'Participate in safety briefings',
+    ],
+    duration: '4 months',
+    stipend: 'GHS 1,400/month',
+    applicationDeadline: '2026-03-20T23:59:59Z',
+    startDate: '2026-04-01T00:00:00Z',
+    slots: 4,
+    applicationsCount: 9,
+    status: 'published',
+    category: 'Port Management',
+    targetDepartment: 'Port & Shipping Administration',
+    coverImage: coverImageForDepartment('Port & Shipping Administration'),
+    isRemote: false,
+    createdAt: '2026-01-14T10:00:00Z',
+    updatedAt: '2026-01-14T10:00:00Z',
+    createdBy: '2',
+  },
+  {
+    id: '7',
+    title: 'Electrical & Instrumentation Intern',
+    company: 'Ghana National Petroleum Corporation',
+    location: 'Tema, Ghana',
+    description:
+      'Gain practical exposure to electrical systems, instrumentation, and maintenance practices in an energy and maritime-industrial environment.',
+    requirements: [
+      'Studying Electrical/Electronic Engineering',
+      'Basic circuit and instrumentation knowledge',
+      'Safety-conscious mindset',
+      'Willingness to work under supervision on site',
+    ],
+    responsibilities: [
+      'Assist with equipment inspections',
+      'Support maintenance logs and checklists',
+      'Help technicians with troubleshooting',
+      'Follow site safety procedures',
+    ],
+    duration: '3 months',
+    stipend: 'GHS 1,600/month',
+    applicationDeadline: '2026-03-10T23:59:59Z',
+    startDate: '2026-03-25T00:00:00Z',
+    slots: 3,
+    applicationsCount: 14,
+    status: 'published',
+    category: 'Electrical Engineering',
+    targetDepartment: 'Electrical/Electronic Engineering',
+    coverImage: coverImageForDepartment('Electrical/Electronic Engineering'),
+    isRemote: false,
+    createdAt: '2026-01-16T10:00:00Z',
+    updatedAt: '2026-01-16T10:00:00Z',
+    createdBy: '2',
+  },
 ];
 
 // Mock Applications
@@ -404,7 +476,7 @@ export const mockNotifications: Notification[] = [
     message: 'A new internship opportunity "Maritime IT Support Intern" at Blue Ocean Technologies has been posted.',
     type: 'new_internship',
     isRead: false,
-    link: '/dashboard/internships/5',
+    link: '/dashboard',
     createdAt: '2026-01-12T10:00:00Z',
   },
   {
@@ -424,7 +496,7 @@ export const mockNotifications: Notification[] = [
     message: 'The application deadline for Port Safety & Security Intern is in 5 days.',
     type: 'deadline_reminder',
     isRead: true,
-    link: '/dashboard/internships/4',
+    link: '/dashboard',
     createdAt: '2026-01-26T09:00:00Z',
   }
 ];
@@ -551,7 +623,7 @@ export const internshipCategories = [
   'Administration',
 ];
 
-// Departments at RMU
+// Departments at RMU (order matches homepage partner showcase)
 export const departments = [
   'Marine Engineering',
   'Nautical Science',
@@ -560,6 +632,14 @@ export const departments = [
   'Electrical/Electronic Engineering',
   'Computer Science',
 ];
+
+/** One published partner opportunity per RMU department for the public homepage. */
+export function getFeaturedInternshipsByDepartment(): Internship[] {
+  const published = mockInternships.filter((i) => i.status === 'published');
+  return departments
+    .map((dept) => published.find((i) => i.targetDepartment === dept))
+    .filter((i): i is Internship => Boolean(i));
+}
 
 // Programs at RMU (display names without degree prefixes)
 export const programs = [

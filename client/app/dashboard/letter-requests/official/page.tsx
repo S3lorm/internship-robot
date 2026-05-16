@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -35,8 +35,18 @@ import {
   Briefcase,
   Mail,
   User,
-  Info
+  Info,
+  Lock,
 } from "lucide-react";
+import {
+  formatPlacementLockDate,
+  getPlacementFormLockState,
+} from "@/lib/placement-form-lock";
+import {
+  internshipEndDateMin,
+  todayInputDateMin,
+  validateInternshipDateRange,
+} from "@/lib/internship-date-validation";
 import {
   Dialog,
   DialogContent,
@@ -62,7 +72,6 @@ export default function OfficialPlacementsPage() {
   
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null);
   const [selectedPlacement, setSelectedPlacement] = useState<InternshipPlacement | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState("new");
@@ -81,9 +90,19 @@ export default function OfficialPlacementsPage() {
     departmentRole: "",
   });
 
+  const formLock = useMemo(() => getPlacementFormLockState(placements), [placements]);
+  const minStartDate = todayInputDateMin();
+  const minEndDate = internshipEndDateMin(formData.internshipStartDate);
+
   useEffect(() => {
     checkPrerequisitesAndLoadData();
   }, []);
+
+  useEffect(() => {
+    if (formLock.locked && activeTab === "new") {
+      setActiveTab("history");
+    }
+  }, [formLock.locked, activeTab]);
 
   const checkPrerequisitesAndLoadData = async () => {
     setIsLoading(true);
@@ -124,10 +143,17 @@ export default function OfficialPlacementsPage() {
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
   ) => {
-    setFormData((prev) => ({
-      ...prev,
-      [e.target.name]: e.target.value,
-    }));
+    const { name, value } = e.target;
+    setFormData((prev) => {
+      const next = { ...prev, [name]: value };
+      if (name === "internshipStartDate" && next.internshipEndDate) {
+        const endMin = internshipEndDateMin(value);
+        if (next.internshipEndDate < endMin) {
+          next.internshipEndDate = "";
+        }
+      }
+      return next;
+    });
   };
 
   const handleSelectChange = (name: string, value: string) => {
@@ -139,8 +165,21 @@ export default function OfficialPlacementsPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (formLock.locked) {
+      toast.error("Official placement registration is locked for your current internship.");
+      return;
+    }
     if (!formData.generalRequestId) {
       toast.error("Please select an approved general request to link this placement to.");
+      return;
+    }
+
+    const dateError = validateInternshipDateRange(
+      formData.internshipStartDate,
+      formData.internshipEndDate
+    );
+    if (dateError) {
+      toast.error(dateError);
       return;
     }
 
@@ -172,27 +211,6 @@ export default function OfficialPlacementsPage() {
       toast.error(error.message || "Failed to submit request");
     } finally {
       setIsSubmitting(false);
-    }
-  };
-
-  const handleSendEmail = async (id: string, orgName: string) => {
-    if (!confirm(`Are you sure you want to send the official letter and evaluation form to ${orgName}? This action cannot be undone.`)) {
-      return;
-    }
-
-    setIsSendingEmail(id);
-    try {
-      const result = await placementsApi.sendToOrganization(id);
-      if (result.error) {
-        toast.error(result.error);
-      } else {
-        toast.success("Email sent successfully!");
-        checkPrerequisitesAndLoadData(); // reload to get updated 'emailSent' status
-      }
-    } catch (error: any) {
-      toast.error(error.message || "Failed to send email");
-    } finally {
-      setIsSendingEmail(null);
     }
   };
 
@@ -247,8 +265,16 @@ export default function OfficialPlacementsPage() {
       ) : (
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="bg-muted/50 w-full justify-start overflow-x-auto">
-            <TabsTrigger value="new" className="data-[state=active]:bg-background">
-              <Plus className="mr-2 h-4 w-4" />
+            <TabsTrigger
+              value="new"
+              className="data-[state=active]:bg-background"
+              disabled={formLock.locked}
+            >
+              {formLock.locked ? (
+                <Lock className="mr-2 h-4 w-4" />
+              ) : (
+                <Plus className="mr-2 h-4 w-4" />
+              )}
               Register Placement
             </TabsTrigger>
             <TabsTrigger value="history" className="data-[state=active]:bg-background">
@@ -259,11 +285,56 @@ export default function OfficialPlacementsPage() {
 
           {/* New Request Form */}
           <TabsContent value="new" className="mt-0">
+            {formLock.locked ? (
+              <Card className="border-amber-200 bg-amber-50/50 dark:border-amber-900 dark:bg-amber-950/30">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-amber-900 dark:text-amber-100">
+                    <Lock className="h-5 w-5" />
+                    Registration locked
+                  </CardTitle>
+                  <CardDescription className="text-amber-800/90 dark:text-amber-200/80">
+                    {formLock.reason === "pending_review"
+                      ? "You have a placement request awaiting HOD or Secretary review. You cannot register another until it is approved or rejected."
+                      : formLock.reason === "modification_requested"
+                        ? "Your placement needs changes from staff review. Resolve that request before registering another official placement."
+                        : "Your official placement was approved by HOD or Secretary. Registration is locked while this placement is active."}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {formLock.placement && (
+                    <div className="rounded-xl border border-amber-200/80 bg-background/80 p-4 text-sm dark:border-amber-800">
+                      <p className="font-semibold text-foreground">
+                        {formLock.placement.organizationName}
+                      </p>
+                      <p className="mt-1 text-muted-foreground">
+                        {formLock.placement.departmentRole || "Internship placement"}
+                      </p>
+                      {formLock.placement.internshipStartDate && formLock.placement.internshipEndDate && (
+                        <p className="mt-2 flex items-center gap-1.5 text-muted-foreground">
+                          <Calendar className="h-3.5 w-3.5" />
+                          {formatPlacementLockDate(formLock.placement.internshipStartDate)} –{" "}
+                          {formatPlacementLockDate(formLock.placement.internshipEndDate)}
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {formLock.reason === "approved_active" && formLock.unlockAfter && (
+                    <p className="text-sm text-amber-900 dark:text-amber-100">
+                      You can register a new placement after your internship ends on{" "}
+                      <strong>{formatPlacementLockDate(formLock.unlockAfter)}</strong>.
+                    </p>
+                  )}
+                  <Button variant="outline" onClick={() => setActiveTab("history")}>
+                    View my placements
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
             <Card className="border-muted shadow-sm">
               <CardHeader className="bg-muted/30 border-b pb-4">
                 <CardTitle>Register Official Internship Placement</CardTitle>
                 <CardDescription>
-                  Provide the exact details of the organization where you will be doing your internship. These details will be used directly to auto-email the company.
+                  Provide the exact details of the organization where you will be doing your internship.
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-6">
@@ -447,8 +518,12 @@ export default function OfficialPlacementsPage() {
                           type="date"
                           value={formData.internshipStartDate}
                           onChange={handleChange}
+                          min={minStartDate}
                           required
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Must be today or a future date.
+                        </p>
                       </div>
 
                       <div className="space-y-2">
@@ -459,8 +534,15 @@ export default function OfficialPlacementsPage() {
                           type="date"
                           value={formData.internshipEndDate}
                           onChange={handleChange}
+                          min={minEndDate}
                           required
+                          disabled={!formData.internshipStartDate}
                         />
+                        <p className="text-xs text-muted-foreground">
+                          {formData.internshipStartDate
+                            ? "Must be on or after the start date and not in the past."
+                            : "Select a start date first."}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -504,6 +586,7 @@ export default function OfficialPlacementsPage() {
                 </form>
               </CardContent>
             </Card>
+            )}
           </TabsContent>
 
           {/* Requests History */}
@@ -554,25 +637,12 @@ export default function OfficialPlacementsPage() {
                   <div className="bg-green-50 border border-green-200 text-green-800 p-4 rounded-lg">
                     <h4 className="font-semibold flex items-center gap-2 mb-2">
                       <CheckCircle2 className="h-5 w-5" />
-                      Approved and Ready for Sending
+                      Placement approved
                     </h4>
                     <p className="text-sm">
-                      Your official placement has been approved. The official letter and secure evaluation form are now ready to be sent to <strong>{selectedPlacement.organizationEmail}</strong>.
+                      Your official placement has been approved. The university will send the official letter and evaluation form to <strong>{selectedPlacement.organizationEmail}</strong> when processing is complete.
                     </p>
-                    <div className="mt-4 float-right pb-2">
-                      <Button 
-                        className="bg-green-600 hover:bg-green-700 text-white"
-                        disabled={isSendingEmail === selectedPlacement.id}
-                        onClick={() => handleSendEmail(selectedPlacement.id, selectedPlacement.organizationName)}
-                      >
-                        {isSendingEmail === selectedPlacement.id ? (
-                          <><Loader2 className="h-4 w-4 mr-2 animate-spin"/> Sending...</>
-                        ) : (
-                          <><Mail className="h-4 w-4 mr-2"/> Send Official Documents Now</>
-                        )}
-                      </Button>
-                    </div>
-                    <div className="clear-both"></div>
+
                   </div>
                 )}
 
@@ -766,8 +836,8 @@ function PlacementsList({
             </div>
             
             <div className="flex items-center justify-end border-t md:border-t-0 pt-3 md:pt-0 shrink-0">
-              <Button variant={placement.status === 'approved' && !placement.emailSent ? "default" : "outline"} size="sm" onClick={() => onView(placement)}>
-                {placement.status === 'approved' && !placement.emailSent ? 'Send Emails' : 'View Details'}
+              <Button variant="outline" size="sm" onClick={() => onView(placement)}>
+                'View Details'
               </Button>
             </div>
           </div>

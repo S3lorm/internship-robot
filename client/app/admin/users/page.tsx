@@ -302,23 +302,10 @@ export default function UserManagementPage() {
     fetchUsers()
   }
 
-  const stats = {
-    total: users.length,
-    active: users.filter((u) => u.isActive).length,
-    inactive: users.filter((u) => !u.isActive).length,
-    students: users.filter((u) => u.role === "student").length,
-    hods: users.filter((u) => u.role === "hod").length,
-    secutuaries: users.filter((u) => u.role === "secutuary").length,
-  }
-
   if (isLoading) {
     return (
       <div className="space-y-6">
-        <div className="grid gap-4 md:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => (
-            <div key={i} className="h-24 bg-muted animate-pulse rounded-lg" />
-          ))}
-        </div>
+        <div className="h-20 bg-muted animate-pulse rounded-lg" />
         <div className="h-96 bg-muted animate-pulse rounded-lg" />
       </div>
     )
@@ -327,31 +314,12 @@ export default function UserManagementPage() {
   return (
     <Suspense fallback={<Loading />}>
       <div className="space-y-6">
-        {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-3">
-          {[
-            { label: "Students & HODs", value: stats.total, icon: Users, color: "bg-blue-500" },
-            { label: "Active accounts", value: stats.active, icon: UserCheck, color: "bg-emerald-500" },
-            { label: "Inactive accounts", value: stats.inactive, icon: UserX, color: "bg-red-500" },
-          ].map((stat) => (
-            <Card key={stat.label} className="border-0 shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-lg ${stat.color} flex items-center justify-center`}>
-                    <stat.icon className="h-6 w-6 text-white" />
-                  </div>
-                  <div>
-                    <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                    <p className="text-sm text-muted-foreground">{stat.label}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">User management</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Manage students, HODs, and secretaries by department. Account totals are on the main dashboard.
+          </p>
         </div>
-        <p className="text-sm text-muted-foreground">
-          {stats.students} students · {stats.hods} heads of department · {stats.secutuaries} secutuaries (excludes system administrators)
-        </p>
 
         {/* Filters & Actions */}
         <Card className="border-0 shadow-sm">

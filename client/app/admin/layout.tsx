@@ -68,12 +68,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                pathname.includes("/users") ? "User Management" :
                pathname.includes("/official-placement-management") ? "Official placement management" :
                pathname.includes("/internship-tracking") ? "Internship Tracking" :
+               pathname.includes("/portal-management") ? "Internship Portal Management" :
                pathname.includes("/notices") ? "Notices" :
                pathname.includes("/notifications") ? "Notifications" :
                pathname.includes("/evaluations") ? "Evaluations" :
                pathname.includes("/signature") ? "Digital signature" :
+               pathname.includes("/weekly-logbooks") ? "Logbook" :
+               pathname.includes("/department-students") ? "Department students" :
                pathname.includes("/letter-requests") ? "Letter Requests" :
                pathname.includes("/letter") ? "Application Letter" :
+               pathname.includes("/settings") ? "Settings" :
                pathname.includes("/analytics") ? "Analytics" : user.role === "hod" ? (isSecutuary ? "Secutuary" : "HOD") : "Admin"}
             </h1>
           </div>

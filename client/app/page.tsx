@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
@@ -9,8 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Sheet, SheetContent } from "@/components/ui/sheet";
-import { mockInternships, mockNotices } from "@/lib/mock-data";
-import { useIsMobile } from "@/hooks/use-mobile";
+import { getFeaturedInternshipsByDepartment } from "@/lib/mock-data";
+import { PartnerInternshipsSection } from "@/components/partner-internships-section";
+import { noticesApi } from "@/lib/api";
 import {
   Ship,
   GraduationCap,
@@ -18,8 +19,6 @@ import {
   FileText,
   Users,
   ArrowRight,
-  Clock,
-  MapPin,
   Calendar,
   Bell,
   Menu,
@@ -28,10 +27,34 @@ import {
 export default function HomePage() {
   const { isAuthenticated, user } = useAuth();
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
-  const isMobile = useIsMobile();
 
-  const featuredInternships = mockInternships.slice(0, 3);
-  const latestNotices = mockNotices.filter((n) => n.isActive).slice(0, 2);
+  const featuredInternships = getFeaturedInternshipsByDepartment();
+  const [latestNotices, setLatestNotices] = useState<
+    Array<{
+      id: string;
+      title: string;
+      content: string;
+      priority?: string;
+      publishDate: string;
+    }>
+  >([]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadAnnouncements() {
+      const result = await noticesApi.getPublicHomepage(4);
+      if (cancelled || result.error) return;
+
+      const rows = Array.isArray(result.data?.data) ? result.data.data : [];
+      setLatestNotices(rows);
+    }
+
+    void loadAnnouncements();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="min-h-screen bg-background">
@@ -66,7 +89,7 @@ export default function HomePage() {
               Internships
             </Link>
             <Link
-              href="#about"
+              href="/about"
               className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
               About
@@ -121,7 +144,7 @@ export default function HomePage() {
                     Internships
                   </Link>
                   <Link
-                    href="#about"
+                    href="/about"
                     className="rounded-md px-3 py-2.5 text-sm font-medium text-foreground hover:bg-muted"
                     onClick={() => setMobileNavOpen(false)}
                   >
@@ -231,7 +254,7 @@ export default function HomePage() {
                 asChild
                 className="w-full sm:w-auto bg-white/10 backdrop-blur-sm border-white/30 text-white hover:bg-white/20 hover:text-white"
               >
-                <Link href="#internships">View Partner Companies</Link>
+                <Link href="/login">Sign In</Link>
               </Button>
             </motion.div>
           </div>
@@ -244,7 +267,11 @@ export default function HomePage() {
           <div className="grid grid-cols-2 gap-8 md:grid-cols-4">
             {[
               { label: "Active Internships", value: "12+", icon: Briefcase },
-              { label: "Partner Companies", value: "25+", icon: Users },
+              {
+                label: "Partner Companies",
+                value: `${featuredInternships.length}+`,
+                icon: Users,
+              },
               { label: "Students Placed", value: "500+", icon: GraduationCap },
               { label: "Success Rate", value: "92%", icon: FileText },
             ].map((stat, i) => (
@@ -291,16 +318,20 @@ export default function HomePage() {
                   transition={{ duration: 0.5, delay: i * 0.15 }}
                 >
                 <Card
-                  className={`transition-shadow hover:shadow-md h-full ${notice.isPinned ? "border-primary/50" : ""}`}
+                  className={`transition-shadow hover:shadow-md h-full ${
+                    notice.priority === "urgent" || notice.priority === "high"
+                      ? "border-primary/50"
+                      : ""
+                  }`}
                 >
                   <CardContent className="p-5">
                     <div className="mb-2 flex items-start justify-between gap-4">
                       <h3 className="font-semibold text-foreground">
                         {notice.title}
                       </h3>
-                      {notice.isPinned && (
-                        <Badge variant="secondary" className="shrink-0">
-                          Pinned
+                      {(notice.priority === "urgent" || notice.priority === "high") && (
+                        <Badge variant="secondary" className="shrink-0 capitalize">
+                          {notice.priority}
                         </Badge>
                       )}
                     </div>
@@ -324,111 +355,10 @@ export default function HomePage() {
         </section>
       )}
 
-      {/* Featured Internships */}
-      <section id="internships" className="overflow-x-hidden py-16 md:py-20">
-        <div className="container mx-auto px-4">
-          <div className="mb-10 text-center">
-            <h2 className="mb-3 text-3xl font-bold text-foreground">
-              Partner Companies & Internship Opportunities
-            </h2>
-            <p className="mx-auto max-w-2xl text-muted-foreground">
-              Browse companies where RMU students can intern and prepare your
-              letter request and placement details in advance.
-            </p>
-          </div>
-
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-            {featuredInternships.map((internship, i) => (
-              <motion.div
-                key={internship.id}
-                initial={
-                  isMobile
-                    ? { opacity: 0, x: 72 }
-                    : { opacity: 0, scale: 0.95 }
-                }
-                whileInView={
-                  isMobile
-                    ? { opacity: 1, x: 0 }
-                    : { opacity: 1, scale: 1 }
-                }
-                viewport={{ once: true, margin: "-40px" }}
-                transition={{
-                  duration: 0.5,
-                  delay: i * 0.15,
-                  ease: isMobile ? [0.22, 1, 0.36, 1] : [0.4, 0, 0.2, 1],
-                }}
-                className="h-full"
-              >
-              <Card
-                className="group transition-all hover:shadow-lg h-full"
-              >
-                <CardContent className="p-6">
-                  <div className="relative mb-4 h-36 overflow-hidden rounded-lg border border-border/60">
-                    <Image
-                      src={internship.coverImage ?? "/placeholder.jpg"}
-                      alt={`${internship.company} — internship opportunity`}
-                      fill
-                      className="object-cover transition-transform duration-300 group-hover:scale-[1.03]"
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-black/10" />
-                    <p className="absolute bottom-2 left-3 text-xs font-medium text-white/90">
-                      {internship.company}
-                    </p>
-                  </div>
-                  <div className="mb-4 flex items-start justify-between">
-                    <Badge variant="secondary">{internship.category}</Badge>
-                    {internship.isRemote && (
-                      <Badge variant="outline">Remote</Badge>
-                    )}
-                  </div>
-                  <h3 className="mb-2 text-lg font-semibold text-foreground group-hover:text-primary">
-                    {internship.title}
-                  </h3>
-                  <p className="mb-4 text-sm font-medium text-muted-foreground">
-                    {internship.company}
-                  </p>
-                  <p className="mb-4 line-clamp-2 text-sm text-muted-foreground">
-                    {internship.description}
-                  </p>
-                  <div className="mb-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1">
-                      <MapPin className="h-3 w-3" />
-                      {internship.location}
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <Clock className="h-3 w-3" />
-                      {internship.duration}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between border-t border-border pt-4">
-                    <div className="text-xs text-muted-foreground">
-                      <span className="font-medium text-foreground">
-                        {internship.slots - internship.applicationsCount > 0
-                          ? internship.slots - internship.applicationsCount
-                          : 0}
-                      </span>{" "}
-                      slots remaining
-                    </div>
-                    <span className="text-xs font-medium text-primary/90">
-                      {isAuthenticated ? "Track via dashboard" : "Sign in to continue"}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-              </motion.div>
-            ))}
-          </div>
-
-          <div className="mt-10 text-center">
-            <Button variant="outline" size="lg" asChild>
-              <Link href={isAuthenticated ? "/dashboard/internships" : "/login"}>
-                View All Internships
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </Link>
-            </Button>
-          </div>
-        </div>
-      </section>
+      <PartnerInternshipsSection
+        internships={featuredInternships}
+        isAuthenticated={isAuthenticated}
+      />
 
       {/* About Section */}
       <section id="about" className="border-t border-border bg-secondary/20 py-16 md:py-20">
@@ -536,17 +466,17 @@ export default function HomePage() {
                 RMU Internship Portal
               </span>
             </div>
-            <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground">
-              <Link href="#" className="hover:text-foreground">
+            <nav className="flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground" aria-label="Footer">
+              <Link href="/about" className="hover:text-foreground">
+                About Us
+              </Link>
+              <Link href="/privacy" className="hover:text-foreground">
                 Privacy Policy
               </Link>
-              <Link href="#" className="hover:text-foreground">
-                Terms of Service
-              </Link>
-              <Link href="#" className="hover:text-foreground">
+              <Link href="/contact" className="hover:text-foreground">
                 Contact
               </Link>
-            </div>
+            </nav>
             <p className="text-sm text-muted-foreground">
               &copy; {new Date().getFullYear()} Regional Maritime University
             </p>

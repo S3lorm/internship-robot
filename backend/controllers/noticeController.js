@@ -1,6 +1,71 @@
 const { Notice, User } = require('../models');
+const { supabase } = require('../models/supabase');
 const { createNotification } = require('../services/notificationService');
-const NOTICE_AUDIENCES = ['all', 'students', 'admins', 'hod', 'secutuary'];
+const { emailNoticeToVerifiedStudents } = require('../services/noticeEmailService');
+const NOTICE_AUDIENCES = ['all', 'students', 'admins', 'hod', 'secutuary', 'students_and_secretary'];
+
+function isSecretaryUser(user) {
+  return user?.role === 'secutuary' || (user?.role === 'hod' && user?.originalRole === 'secutuary');
+}
+
+function isHodOnlyUser(user) {
+  return user?.role === 'hod' && user?.originalRole !== 'secutuary';
+}
+
+async function getNoticeRecipientUsers(notice) {
+  const all = await User.findAll({ where: { isActive: true }, limit: 5000 });
+  const audience = notice.targetAudience || 'students';
+
+  let candidates = all;
+  switch (audience) {
+    case 'students':
+      candidates = all.filter((u) => u.role === 'student');
+      break;
+    case 'hod':
+      candidates = all.filter((u) => isHodOnlyUser(u));
+      break;
+    case 'secutuary':
+      candidates = all.filter((u) => isSecretaryUser(u));
+      break;
+    case 'students_and_secretary':
+      candidates = all.filter((u) => u.role === 'student' || isSecretaryUser(u));
+      break;
+    case 'admins':
+      candidates = all.filter((u) => u.role === 'admin');
+      break;
+  }
+
+  if (notice.targetDepartment) {
+    candidates = candidates.filter((u) => u.department === notice.targetDepartment);
+  }
+  return candidates;
+}
+const PUBLISH_SCOPES = ['portal', 'homepage', 'both'];
+
+function resolveAdminPublishPlacement(body, userRole) {
+  if (userRole !== 'admin') {
+    return { showOnHomepage: false, homepageOnly: false, publishScope: 'portal' };
+  }
+
+  let scope = String(body.publishScope || '').toLowerCase();
+  if (!PUBLISH_SCOPES.includes(scope)) {
+    if (body.homepageOnly === true) scope = 'homepage';
+    else if (body.showOnHomepage === true) scope = 'both';
+    else scope = 'portal';
+  }
+
+  if (scope === 'homepage') {
+    return { showOnHomepage: true, homepageOnly: true, publishScope: 'homepage' };
+  }
+  if (scope === 'both') {
+    return { showOnHomepage: true, homepageOnly: false, publishScope: 'both' };
+  }
+  return { showOnHomepage: false, homepageOnly: false, publishScope: 'portal' };
+}
+
+function shouldDeliverNoticeToStudentPortal(notice) {
+  return Boolean(notice?.isActive) && !notice?.homepageOnly;
+}
 
 function parsePagination(req) {
   const page = req.query.page ? Math.max(1, Number(req.query.page)) : 1;
@@ -20,6 +85,16 @@ function noticeAudienceForUser(user) {
 
 function canUserViewNotice(user, notice) {
   if (!user || !notice) return false;
+  if (notice.targetAudience === 'students_and_secretary') {
+    if (user.role === 'admin') return true;
+    if (user.role === 'student' || isSecretaryUser(user)) {
+      if (notice.targetDepartment && user.role !== 'admin' && notice.targetDepartment !== user.department) {
+        return false;
+      }
+      return true;
+    }
+    return false;
+  }
   const audience = noticeAudienceForUser(user);
   if (!audience) return false;
   if (notice.targetAudience !== 'all' && notice.targetAudience !== audience) return false;
@@ -30,18 +105,11 @@ function canUserViewNotice(user, notice) {
 async function notifyUsersForNewNotice(notice, excludeUserId = null) {
   if (!notice?.id) return;
 
-  const where = { isActive: true };
-  if (notice.targetAudience === 'students') where.role = 'student';
-  if (notice.targetAudience === 'admins') where.role = 'admin';
-  if (notice.targetAudience === 'hod') where.role = 'hod';
-  if (notice.targetAudience === 'secutuary') where.role = 'secutuary';
-
-  const candidates = await User.findAll({ where });
-  const recipients = notice.targetDepartment
-    ? candidates.filter((u) => u.department === notice.targetDepartment)
-    : candidates;
-
-  const link = notice.targetAudience === 'students' ? '/dashboard/notices' : '/admin/notifications';
+  const recipients = await getNoticeRecipientUsers(notice);
+  const studentAudiences = ['students', 'students_and_secretary', 'all'];
+  const link = studentAudiences.includes(notice.targetAudience)
+    ? '/dashboard/notices'
+    : '/admin/notifications';
   const message = `New notice: ${notice.title}`;
 
   for (const recipient of recipients) {
@@ -54,6 +122,78 @@ async function notifyUsersForNewNotice(notice, excludeUserId = null) {
       relatedId: notice.id,
       link,
     });
+  }
+}
+
+/** Public homepage: active announcements created by system admins only. */
+async function listPublicHomepage(req, res) {
+  try {
+    const limit = Math.min(10, Math.max(1, Number(req.query.limit) || 4));
+
+    const { data: adminUsers, error: adminErr } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('role', 'admin');
+
+    if (adminErr) throw adminErr;
+
+    const adminIds = (adminUsers || []).map((u) => u.id).filter(Boolean);
+    if (adminIds.length === 0) {
+      return res.json({ data: [] });
+    }
+
+    let query = supabase
+      .from('notices')
+      .select('*')
+      .eq('is_active', true)
+      .in('created_by', adminIds)
+      .in('target_audience', ['all', 'students'])
+      .order('created_at', { ascending: false })
+      .limit(Math.max(limit * 3, 12));
+
+    query = query.eq('show_on_homepage', true);
+
+    let { data, error } = await query;
+
+    if (error && /show_on_homepage|column/i.test(error.message || '')) {
+      const fallback = await supabase
+        .from('notices')
+        .select('*')
+        .eq('is_active', true)
+        .in('created_by', adminIds)
+        .in('target_audience', ['all', 'students'])
+        .order('created_at', { ascending: false })
+        .limit(Math.max(limit * 3, 12));
+      data = fallback.data;
+      error = fallback.error;
+    }
+
+    if (error) throw error;
+
+    const now = new Date();
+    const rows = (data || [])
+      .filter((n) => !n.expires_at || new Date(n.expires_at) > now)
+      .slice(0, limit)
+      .map((row) => ({
+        id: row.id,
+        title: row.title,
+        content: row.content,
+        priority: row.priority,
+        targetAudience: row.target_audience,
+        targetDepartment: row.target_department || null,
+        isActive: row.is_active,
+        showOnHomepage: row.show_on_homepage === true,
+        homepageOnly: row.homepage_only === true,
+        expiresAt: row.expires_at,
+        publishDate: row.created_at,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+      }));
+
+    return res.json({ data: rows });
+  } catch (err) {
+    console.error('listPublicHomepage:', err);
+    return res.status(500).json({ message: 'Failed to load announcements' });
   }
 }
 
@@ -84,6 +224,7 @@ async function list(req, res) {
   const now = new Date();
   let filteredRows = rows.filter((n) => {
     if (n.expiresAt && new Date(n.expiresAt) <= now) return false;
+    if (!manage && n.homepageOnly) return false;
     if (!manage && req.user && !canUserViewNotice(req.user, n)) return false;
     return true;
   });
@@ -144,6 +285,8 @@ async function create(req, res) {
     return res.status(400).json({ message: 'Invalid target audience.' });
   }
 
+  const placement = resolveAdminPublishPlacement(req.body, req.user.role);
+
   const notice = await Notice.create({
     title: req.body.title,
     content: req.body.content,
@@ -151,6 +294,8 @@ async function create(req, res) {
     targetAudience,
     targetDepartment,
     isActive: req.body.isActive ?? true,
+    showOnHomepage: placement.showOnHomepage,
+    homepageOnly: placement.homepageOnly,
     expiresAt: req.body.expiresAt,
     createdBy,
   });
@@ -165,28 +310,78 @@ async function create(req, res) {
     });
   }
 
-  if (notice.isActive) {
+  if (shouldDeliverNoticeToStudentPortal(notice)) {
     try {
       const skipId = req.user.role === 'hod' ? req.user.id : null;
       await notifyUsersForNewNotice(notice, skipId);
     } catch (err) {
       console.error('notifyUsersForNewNotice:', err);
     }
+    if (req.user.role === 'admin') {
+      try {
+        const emailStats = await emailNoticeToVerifiedStudents(notice);
+        return res.status(201).json({
+          message: 'Notice created',
+          notice,
+          emailDelivery: emailStats,
+        });
+      } catch (err) {
+        console.error('emailNoticeToVerifiedStudents:', err);
+      }
+    }
   }
 
-  return res.status(201).json({ message: 'Notice created', notice });
+  const scopeLabel =
+    notice.homepageOnly ? 'homepage' : notice.showOnHomepage ? 'homepage and student portal' : 'student portal';
+  return res.status(201).json({
+    message: `Notice published to ${scopeLabel}.`,
+    notice,
+  });
 }
 
 async function update(req, res) {
   const notice = await Notice.findByPk(req.params.id);
   if (!notice) return res.status(404).json({ message: 'Notice not found' });
 
-  const allowed = ['title', 'content', 'priority', 'targetAudience', 'targetDepartment', 'isActive', 'expiresAt'];
+  const wasActive = notice.isActive;
+  const allowed = [
+    'title',
+    'content',
+    'priority',
+    'targetAudience',
+    'targetDepartment',
+    'isActive',
+    'expiresAt',
+  ];
+  if (req.user.role === 'admin' && req.body.publishScope !== undefined) {
+    const placement = resolveAdminPublishPlacement(req.body, 'admin');
+    notice.showOnHomepage = placement.showOnHomepage;
+    notice.homepageOnly = placement.homepageOnly;
+  } else if (req.user.role === 'admin') {
+    allowed.push('showOnHomepage', 'homepageOnly');
+  }
   for (const k of allowed) {
     if (req.body[k] !== undefined) notice[k] = req.body[k];
   }
+  if (notice.homepageOnly) {
+    notice.showOnHomepage = true;
+  }
+  if (!notice.showOnHomepage) {
+    notice.homepageOnly = false;
+  }
   await notice.save();
-  return res.json({ message: 'Notice updated', notice });
+
+  let emailDelivery = null;
+  if (req.user.role === 'admin' && shouldDeliverNoticeToStudentPortal(notice) && notice.isActive && !wasActive) {
+    try {
+      await notifyUsersForNewNotice(notice, req.user.id);
+      emailDelivery = await emailNoticeToVerifiedStudents(notice);
+    } catch (err) {
+      console.error('notice publish notify/email:', err);
+    }
+  }
+
+  return res.json({ message: 'Notice updated', notice, emailDelivery });
 }
 
 async function remove(req, res) {
@@ -273,6 +468,7 @@ async function markAllAsRead(req, res) {
 }
 
 module.exports = {
+  listPublicHomepage,
   list,
   getById,
   create,

@@ -1,15 +1,15 @@
-const { normalizeDepartmentName } = require('../constants/departments');
-
-function departmentMatch(a, b) {
-  const na = normalizeDepartmentName(a) || (a && String(a).trim()) || '';
-  const nb = normalizeDepartmentName(b) || (b && String(b).trim()) || '';
-  if (!na || !nb) return false;
-  return na.toLowerCase() === nb.toLowerCase();
-}
+const { studentBelongsToHodDepartment } = require('../constants/departmentCatalog');
+const { isEmailVerifiedStudent } = require('../utils/verifiedStudent');
 
 function canStaffAccess(user, bundle) {
   if (!user || !bundle?.student) return false;
-  if (user.role === 'hod') return departmentMatch(user.department, bundle.student.department);
+  if (user.originalRole === 'secutuary' || user.role === 'secutuary') return true;
+  if (user.role === 'hod') {
+    return (
+      isEmailVerifiedStudent(bundle.student) &&
+      studentBelongsToHodDepartment(bundle.student, user.department)
+    );
+  }
   return false;
 }
 
@@ -135,7 +135,7 @@ async function listStaffLogbooks(req, res) {
 
     const { WeeklyLogbook } = require('../models');
     let bundles = await WeeklyLogbook.listForStaff(req.query.status || 'supervisor_reviewed');
-    if (user.role === 'hod') {
+    if (user.role === 'hod' && user.originalRole !== 'secutuary') {
       bundles = bundles.filter((bundle) => canStaffAccess(user, bundle));
     }
     res.json({ logbooks: bundles });
@@ -231,19 +231,30 @@ async function submitSupervisorReview(req, res) {
     });
 
     const student = await User.findByPk(result.logbook.studentId);
-    const hods = await User.findAll({ where: { role: 'hod' } });
-    for (const hod of hods) {
-      if (!student || !departmentMatch(hod.department, student.department)) continue;
+    const notifyStaff = async (userId) => {
       await createNotification({
-        userId: hod.id,
+        userId,
         type: 'weekly_logbook',
         title: 'Weekly Log Sheet Book ready for institutional review',
-        message: `${student.firstName} ${student.lastName}'s Weekly Log Sheet Book has been acknowledged by the supervisor.`,
+        message: `${student.firstName} ${student.lastName}'s Weekly Log Sheet Book has been acknowledged by the supervisor and is ready for review.`,
         relatedId: result.logbook.id,
         link: '/admin/weekly-logbooks',
         priority: 'high',
         actionRequired: true,
       });
+    };
+
+    const hods = await User.findAll({ where: { role: 'hod' } });
+    for (const hod of hods) {
+      if (!student || !isEmailVerifiedStudent(student) || !studentBelongsToHodDepartment(student, hod.department)) {
+        continue;
+      }
+      await notifyStaff(hod.id);
+    }
+
+    const secretaries = await User.findAll({ where: { role: 'secutuary' } });
+    for (const secretary of secretaries) {
+      await notifyStaff(secretary.id);
     }
 
     res.status(201).json({ message: 'Supervisor acknowledgment submitted successfully' });

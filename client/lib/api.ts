@@ -270,6 +270,17 @@ export const applicationsApi = {
 
 // Notices API
 export const noticesApi = {
+  getPublicHomepage: (limit = 4) =>
+    fetchApi<{ data: Array<{
+      id: string;
+      title: string;
+      content: string;
+      priority: string;
+      showOnHomepage?: boolean;
+      publishDate: string;
+      createdAt: string;
+    }> }>(`/notices/public/homepage?limit=${limit}`),
+
   getAll: (params?: Record<string, string>) => {
     const query = params ? `?${new URLSearchParams(params)}` : '';
     return fetchApi(`/notices${query}`);
@@ -631,6 +642,19 @@ export const weeklyLogbooksApi = {
     }),
 
   pdfUrl: (id: string) => `${API_BASE_URL}/weekly-logbooks/${id}/pdf`,
+};
+
+export const portalApi = {
+  getStatus: () => fetchApi('/portal/status'),
+  setStatus: (status: 'open' | 'closed') =>
+    fetchApi('/portal/status', {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    }),
+};
+
+export const hodApi = {
+  getDepartmentStudents: () => fetchApi('/hod/department-students'),
 };
 
 export const staffSignaturesApi = {

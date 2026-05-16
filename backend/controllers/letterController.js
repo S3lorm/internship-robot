@@ -1,4 +1,10 @@
 const { User } = require('../models');
+const { studentBelongsToHodDepartment } = require('../constants/departmentCatalog');
+const {
+  formatLetterRefDisplay,
+  ensureLetterRequestReference,
+} = require('../services/letterReferenceService');
+const { isEmailVerifiedStudent } = require('../utils/verifiedStudent');
 const auth = require('../middleware/auth');
 const PDFDocument = require('pdfkit');
 const fs = require('fs');
@@ -74,9 +80,12 @@ function formatDepartmentLabel(department) {
   return /department/i.test(d) ? d : `${d} Department`;
 }
 
-async function resolveLetterSignature(user) {
-  const { resolveDepartmentSignature } = require('../services/staffSignatureService');
-  const signature = await resolveDepartmentSignature(user);
+async function resolveLetterSignature(student, letterRequest = null, reviewerId = null) {
+  const { resolveLetterSignatureForRequest } = require('../services/staffSignatureService');
+  const signature = await resolveLetterSignatureForRequest(student, {
+    ...(letterRequest || {}),
+    reviewedBy: reviewerId || letterRequest?.reviewedBy || null,
+  });
   return {
     ...signature,
     signature: signature.signatureDataUrl,
@@ -91,7 +100,13 @@ function renderSignatureHtml(signature) {
   return `<div style="font-family:'Brush Script MT','Segoe Script',cursive;font-size:32px;line-height:1.1;margin:6px 0;color:#1f2937;">${signature.signatureText || signature.name}</div>`;
 }
 
-function generateLetterHTML(user, internship = null, letterRequest = null, resolvedSignature = null) {
+async function generateLetterHTML(
+  user,
+  internship = null,
+  letterRequest = null,
+  resolvedSignature = null,
+  verificationAssets = null
+) {
   const signature = resolvedSignature || programSignatures[user.program] || defaultSignature;
   const signatureDepartmentLabel = formatDepartmentLabel(signature.department);
   const currentDate = new Date().toLocaleDateString('en-GB', {
@@ -101,6 +116,16 @@ function generateLetterHTML(user, internship = null, letterRequest = null, resol
   });
 
   const isGeneral = letterRequest && (letterRequest.requestType === 'general');
+
+  const {
+    buildLetterVerificationAssets,
+    renderVerificationHtmlBlock,
+  } = require('../utils/letterVerificationQr');
+  const vAssets =
+    verificationAssets ??
+    (letterRequest?.verificationCode
+      ? await buildLetterVerificationAssets(letterRequest.verificationCode)
+      : null);
 
   // Use letter request details if provided, otherwise use internship details
   let internshipDetails = '';
@@ -259,17 +284,8 @@ function generateLetterHTML(user, internship = null, letterRequest = null, resol
   <div class="meta-line">
     <div class="ref-col">
       <div class="ref-row">
-        <span>MY REF:</span>
-        <span style="font-weight: bold;">${letterRequest?.referenceNumber ? `RMU/${letterRequest.referenceNumber}` : 'RMU/50/57[852]/9'}</span>
-      </div>
-      <div class="ref-row mt-2">
-        <span>YOUR REF:</span>
-      </div>
-      <div class="ref-col" style="margin-top: 15px; margin-left: 70px;">
-        <span class="dots"></span>
-        <span class="dots"></span>
-        <span class="dots"></span>
-        <span class="dots"></span>
+        <span>REF NO.</span>
+        <span style="font-weight: bold;">${formatLetterRefDisplay(letterRequest?.referenceNumber)}</span>
       </div>
     </div>
     <div class="date-col" style="font-weight: bold;">
@@ -323,20 +339,13 @@ function generateLetterHTML(user, internship = null, letterRequest = null, resol
     <div class="signature-title">[${signature.title.toUpperCase()} - ${signatureDepartmentLabel.toUpperCase()}]</div>
   </div>
 
-  ${letterRequest && letterRequest.verificationCode ? `
-  <div style="margin-top: 40px; font-size: 11px;">
-    <strong>Verification Code:</strong> ${letterRequest.verificationCode}<br>
-    <em>This document can be verified online using the code above.</em>
-  </div>
-  ` : ''}
+  ${renderVerificationHtmlBlock(vAssets)}
 
   <div class="footer">
     <div class="member-states">Member States: Cameroon, The Gambia, Ghana, Liberia, Sierra Leone</div>
     Email: university.registrar@rmu.edu.gh &nbsp;&nbsp;&nbsp; Website: www.rmu.edu.gh<br>
     In case of reply the number and date of this letter should be quoted.
   </div>
-</body>
-</html>
 </body>
 </html>
   `;
@@ -353,7 +362,28 @@ function getOrdinalSuffix(num) {
 }
 
 // Generate a real PDF buffer of the formal letter using pdfkit
-async function generatePDFBuffer(user, letterRequest, resolvedSignature = null) {
+async function generatePDFBuffer(
+  user,
+  letterRequest,
+  resolvedSignature = null,
+  verificationAssets = null
+) {
+  let signature = resolvedSignature;
+  if (!signature?.signerName && !signature?.name) {
+    const { resolveLetterSignatureWithSnapshot } = require('../services/staffSignatureService');
+    signature = await resolveLetterSignatureWithSnapshot(user, letterRequest);
+  } else if (!signature?.imageBuffer && !signature?.signatureDataUrl) {
+    signature = await resolveLetterSignature(user, letterRequest);
+  }
+  signature = signature || programSignatures[user.program] || defaultSignature;
+
+  const { buildLetterVerificationAssets } = require('../utils/letterVerificationQr');
+  const vAssets =
+    verificationAssets ??
+    (letterRequest?.verificationCode
+      ? await buildLetterVerificationAssets(letterRequest.verificationCode)
+      : null);
+
   return new Promise((resolve, reject) => {
     try {
       const doc = new PDFDocument({ size: 'A4', margin: 50 });
@@ -362,8 +392,6 @@ async function generatePDFBuffer(user, letterRequest, resolvedSignature = null) 
       doc.on('data', (chunk) => chunks.push(chunk));
       doc.on('end', () => resolve(Buffer.concat(chunks)));
       doc.on('error', (err) => reject(err));
-
-      const signature = resolvedSignature || programSignatures[user.program] || defaultSignature;
       const signatureDepartmentLabel = formatDepartmentLabel(signature.department);
       const { drawSignatureOnPdf } = require('../services/staffSignatureService');
       const currentDate = new Date().toLocaleDateString('en-GB', {
@@ -392,19 +420,13 @@ async function generatePDFBuffer(user, letterRequest, resolvedSignature = null) 
 
       // --- Meta Line (Refs and Date) ---
       const refY = doc.y;
-      doc.fontSize(11).font('Helvetica').text('MY REF:', 50, refY);
-      const myRef = letterRequest?.referenceNumber ? `RMU/${letterRequest.referenceNumber}` : 'RMU/50/57[852]/9';
-      doc.font('Helvetica-Bold').text(myRef, 110, refY);
-      
-      doc.font('Helvetica-Bold').text(currentDate, 400, refY, { align: 'right', width: 145 });
-      
-      doc.font('Helvetica').text('YOUR REF:', 50, refY + 20);
-      doc.text('...........................................................................', 120, refY + 40);
-      doc.text('...........................................................................', 120, refY + 60);
-      doc.text('...........................................................................', 120, refY + 80);
-      doc.text('...........................................................................', 120, refY + 100);
+      const refNo = formatLetterRefDisplay(letterRequest?.referenceNumber);
+      doc.fontSize(11).font('Helvetica').text('REF NO.', 50, refY);
+      doc.font('Helvetica-Bold').text(refNo, 115, refY);
 
-      doc.moveDown(9);
+      doc.font('Helvetica-Bold').text(currentDate, 400, refY, { align: 'right', width: 145 });
+
+      doc.moveDown(3);
       
       // --- Recipient ---
       doc.font('Helvetica').text('Dear Sir/Madam,', 50, doc.y);
@@ -457,11 +479,33 @@ async function generatePDFBuffer(user, letterRequest, resolvedSignature = null) 
       doc.font('Helvetica-Bold').text(signature.name);
       doc.font('Helvetica-Bold').text(`[${signature.title.toUpperCase()} - ${signatureDepartmentLabel.toUpperCase()}]`);
 
-      // --- Reference / Verification ---
-      if (letterRequest && letterRequest.verificationCode) {
+      // --- Reference / Verification + QR ---
+      if (vAssets) {
         doc.moveDown(2);
-        doc.fontSize(9).font('Helvetica-Bold').text('Verification Code: ', { continued: true }).font('Helvetica').text(letterRequest.verificationCode);
-        doc.font('Helvetica-Oblique').text('This document can be verified online using the code above.');
+        const blockTop = doc.y;
+        try {
+          doc.image(vAssets.qrPngBuffer, 50, blockTop, { width: 72, height: 72 });
+        } catch (qrErr) {
+          console.error('Could not embed verification QR on PDF:', qrErr.message || qrErr);
+        }
+        doc.fontSize(8).font('Helvetica').fillColor('#444444').text('Scan to verify', 50, blockTop + 76, {
+          width: 72,
+          align: 'center',
+        });
+        doc.fillColor('#000000');
+        const textX = 132;
+        doc.fontSize(9).font('Helvetica-Bold').text('Verification Code: ', textX, blockTop, { continued: true });
+        doc.font('Helvetica').text(vAssets.verificationCode);
+        doc.fontSize(8).font('Helvetica').text('Verify online (scan QR or open link):', textX, blockTop + 16);
+        doc.fontSize(8).fillColor('#1e40af').text(vAssets.verifyUrl, textX, blockTop + 28, { width: 400 });
+        doc.fillColor('#000000');
+        doc.fontSize(8).font('Helvetica-Oblique').text(
+          'Scan to view student details and confirm this letter in the RMU Internship Portal.',
+          textX,
+          blockTop + 52,
+          { width: 400 }
+        );
+        doc.y = Math.max(doc.y, blockTop + 88);
       }
 
       // --- Footer ---
@@ -500,7 +544,7 @@ async function generateLetter(req, res) {
     }
 
     const signature = await resolveLetterSignature(fullUser);
-    const html = generateLetterHTML(fullUser, internship, null, signature);
+    const html = await generateLetterHTML(fullUser, internship, null, signature);
 
     // Return HTML that can be rendered or converted to PDF
     res.setHeader('Content-Type', 'text/html');
@@ -532,7 +576,7 @@ async function downloadLetter(req, res) {
     }
 
     const signature = await resolveLetterSignature(fullUser);
-    const html = generateLetterHTML(fullUser, internship, null, signature);
+    const html = await generateLetterHTML(fullUser, internship, null, signature);
 
     if (format === 'html') {
       const filename = `Internship_Letter_${user.firstName}_${user.lastName}_${Date.now()}.html`;
@@ -556,9 +600,19 @@ async function createRequest(req, res) {
   try {
     const user = req.user;
     const { LetterRequest } = require('../models');
+    const { assertPortalOpenForStudentRequest, CLOSED_MESSAGE } = require('../services/internshipPortalService');
 
     if (!user || user.role !== 'student') {
       return res.status(403).json({ message: 'Only students can create letter requests' });
+    }
+
+    try {
+      await assertPortalOpenForStudentRequest();
+    } catch (portalErr) {
+      return res.status(portalErr.statusCode || 403).json({
+        message: portalErr.message || CLOSED_MESSAGE,
+        code: portalErr.code || 'PORTAL_CLOSED',
+      });
     }
 
     const {
@@ -629,15 +683,16 @@ async function createRequest(req, res) {
     const { createNotification } = require('../services/notificationService');
     const { User } = require('../models');
     const admins = await User.findAll({ where: { role: 'admin' } });
-    const deptHods = user.department
-      ? await User.findAll({ where: { role: 'hod', department: user.department } })
-      : [];
+    const allHods = await User.findAll({ where: { role: 'hod' } });
+    const deptHods = allHods.filter((h) => studentBelongsToHodDepartment(user, h.department));
+    const allSec = await User.findAll({ where: { role: 'secutuary' } });
+    const deptSec = allSec.filter((h) => studentBelongsToHodDepartment(user, h.department));
 
     const notifyIds = new Set();
     for (const admin of admins) {
       if (admin.id) notifyIds.add(admin.id);
     }
-    for (const h of deptHods) {
+    for (const h of [...deptHods, ...deptSec]) {
       if (h.id) notifyIds.add(h.id);
     }
 
@@ -701,7 +756,12 @@ async function getRequests(req, res) {
 
     let out = requests;
     if (user.role === 'hod') {
-      out = requests.filter((r) => r.student && r.student.department === user.department);
+      out = requests.filter(
+        (r) =>
+          r.student &&
+          isEmailVerifiedStudent(r.student) &&
+          studentBelongsToHodDepartment(r.student, user.department)
+      );
     }
 
     res.json({ requests: out });
@@ -745,7 +805,7 @@ async function getRequestById(req, res) {
 
     if (user.role === 'hod') {
       const st = await User.findOne({ id: request.studentId });
-      if (!st || st.department !== user.department) {
+      if (!st || !isEmailVerifiedStudent(st) || !studentBelongsToHodDepartment(st, user.department)) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -783,7 +843,7 @@ async function updateRequestStatus(req, res) {
     if (user.role === 'hod') {
       const { User } = require('../models');
       const st = await User.findOne({ id: request.studentId });
-      if (!st || st.department !== user.department) {
+      if (!st || !isEmailVerifiedStudent(st) || !studentBelongsToHodDepartment(st, user.department)) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -795,7 +855,7 @@ async function updateRequestStatus(req, res) {
     const updateData = {
       status,
       adminNotes: mergedNotes || adminNotes,
-      reviewedBy: user.role === 'hod' ? null : user.id,
+      reviewedBy: user.id,
       reviewedAt: new Date().toISOString(),
     };
 
@@ -805,10 +865,16 @@ async function updateRequestStatus(req, res) {
         const { User } = require('../models');
         const { signatureSnapshot } = require('../services/staffSignatureService');
         const student = await User.findOne({ id: request.studentId });
+        let requestForLetter = request;
         if (student) {
-          updateData.signatureSnapshot = signatureSnapshot(await resolveLetterSignature(student));
+          requestForLetter = await ensureLetterRequestReference(request, student.department);
+          updateData.referenceNumber = requestForLetter.referenceNumber;
+          updateData.signatureSnapshot = signatureSnapshot(
+            await resolveLetterSignature(student, requestForLetter, user.id)
+          );
+          requestForLetter = { ...requestForLetter, reviewedBy: user.id };
         }
-        const pdfData = await generateLetterPDF(request);
+        const pdfData = await generateLetterPDF(requestForLetter);
         updateData.pdfUrl = pdfData.url;
         updateData.pdfGeneratedAt = new Date().toISOString();
       } catch (pdfError) {
@@ -830,7 +896,7 @@ async function updateRequestStatus(req, res) {
       notificationTitle = isGeneral ? 'General Internship Letter Approved' : 'Letter Request Approved - PDF Ready';
       notificationMessage = isGeneral 
         ? "Your General Internship Letter has been approved and is now available for viewing, download, and printing."
-        : `Your internship letter request for ${request.companyName} has been approved. Your PDF letter is now available for download. Reference: ${request.referenceNumber || 'N/A'}`;
+        : `Your internship letter request for ${request.companyName} has been approved. Your PDF letter is now available for download. Reference: ${formatLetterRefDisplay(updated?.referenceNumber || request.referenceNumber)}`;
     } else if (status === 'rejected') {
       notificationTitle = 'Letter Request Rejected';
       notificationMessage = isGeneral
@@ -850,7 +916,7 @@ async function updateRequestStatus(req, res) {
     // Send email notification to student if requested and approved
     if (status === 'approved' && sendEmail !== false) {
       try {
-        await sendLetterEmailNotification(request, updated);
+        await sendLetterEmailNotification(updated || request, updated);
       } catch (emailError) {
         console.error('Error sending student email notification:', emailError);
         // Don't fail the request if email fails
@@ -863,8 +929,14 @@ async function updateRequestStatus(req, res) {
         const { User } = require('../models');
         const student = await User.findOne({ id: request.studentId });
         if (student) {
-          const signature = await resolveLetterSignature(student);
-          const pdfBuffer = await generatePDFBuffer(student, request, signature);
+          const letterReq = await ensureLetterRequestReference(updated || request, student.department);
+          const { resolveLetterSignatureWithSnapshot } = require('../services/staffSignatureService');
+          const signature = await resolveLetterSignatureWithSnapshot(student, letterReq);
+          const { buildLetterVerificationAssets } = require('../utils/letterVerificationQr');
+          const vAssets = letterReq.verificationCode
+            ? await buildLetterVerificationAssets(letterReq.verificationCode)
+            : null;
+          const pdfBuffer = await generatePDFBuffer(student, letterReq, signature, vAssets);
           const transporter = require('../config/email');
           const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER || 'noreply@rmu.edu.gh'}>`;
 
@@ -958,33 +1030,40 @@ async function generateLetterPDF(request) {
     throw new Error('Student not found');
   }
 
+  const letterRequest = await ensureLetterRequestReference(request, student.department);
+
   // Generate HTML letter
-  const signature = await resolveLetterSignature(student);
-  const html = generateLetterHTML(student, null, request, signature);
+  const { resolveLetterSignatureWithSnapshot } = require('../services/staffSignatureService');
+  const signature = await resolveLetterSignatureWithSnapshot(student, letterRequest);
+  const { buildLetterVerificationAssets } = require('../utils/letterVerificationQr');
+  const vAssets = letterRequest.verificationCode
+    ? await buildLetterVerificationAssets(letterRequest.verificationCode)
+    : null;
+  const html = await generateLetterHTML(student, null, letterRequest, signature, vAssets);
 
   // Create document verification record for security and integrity
-  if (request.referenceNumber && request.verificationCode) {
+  if (letterRequest.referenceNumber && letterRequest.verificationCode) {
     const { createDocumentVerification } = require('../services/documentVerificationService');
     await createDocumentVerification({
       documentType: 'letter',
-      documentId: request.id,
-      referenceNumber: request.referenceNumber,
-      verificationCode: request.verificationCode,
+      documentId: letterRequest.id,
+      referenceNumber: letterRequest.referenceNumber,
+      verificationCode: letterRequest.verificationCode,
       content: html,
       generatedBy: request.reviewedBy || student.id,
       metadata: {
-        companyName: request.companyName,
-        studentId: request.studentId,
+        companyName: letterRequest.companyName,
+        studentId: letterRequest.studentId,
         studentName: `${student.firstName} ${student.lastName}`,
       },
     });
   }
 
   const { v4: uuidv4 } = require('uuid');
-  const filename = `letter_${request.referenceNumber || request.id}_${Date.now()}.html`;
+  const filename = `letter_${letterRequest.referenceNumber || letterRequest.id}_${Date.now()}.html`;
 
   return {
-    url: `/api/letters/requests/${request.id}/download`,
+    url: `/api/letters/requests/${letterRequest.id}/download`,
     filename: filename,
   };
 }
@@ -1004,7 +1083,7 @@ async function sendLetterEmailNotification(request, updatedRequest) {
   const mailOptions = {
     from: emailFrom,
     to: student.email,
-    subject: `Internship Letter Approved - ${request.referenceNumber || 'Reference'}`,
+    subject: `Internship Letter Approved - ${formatLetterRefDisplay(request.referenceNumber)}`,
     html: `
       <!DOCTYPE html>
       <html>
@@ -1031,7 +1110,7 @@ async function sendLetterEmailNotification(request, updatedRequest) {
             
             <div class="info-box">
               <h3>Request Details</h3>
-              <p><strong>Reference Number:</strong> ${request.referenceNumber || 'N/A'}</p>
+              <p><strong>Reference Number:</strong> ${formatLetterRefDisplay(request.referenceNumber)}</p>
               <p><strong>Verification Code:</strong> ${request.verificationCode || 'N/A'}</p>
               <p><strong>Company:</strong> ${request.companyName}</p>
               <p><strong>Duration:</strong> ${request.internshipDuration}</p>
@@ -1058,7 +1137,7 @@ async function sendLetterEmailNotification(request, updatedRequest) {
 
       Your internship letter request has been approved and is now available for download.
 
-      Reference Number: ${request.referenceNumber || 'N/A'}
+      Reference Number: ${formatLetterRefDisplay(request.referenceNumber)}
       Verification Code: ${request.verificationCode || 'N/A'}
       Company: ${request.companyName}
       Duration: ${request.internshipDuration}
@@ -1092,7 +1171,7 @@ async function downloadLetterPDF(req, res) {
 
     if (user.role === 'hod') {
       const st = await User.findOne({ id: request.studentId });
-      if (!st || st.department !== user.department) {
+      if (!st || !isEmailVerifiedStudent(st) || !studentBelongsToHodDepartment(st, user.department)) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -1108,9 +1187,15 @@ async function downloadLetterPDF(req, res) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const { signatureFromSnapshot } = require('../services/staffSignatureService');
-    const signature = signatureFromSnapshot(request.signatureSnapshot, student) || await resolveLetterSignature(student);
-    const html = generateLetterHTML(student, null, request, signature);
+    const letterRequest = await ensureLetterRequestReference(request, student.department);
+
+    const { resolveLetterSignatureWithSnapshot } = require('../services/staffSignatureService');
+    const signature = await resolveLetterSignatureWithSnapshot(student, letterRequest);
+    const { buildLetterVerificationAssets } = require('../utils/letterVerificationQr');
+  const vAssets = letterRequest.verificationCode
+    ? await buildLetterVerificationAssets(letterRequest.verificationCode)
+    : null;
+  const html = await generateLetterHTML(student, null, letterRequest, signature, vAssets);
 
     // Log document download
     const { logActivity } = require('../services/activityLogService');
@@ -1121,12 +1206,12 @@ async function downloadLetterPDF(req, res) {
       actionType: 'document_download',
       resourceType: 'letter_request',
       resourceId: id,
-      description: `Downloaded letter PDF: ${request.referenceNumber || request.id}`,
+      description: `Downloaded letter PDF: ${letterRequest.referenceNumber || letterRequest.id}`,
       ipAddress: req.ip || req.connection.remoteAddress,
       userAgent: req.get('user-agent'),
       metadata: {
-        referenceNumber: request.referenceNumber,
-        verificationCode: request.verificationCode,
+        referenceNumber: letterRequest.referenceNumber,
+        verificationCode: letterRequest.verificationCode,
       },
     });
 
@@ -1140,20 +1225,20 @@ async function downloadLetterPDF(req, res) {
       recipientName: `${user.firstName} ${user.lastName}`,
       transmissionMethod: 'download',
       metadata: {
-        referenceNumber: request.referenceNumber,
-        verificationCode: request.verificationCode,
+        referenceNumber: letterRequest.referenceNumber,
+        verificationCode: letterRequest.verificationCode,
       },
     });
 
     // Increment download count
     await LetterRequest.update(id, {
-      downloadCount: (request.downloadCount || 0) + 1,
+      downloadCount: (letterRequest.downloadCount || 0) + 1,
       lastDownloadedAt: new Date().toISOString(),
     });
 
     // Return HTML (can be printed to PDF by browser)
     res.setHeader('Content-Type', 'text/html');
-    res.setHeader('Content-Disposition', `attachment; filename="Internship_Letter_${request.referenceNumber || request.id}.html"`);
+    res.setHeader('Content-Disposition', `attachment; filename="Internship_Letter_${letterRequest.referenceNumber || letterRequest.id}.html"`);
     res.send(html);
   } catch (error) {
     console.error('Error downloading letter PDF:', error);
@@ -1183,7 +1268,7 @@ async function viewLetterHTML(req, res) {
 
     if (user.role === 'hod') {
       const st = await User.findOne({ id: request.studentId });
-      if (!st || st.department !== user.department) {
+      if (!st || !isEmailVerifiedStudent(st) || !studentBelongsToHodDepartment(st, user.department)) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -1199,9 +1284,15 @@ async function viewLetterHTML(req, res) {
       return res.status(404).json({ message: 'Student not found' });
     }
 
-    const { signatureFromSnapshot } = require('../services/staffSignatureService');
-    const signature = signatureFromSnapshot(request.signatureSnapshot, student) || await resolveLetterSignature(student);
-    const html = generateLetterHTML(student, null, request, signature);
+    const letterRequest = await ensureLetterRequestReference(request, student.department);
+
+    const { resolveLetterSignatureWithSnapshot } = require('../services/staffSignatureService');
+    const signature = await resolveLetterSignatureWithSnapshot(student, letterRequest);
+    const { buildLetterVerificationAssets } = require('../utils/letterVerificationQr');
+  const vAssets = letterRequest.verificationCode
+    ? await buildLetterVerificationAssets(letterRequest.verificationCode)
+    : null;
+  const html = await generateLetterHTML(student, null, letterRequest, signature, vAssets);
 
     // Return HTML (inline)
     res.setHeader('Content-Type', 'text/html');
@@ -1374,7 +1465,12 @@ async function bulkUpdateRequestStatus(req, res) {
     }
 
     if (user.role === 'hod') {
-      requests = requests.filter((r) => r.student && r.student.department === user.department);
+      requests = requests.filter(
+        (r) =>
+          r.student &&
+          isEmailVerifiedStudent(r.student) &&
+          studentBelongsToHodDepartment(r.student, user.department)
+      );
     }
 
     if (studentIdPrefix && String(studentIdPrefix).trim()) {

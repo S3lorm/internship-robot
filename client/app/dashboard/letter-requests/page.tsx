@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -43,6 +43,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  formatPlacementLockDate,
+  getPlacementFormLockState,
+} from "@/lib/placement-form-lock";
+import { usePortalStatus } from "@/hooks/use-portal-status";
+import { PortalStatusBanner } from "@/components/portal-status-banner";
+import { PORTAL_CLOSED_MESSAGE } from "@/lib/internship-portal";
+import {
+  internshipEndDateMin,
+  todayInputDateMin,
+  validateInternshipDateRange,
+} from "@/lib/internship-date-validation";
 
 const statusConfig: Record<string, { label: string; color: string; icon: any }> = {
   pending: { label: "Pending", color: "bg-amber-100 text-amber-800 border-amber-200", icon: Clock },
@@ -65,6 +77,7 @@ function calculateSixWeeksEndDate(startDate: string): string {
 
 export default function LetterRequestsPage() {
   const { user } = useAuth();
+  const { portal, loading: portalLoading, isOpen: portalOpen } = usePortalStatus();
 
   // Stage 1 state
   const [generalRequests, setGeneralRequests] = useState<LetterRequest[]>([]);
@@ -150,21 +163,17 @@ export default function LetterRequestsPage() {
   );
   const hasApprovedGeneral = generalRequests.some((r) => r.status === "approved");
   
-  // Check if they have an active placement (approved/pending) whose end date hasn't passed
-  const activePlacement = placements.find(p => {
-    if (p.status === "rejected") return false;
-    if (!p.internshipEndDate) return true; // Safety fallback
-    const endDate = new Date(p.internshipEndDate);
-    const today = new Date();
-    // Reset times for date-only comparison
-    endDate.setHours(0, 0, 0, 0);
-    today.setHours(0, 0, 0, 0);
-    return endDate >= today;
-  });
+  const placementFormLock = useMemo(
+    () => getPlacementFormLockState(placements),
+    [placements]
+  );
+  const minPlacementStartDate = todayInputDateMin();
+  const minPlacementEndDate = internshipEndDateMin(placementForm.internshipStartDate);
 
-  const stage1Locked = hasPendingOrApprovedGeneral;
-  const stage2LockedByPlacement = !!activePlacement;
-  const stage2Unlocked = hasApprovedGeneral && !stage2LockedByPlacement;
+  const portalClosed = !portalOpen;
+  const stage1Locked = hasPendingOrApprovedGeneral || portalClosed;
+  const stage2LockedByPlacement = placementFormLock.locked;
+  const stage2Unlocked = hasApprovedGeneral && !stage2LockedByPlacement && portalOpen;
 
   const latestGeneralRequest = generalRequests.length > 0
     ? generalRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
@@ -173,6 +182,10 @@ export default function LetterRequestsPage() {
   // Stage 1 handlers
   const handleGeneralSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (portalClosed) {
+      toast.error(PORTAL_CLOSED_MESSAGE);
+      return;
+    }
     if (!generalForm.internshipStartDate) {
       toast.error("Please select your internship start date.");
       return;
@@ -201,8 +214,24 @@ export default function LetterRequestsPage() {
   // Stage 2 handlers
   const handlePlacementSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (portalClosed) {
+      toast.error(PORTAL_CLOSED_MESSAGE);
+      return;
+    }
+    if (placementFormLock.locked) {
+      toast.error("Official placement registration is locked.");
+      return;
+    }
     if (!placementForm.generalRequestId) {
       toast.error("Please select an approved general request to link this placement to.");
+      return;
+    }
+    const dateError = validateInternshipDateRange(
+      placementForm.internshipStartDate,
+      placementForm.internshipEndDate
+    );
+    if (dateError) {
+      toast.error(dateError);
       return;
     }
     setIsSubmittingPlacement(true);
@@ -270,6 +299,8 @@ export default function LetterRequestsPage() {
           Complete both stages to get your official internship documents.
         </p>
       </div>
+
+      <PortalStatusBanner portal={portal} loading={portalLoading} />
 
       {/* How it works */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex gap-3 text-blue-800 shadow-sm">
@@ -498,7 +529,15 @@ export default function LetterRequestsPage() {
           ) : (
             <Badge variant="outline" className="ml-auto text-muted-foreground">
               <Lock className="h-3 w-3 mr-1" />
-              {stage2LockedByPlacement ? "Locked — Active Placement" : "Locked — Stage 1 approval required"}
+              {stage2LockedByPlacement
+                ? placementFormLock.reason === "approved_active"
+                  ? "Locked — Approved by staff"
+                  : placementFormLock.reason === "pending_review"
+                    ? "Locked — Awaiting review"
+                    : placementFormLock.reason === "modification_requested"
+                      ? "Locked — Changes requested"
+                      : "Locked — Active placement"
+                : "Locked — Stage 1 approval required"}
             </Badge>
           )}
         </div>
@@ -520,16 +559,71 @@ export default function LetterRequestsPage() {
               </CardContent>
             </Card>
           ) : stage2LockedByPlacement ? (
-            /* Locked state (has active placement) */
-            <Card className="border-dashed border-2 border-muted bg-blue-50/30">
+            /* Locked: pending review, approved by HOD/Secretary, or changes requested */
+            <Card
+              className={
+                placementFormLock.reason === "approved_active"
+                  ? "border-green-200 bg-green-50/40 dark:border-green-900 dark:bg-green-950/20"
+                  : "border-amber-200 bg-amber-50/40 dark:border-amber-900 dark:bg-amber-950/20"
+              }
+            >
               <CardContent className="py-12 text-center">
-                <Briefcase className="mx-auto h-12 w-12 text-blue-300 mb-4" />
-                <h3 className="text-lg font-medium text-blue-800 mb-2">
-                  Active Placement Ongoing
+                <Lock
+                  className={`mx-auto h-12 w-12 mb-4 ${
+                    placementFormLock.reason === "approved_active"
+                      ? "text-green-500"
+                      : "text-amber-500"
+                  }`}
+                />
+                <h3
+                  className={`text-lg font-medium mb-2 ${
+                    placementFormLock.reason === "approved_active"
+                      ? "text-green-900 dark:text-green-100"
+                      : "text-amber-900 dark:text-amber-100"
+                  }`}
+                >
+                  {placementFormLock.reason === "approved_active"
+                    ? "Placement approved — registration locked"
+                    : placementFormLock.reason === "pending_review"
+                      ? "Placement awaiting HOD / Secretary review"
+                      : placementFormLock.reason === "modification_requested"
+                        ? "Placement needs changes"
+                        : "Official placement locked"}
                 </h3>
-                <p className="text-sm text-blue-700 max-w-md mx-auto">
-                  You currently have an active internship placement registered. You cannot register a new placement until your current internship officially ends.
+                <p
+                  className={`text-sm max-w-md mx-auto ${
+                    placementFormLock.reason === "approved_active"
+                      ? "text-green-800 dark:text-green-200"
+                      : "text-amber-800 dark:text-amber-200"
+                  }`}
+                >
+                  {placementFormLock.reason === "approved_active"
+                    ? "Your official placement was approved by HOD or Secretary. You cannot edit or submit another registration while this placement is active."
+                    : placementFormLock.reason === "pending_review"
+                      ? "You already submitted an official placement. Wait until HOD or Secretary approves or rejects it before registering another."
+                      : placementFormLock.reason === "modification_requested"
+                        ? "Staff requested changes on your placement. Resolve that request before registering another."
+                        : "You cannot register another official placement at this time."}
                 </p>
+                {placementFormLock.placement && (
+                  <div className="mt-6 mx-auto max-w-sm rounded-lg border bg-background/80 p-4 text-left text-sm">
+                    <p className="font-semibold">{placementFormLock.placement.organizationName}</p>
+                    {placementFormLock.placement.internshipStartDate &&
+                      placementFormLock.placement.internshipEndDate && (
+                        <p className="mt-1 text-muted-foreground">
+                          {formatPlacementLockDate(placementFormLock.placement.internshipStartDate)} –{" "}
+                          {formatPlacementLockDate(placementFormLock.placement.internshipEndDate)}
+                        </p>
+                      )}
+                  </div>
+                )}
+                {placementFormLock.reason === "approved_active" &&
+                  placementFormLock.unlockAfter && (
+                    <p className="mt-4 text-sm text-green-800 dark:text-green-200">
+                      New registration opens after your internship ends on{" "}
+                      <strong>{formatPlacementLockDate(placementFormLock.unlockAfter)}</strong>.
+                    </p>
+                  )}
               </CardContent>
             </Card>
           ) : (
@@ -676,7 +770,18 @@ export default function LetterRequestsPage() {
                           id="placementStartDate"
                           type="date"
                           value={placementForm.internshipStartDate}
-                          onChange={(e) => setPlacementForm({ ...placementForm, internshipStartDate: e.target.value })}
+                          min={minPlacementStartDate}
+                          onChange={(e) => {
+                            const start = e.target.value;
+                            setPlacementForm((prev) => {
+                              const next = { ...prev, internshipStartDate: start };
+                              if (next.internshipEndDate) {
+                                const endMin = internshipEndDateMin(start);
+                                if (next.internshipEndDate < endMin) next.internshipEndDate = "";
+                              }
+                              return next;
+                            });
+                          }}
                           required
                         />
                       </div>
@@ -686,7 +791,11 @@ export default function LetterRequestsPage() {
                           id="placementEndDate"
                           type="date"
                           value={placementForm.internshipEndDate}
-                          onChange={(e) => setPlacementForm({ ...placementForm, internshipEndDate: e.target.value })}
+                          min={minPlacementEndDate}
+                          disabled={!placementForm.internshipStartDate}
+                          onChange={(e) =>
+                            setPlacementForm({ ...placementForm, internshipEndDate: e.target.value })
+                          }
                           required
                         />
                       </div>

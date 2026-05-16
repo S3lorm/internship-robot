@@ -30,6 +30,8 @@ const supervisorEvaluationRoutes = require('./routes/supervisorEvaluation');
 const weeklyLogbookRoutes = require('./routes/weeklyLogbooks');
 const weeklyLogReviewRoutes = require('./routes/weeklyLogReview');
 const staffSignatureRoutes = require('./routes/staffSignatures');
+const hodRoutes = require('./routes/hod');
+const portalRoutes = require('./routes/portal');
 const activityLogger = require('./middleware/activityLogger');
 const { apiLimiter } = require('./middleware/security');
 
@@ -105,6 +107,8 @@ app.use('/api/feedback', feedbackAcknowledgmentRoutes);
 app.use('/api/security', securityRoutes);
 app.use('/api/dashboard', dashboardRoutes);
 app.use('/api/placements', placementRoutes);
+app.use('/api/hod', hodRoutes);
+app.use('/api/portal', portalRoutes);
 app.use('/api/weekly-logbooks', weeklyLogbookRoutes);
 app.use('/api/staff-signatures', staffSignatureRoutes);
 

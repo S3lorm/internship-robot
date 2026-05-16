@@ -33,6 +33,9 @@ function mapEntry(row) {
     weekEnding: row.week_ending,
     activities: Array.isArray(row.activities) ? row.activities : [],
     studentRemark: row.student_remark,
+    supervisorRemark: row.supervisor_remark,
+    supervisorName: row.supervisor_name,
+    supervisorStatus: row.supervisor_status,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
   };
@@ -71,7 +74,7 @@ async function getPlacement(placementId) {
 async function getStudent(studentId) {
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, first_name, last_name, email, student_id, department, program, level, phone')
+    .select('id, first_name, last_name, email, student_id, department, program, year_of_study, phone')
     .eq('id', studentId)
     .maybeSingle();
   if (error && error.code !== 'PGRST116') throw error;
@@ -84,7 +87,7 @@ async function getStudent(studentId) {
     studentId: data.student_id,
     department: data.department,
     program: data.program,
-    level: data.level,
+    yearOfStudy: data.year_of_study,
     phone: data.phone,
   };
 }
@@ -284,13 +287,64 @@ const WeeklyLogbook = {
 
   async submitSupervisorReview(bundle, payload, ipAddress) {
     const supervisorFullName = String(payload.supervisorFullName || '').trim();
-    const supervisorRemark = String(payload.supervisorRemark || '').trim();
     const supervisorRecommendation = String(payload.supervisorRecommendation || '').trim();
-    if (!supervisorFullName || !supervisorRemark) {
-      const err = new Error('Supervisor name confirmation and remark are required.');
+    const entryReviews = Array.isArray(payload.entryReviews) ? payload.entryReviews : [];
+
+    if (!supervisorFullName) {
+      const err = new Error('Supervisor name confirmation is required.');
       err.status = 400;
       throw err;
     }
+
+    const expectedEntries = bundle.entries || [];
+    if (entryReviews.length === 0 || entryReviews.length !== expectedEntries.length) {
+      const err = new Error('Supervisor remarks are required for every weekly log sheet in this book.');
+      err.status = 400;
+      throw err;
+    }
+
+    const entryIds = new Set(expectedEntries.map((entry) => entry.id));
+    const now = new Date().toISOString();
+
+    for (const item of entryReviews) {
+      const entryId = String(item.entryId || '').trim();
+      const supervisorRemark = String(item.supervisorRemark || '').trim();
+      const supervisorName = String(item.supervisorName || supervisorFullName).trim();
+      const supervisorStatus = String(item.supervisorStatus || '').trim();
+
+      if (!entryIds.has(entryId)) {
+        const err = new Error('Invalid weekly log sheet entry.');
+        err.status = 400;
+        throw err;
+      }
+      if (!supervisorRemark) {
+        const err = new Error(`Supervisor remark is required for week ${item.weekNumber || ''}.`.trim());
+        err.status = 400;
+        throw err;
+      }
+      if (!supervisorStatus) {
+        const err = new Error(`Supervisor status is required for week ${item.weekNumber || ''}.`.trim());
+        err.status = 400;
+        throw err;
+      }
+
+      const { error: entryError } = await supabase
+        .from('weekly_log_entries')
+        .update({
+          supervisor_remark: supervisorRemark,
+          supervisor_name: supervisorName,
+          supervisor_status: supervisorStatus,
+          updated_at: now,
+        })
+        .eq('id', entryId)
+        .eq('logbook_id', bundle.logbook.id);
+      if (entryError) throw entryError;
+    }
+
+    const combinedRemark = entryReviews
+      .map((item) => String(item.supervisorRemark || '').trim())
+      .filter(Boolean)
+      .join('\n\n');
 
     const { data: review, error: reviewError } = await supabase
       .from('weekly_log_reviews')
@@ -298,7 +352,7 @@ const WeeklyLogbook = {
         id: uuidv4(),
         logbook_id: bundle.logbook.id,
         supervisor_full_name: supervisorFullName,
-        supervisor_remark: supervisorRemark,
+        supervisor_remark: combinedRemark,
         supervisor_recommendation: supervisorRecommendation || null,
         supervisor_ip: ipAddress || null,
       })
@@ -306,7 +360,6 @@ const WeeklyLogbook = {
       .single();
     if (reviewError) throw reviewError;
 
-    const now = new Date().toISOString();
     const { error: tokenError } = await supabase
       .from('weekly_log_supervisor_tokens')
       .update({ used_at: now })

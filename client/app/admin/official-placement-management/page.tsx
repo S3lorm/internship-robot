@@ -52,6 +52,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { getStudentProgramGroup, groupByProgram } from "@/lib/department-catalog";
 
 const statusConfig: Record<
   InternshipPlacement["status"],
@@ -188,6 +189,23 @@ export default function OfficialPlacementManagementPage() {
 
   const orderedDepts = useMemo(() => sortDepts(Array.from(byDepartment.keys())), [byDepartment]);
 
+  const hodProgramSections = useMemo(() => {
+    if (!isDepartmentRole || !user?.department) return null;
+    return groupByProgram(filteredPlacements, user.department, (p) => p.student || {});
+  }, [filteredPlacements, isDepartmentRole, user?.department]);
+
+  const accordionSections = useMemo(() => {
+    if (hodProgramSections && hodProgramSections.length > 0) {
+      return hodProgramSections.map((g) => ({ key: g.program, rows: g.items }));
+    }
+    return orderedDepts.map((dept) => ({ key: dept, rows: byDepartment.get(dept) || [] }));
+  }, [hodProgramSections, orderedDepts, byDepartment]);
+
+  const accordionDefault = useMemo(
+    () => accordionSections.map((s) => s.key),
+    [accordionSections]
+  );
+
   const openDetail = async (p: InternshipPlacement) => {
     setDetailLoading(true);
     setSelectedPlacement(p);
@@ -273,14 +291,6 @@ export default function OfficialPlacementManagementPage() {
     }
   };
 
-  const stats = {
-    total: placements.length,
-    pending: placements.filter((p) => p.status === "pending").length,
-    approved: placements.filter((p) => p.status === "approved").length,
-    notApproved: placements.filter((p) => p.status === "rejected" || p.status === "modification_requested")
-      .length,
-  };
-
   if (!user || !canAccessPage) {
     return null;
   }
@@ -296,52 +306,6 @@ export default function OfficialPlacementManagementPage() {
         </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Card>
-          <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-primary/10">
-              <Briefcase className="h-5 w-5 text-primary" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">{stats.total}</p>
-              <p className="text-sm text-muted-foreground">All requests</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-amber-100 dark:bg-amber-950/50">
-              <Clock className="h-5 w-5 text-amber-700 dark:text-amber-300" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">{stats.pending}</p>
-              <p className="text-sm text-muted-foreground">Pending / needs action</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-100 dark:bg-emerald-950/50">
-              <CheckCircle2 className="h-5 w-5 text-emerald-700 dark:text-emerald-300" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">{stats.approved}</p>
-              <p className="text-sm text-muted-foreground">Approved</p>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="flex items-center gap-4 p-5">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-red-100 dark:bg-red-950/50">
-              <XCircle className="h-5 w-5 text-red-700 dark:text-red-300" />
-            </div>
-            <div>
-              <p className="text-2xl font-bold tabular-nums">{stats.notApproved}</p>
-              <p className="text-sm text-muted-foreground">Not approved (rejected / changes)</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       <Card>
         <CardHeader>
@@ -413,14 +377,12 @@ export default function OfficialPlacementManagementPage() {
           </CardContent>
         </Card>
       ) : (
-        <Accordion type="multiple" defaultValue={orderedDepts} className="space-y-2">
-          {orderedDepts.map((dept) => {
-            const rows = byDepartment.get(dept) || [];
-            return (
-              <AccordionItem key={dept} value={dept} className="rounded-lg border border-border/80 bg-card px-1">
+        <Accordion type="multiple" defaultValue={accordionDefault} className="space-y-2">
+          {accordionSections.map(({ key, rows }) => (
+              <AccordionItem key={key} value={key} className="rounded-lg border border-border/80 bg-card px-1">
                 <AccordionTrigger className="px-3 py-3 text-left hover:no-underline">
                   <div className="flex flex-1 items-center justify-between gap-2 pr-2">
-                    <span className="font-semibold">{dept}</span>
+                    <span className="font-semibold">{key}</span>
                     <Badge variant="secondary" className="shrink-0">
                       {rows.length} request{rows.length === 1 ? "" : "s"}
                     </Badge>
@@ -433,7 +395,7 @@ export default function OfficialPlacementManagementPage() {
                         <tr className="border-b bg-muted/40 text-left text-xs font-medium text-muted-foreground">
                           <th className="p-3">Requested</th>
                           <th className="p-3">Student</th>
-                          <th className="p-3">ID / Dept</th>
+                          <th className="p-3">{isDepartmentRole ? "ID / Course" : "ID / Dept"}</th>
                           <th className="p-3">Organisation</th>
                           <th className="p-3">Contact</th>
                           <th className="p-3">Status</th>
@@ -463,7 +425,9 @@ export default function OfficialPlacementManagementPage() {
                               </td>
                               <td className="p-3">
                                 <div className="font-mono text-xs">{p.student?.studentId}</div>
-                                <div className="text-xs text-muted-foreground">{p.student?.department || "—"}</div>
+                                <div className="text-xs text-muted-foreground">{isDepartmentRole && user?.department
+                                    ? getStudentProgramGroup(p.student || {}, user.department)
+                                    : p.student?.department || "—"}</div>
                               </td>
                               <td className="p-3 max-w-[180px]">
                                 <div className="font-medium truncate" title={p.organizationName}>
@@ -511,8 +475,7 @@ export default function OfficialPlacementManagementPage() {
                   </div>
                 </AccordionContent>
               </AccordionItem>
-            );
-          })}
+          ))}
         </Accordion>
       )}
 

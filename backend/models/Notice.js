@@ -10,6 +10,8 @@ function mapNoticeFromSupabase(row) {
     targetAudience: row.target_audience,
     targetDepartment: row.target_department || null,
     isActive: row.is_active,
+    showOnHomepage: row.show_on_homepage === true,
+    homepageOnly: row.homepage_only === true,
     isRead: row.isRead || false,
     expiresAt: row.expires_at,
     createdBy: row.created_by,
@@ -41,6 +43,8 @@ function mapNoticeToSupabase(notice) {
   if (notice.targetAudience !== undefined) mapped.target_audience = notice.targetAudience;
   if (notice.targetDepartment !== undefined) mapped.target_department = notice.targetDepartment;
   if (notice.isActive !== undefined) mapped.is_active = notice.isActive;
+  if (notice.showOnHomepage !== undefined) mapped.show_on_homepage = notice.showOnHomepage;
+  if (notice.homepageOnly !== undefined) mapped.homepage_only = notice.homepageOnly;
   if (notice.expiresAt !== undefined) mapped.expires_at = notice.expiresAt;
   if (notice.createdBy !== undefined) mapped.created_by = notice.createdBy;
   return mapped;
