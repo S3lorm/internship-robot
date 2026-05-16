@@ -24,6 +24,24 @@ function mapKeyToSupabase(key) {
     coverLetter: 'cover_letter',
     cvUrl: 'cv_url',
     
+    // Letter / placement document fields
+    verificationCode: 'verification_code',
+    referenceNumber: 'reference_number',
+    companyName: 'company_name',
+    companyEmail: 'company_email',
+    companyPhone: 'company_phone',
+    companyAddress: 'company_address',
+    requestType: 'request_type',
+    pdfUrl: 'pdf_url',
+    pdfGeneratedAt: 'pdf_generated_at',
+    signatureSnapshot: 'signature_snapshot',
+    organizationName: 'organization_name',
+    organizationAddress: 'organization_address',
+    organizationEmail: 'organization_email',
+    generalRequestId: 'general_request_id',
+    officialLetterUrl: 'official_letter_url',
+    officialLetterGeneratedAt: 'official_letter_generated_at',
+
     // Admin / Reviewing specific
     reviewedBy: 'reviewed_by',
     reviewedAt: 'reviewed_at',

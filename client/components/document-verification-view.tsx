@@ -81,7 +81,11 @@ function ResultCard({ result }: { result: VerificationResult }) {
             fontWeight: 700,
           }}
         >
-          {result.valid ? "Document verified" : "Document not found"}
+          {result.valid
+            ? "Document verified"
+            : result.document
+              ? "Document not valid"
+              : "Document not found"}
         </span>
       </div>
 

@@ -658,10 +658,19 @@ async function getTrackingData(req, res) {
   }
 }
 
+function normalizeVerificationCode(raw) {
+  const trimmed = String(raw || '').trim();
+  if (!trimmed) return '';
+  if (/^\d+$/.test(trimmed)) {
+    return trimmed.padStart(6, '0').slice(-6);
+  }
+  return trimmed.toUpperCase();
+}
+
 // Public: verify a document by verification code (official placement or internship request letter)
 async function verifyDocument(req, res) {
   try {
-    const code = String(req.params.code || '').trim();
+    const code = normalizeVerificationCode(req.params.code);
     if (!code) {
       return res.json({ valid: false, message: 'Verification code is required.' });
     }
@@ -671,9 +680,13 @@ async function verifyDocument(req, res) {
     const placement = await InternshipPlacement.findOne({ verificationCode: code });
     if (placement) {
       const student = await User.findByPk(placement.studentId);
+      const approved = placement.status === 'approved';
       return res.json({
-        valid: placement.status === 'approved',
+        valid: approved,
         documentType: 'Official placement letter',
+        message: approved
+          ? undefined
+          : `This placement letter exists but is not yet approved (current status: ${placement.status}).`,
         document: {
           studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
           studentId: student?.studentId || undefined,
@@ -684,7 +697,7 @@ async function verifyDocument(req, res) {
             ? new Date(placement.officialLetterGeneratedAt).toLocaleDateString('en-GB')
             : 'N/A',
           referenceNumber: placement.referenceNumber,
-          status: placement.status === 'approved' ? 'Valid' : 'Invalid',
+          status: approved ? 'Valid' : 'Not approved',
         },
       });
     }
@@ -693,9 +706,13 @@ async function verifyDocument(req, res) {
     if (letter) {
       const student = await User.findByPk(letter.studentId);
       const issuedAt = letter.pdfGeneratedAt || letter.reviewedAt || letter.createdAt;
+      const approved = letter.status === 'approved';
       return res.json({
-        valid: letter.status === 'approved',
+        valid: approved,
         documentType: 'Internship request letter',
+        message: approved
+          ? undefined
+          : `This letter exists but is not yet approved (current status: ${letter.status}).`,
         document: {
           studentName: student ? `${student.firstName} ${student.lastName}` : 'N/A',
           studentId: student?.studentId || undefined,
@@ -704,7 +721,7 @@ async function verifyDocument(req, res) {
           organisationName: letter.companyName || 'General internship letter',
           dateIssued: issuedAt ? new Date(issuedAt).toLocaleDateString('en-GB') : 'N/A',
           referenceNumber: letter.referenceNumber,
-          status: letter.status === 'approved' ? 'Valid' : 'Invalid',
+          status: approved ? 'Valid' : 'Not approved',
         },
       });
     }
