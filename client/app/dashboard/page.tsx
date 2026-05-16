@@ -129,6 +129,14 @@ export default function DashboardPage() {
     }
   }, [user]);
 
+  useEffect(() => {
+    const onNotificationsUpdated = () => {
+      setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    };
+    window.addEventListener("notifications-updated", onNotificationsUpdated);
+    return () => window.removeEventListener("notifications-updated", onNotificationsUpdated);
+  }, []);
+
   const stats = useMemo(() => {
     if (applicationStats) {
       return {

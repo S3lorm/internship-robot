@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -36,6 +36,7 @@ export default function NotificationsPage() {
   const [selectedItem, setSelectedItem] = useState<SelectedItem | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
+  const didAutoMarkOnVisitRef = useRef(false);
 
   const noticesUnreadCount = notices.filter((n) => !n.isRead).length;
   const noticesReadCount = notices.filter((n) => n.isRead).length;
@@ -128,7 +129,33 @@ export default function NotificationsPage() {
     };
   }, [loadNotifications]);
 
+  const markAllAsRead = useCallback(async (options?: { silent?: boolean }) => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    setNotices((prev) => prev.map((n) => ({ ...n, isRead: true })));
+    if (!options?.silent) {
+      toast.success("All items marked as read");
+    }
+    window.dispatchEvent(new Event("notifications-updated"));
 
+    try {
+      await Promise.all([notificationsApi.markAllAsRead(), noticesApi.markAllAsRead()]);
+    } catch {
+      // Ignore errors for smoother UX
+    }
+  }, []);
+
+  // Opening this page counts as viewing all alerts — clear unread badges everywhere.
+  useEffect(() => {
+    if (isLoading || didAutoMarkOnVisitRef.current) return;
+
+    const hasUnread =
+      notifications.some((n) => !n.isRead) || notices.some((n) => !n.isRead);
+    didAutoMarkOnVisitRef.current = true;
+
+    if (hasUnread) {
+      void markAllAsRead({ silent: true });
+    }
+  }, [isLoading, notifications, notices, markAllAsRead]);
 
   const markAsRead = async (id: string, isNotice: boolean = false) => {
     // Optimistically update state so it instantly works in UI
@@ -154,22 +181,6 @@ export default function NotificationsPage() {
 
     try {
       await notificationsApi.markAsRead(id);
-    } catch {
-      // Ignore errors for smoother UX
-    }
-  };
-
-  const markAllAsRead = async () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    setNotices((prev) => prev.map((n) => ({ ...n, isRead: true })));
-    toast.success("All items marked as read");
-    window.dispatchEvent(new Event('notifications-updated'));
-
-    try {
-      await Promise.all([
-        notificationsApi.markAllAsRead(),
-        noticesApi.markAllAsRead(),
-      ]);
     } catch {
       // Ignore errors for smoother UX
     }

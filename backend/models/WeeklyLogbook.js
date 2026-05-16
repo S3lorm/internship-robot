@@ -164,6 +164,10 @@ const WeeklyLogbook = {
     }
 
     const weekNumber = Number(payload.weekNumber);
+    const placement = await getPlacement(logbook.placementId);
+    const { assertWeekEntryAllowed } = require('../utils/weeklyLogbookSchedule');
+    assertWeekEntryAllowed(placement, weekNumber);
+
     const activities = Array.isArray(payload.activities) ? payload.activities : [];
     if (!weekNumber || !payload.weekBeginning || !payload.weekEnding || activities.length === 0) {
       const err = new Error('Week number, week dates, and activities are required.');

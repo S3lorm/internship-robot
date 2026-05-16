@@ -32,7 +32,9 @@ async function getMyLogbook(req, res) {
 
     const logbook = await WeeklyLogbook.getOrCreateForPlacement(user.id, placement.id);
     const bundle = await WeeklyLogbook.bundle(logbook.id);
-    res.json({ bundle });
+    const { buildWeeklyLogSchedule } = require('../utils/weeklyLogbookSchedule');
+    const schedule = buildWeeklyLogSchedule(placement);
+    res.json({ bundle, schedule });
   } catch (error) {
     console.error('Error loading weekly logbook:', error);
     res.status(500).json({ message: 'Failed to load weekly logbook', error: error.message });

@@ -50,6 +50,10 @@ const config = {
   // Set EVALUATION_BYPASS_SUBMIT_WINDOW=false to restore the final-14-days rule.
   evaluationBypassSubmitWindow: process.env.EVALUATION_BYPASS_SUBMIT_WINDOW !== 'false',
 
+  // Weekly logbook: when true, students can fill every week at once (testing).
+  // Set WEEKLY_LOGBOOK_BYPASS_WEEK_SCHEDULE=false to restore one-week-at-a-time rules.
+  weeklyLogbookBypassWeekSchedule: process.env.WEEKLY_LOGBOOK_BYPASS_WEEK_SCHEDULE !== 'false',
+
   // CORS — allowed origins
   corsOrigins: [
     'http://localhost:3000',
@@ -66,6 +70,9 @@ if (isDev) {
   console.log(`   Port:         ${config.port}`);
   if (config.evaluationBypassSubmitWindow) {
     console.log('   ⚠️  Evaluation submit window BYPASSED (supervisors can submit anytime)');
+  }
+  if (config.weeklyLogbookBypassWeekSchedule) {
+    console.log('   ⚠️  Weekly logbook week schedule BYPASSED (all weeks editable at once)');
   }
 } else {
   console.log(`🚀 [PROD] Server starting on port ${config.port}`);
