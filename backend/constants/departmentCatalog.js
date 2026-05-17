@@ -179,11 +179,24 @@ function getInternshipStatusForStudent(placements) {
       status: 'placement_pending',
       label: 'Placement awaiting review',
       placementId: pending.id,
+      organizationName: pending.organizationName,
+      internshipStartDate: pending.internshipStartDate,
+      internshipEndDate: pending.internshipEndDate,
     };
   }
-  const hadApproved = list.some((p) => p.status === 'approved');
-  if (hadApproved) {
-    return { status: 'internship_ended', label: 'Internship ended' };
+  const approved = list
+    .filter((p) => p.status === 'approved')
+    .sort((a, b) => new Date(b.internshipEndDate || b.updatedAt || 0) - new Date(a.internshipEndDate || a.updatedAt || 0));
+  if (approved.length > 0) {
+    const latest = approved[0];
+    return {
+      status: 'internship_ended',
+      label: 'Internship completed',
+      placementId: latest.id,
+      organizationName: latest.organizationName,
+      internshipStartDate: latest.internshipStartDate,
+      internshipEndDate: latest.internshipEndDate,
+    };
   }
   if (list.some((p) => p.status === 'rejected')) {
     return { status: 'not_on_internship', label: 'Not on internship' };

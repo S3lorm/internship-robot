@@ -17,11 +17,15 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatStatusLabel } from "@/lib/utils";
 import { toast } from "sonner";
-import { BookOpen, CheckCircle2, Loader2, Lock, Mail, RefreshCw, Send } from "lucide-react";
+import { AlertCircle, BookOpen, CheckCircle2, Loader2, Lock, Mail, RefreshCw, Send } from "lucide-react";
+import { usePortalStatus } from "@/hooks/use-portal-status";
+import { PORTAL_CLOSED_MESSAGE } from "@/lib/internship-portal";
 
 const editableStatuses = ["draft", "ongoing", "rejected"];
+const noCurrentPlacementMessage = "No approved official placement was found for this student.";
 
 export default function WeeklyLogbookPage() {
+  const { portal, loading: portalLoading } = usePortalStatus();
   const [bundle, setBundle] = useState<WeeklyLogbookBundle | null>(null);
   const [schedule, setSchedule] = useState<WeeklyLogSchedule | null>(null);
   const [loading, setLoading] = useState(true);
@@ -91,7 +95,11 @@ export default function WeeklyLogbookPage() {
     setLoading(true);
     const result = await weeklyLogbooksApi.getMyCurrent();
     if (result.error) {
-      toast.error(result.error);
+      setBundle(null);
+      setSchedule(null);
+      if (result.error !== noCurrentPlacementMessage) {
+        toast.error(result.error);
+      }
     } else {
       const data = result.data as { bundle: WeeklyLogbookBundle; schedule?: WeeklyLogSchedule };
       setBundle(data.bundle);
@@ -203,10 +211,62 @@ export default function WeeklyLogbookPage() {
     setResubmitting(false);
   };
 
-  if (loading) {
+  if (loading || portalLoading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!portal.isOpen) {
+    return (
+      <div className="relative min-h-[60vh]">
+        <div className="pointer-events-none select-none space-y-6 blur-sm">
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+            <div>
+              <h1 className="flex items-center gap-2 text-2xl font-bold md:text-3xl">
+                <BookOpen className="h-7 w-7 text-primary" />
+                Weekly Log Sheet Book
+              </h1>
+              <p className="text-muted-foreground">
+                Fill in your weekly log sheet after your official placement has been approved.
+              </p>
+            </div>
+            <Badge variant="secondary">Locked</Badge>
+          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle>Weekly log sheets</CardTitle>
+              <CardDescription>
+                Your logbook will be available when the internship portal opens and your current
+                official placement is approved.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="h-8 rounded bg-muted" />
+              <div className="h-24 rounded bg-muted" />
+              <div className="h-8 w-40 rounded bg-muted" />
+            </CardContent>
+          </Card>
+        </div>
+        <div className="absolute inset-0 flex items-center justify-center px-4">
+          <Card className="w-full max-w-xl border-red-200 bg-background/95 text-center shadow-xl">
+            <CardContent className="py-10">
+              <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-700">
+                <AlertCircle className="h-7 w-7" />
+              </div>
+              <h1 className="text-2xl font-bold text-red-950">Internship Portal Closed</h1>
+              <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-red-800">
+                {portal.closedMessage || PORTAL_CLOSED_MESSAGE}
+              </p>
+              <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+                When the admin opens the portal again, this page will show your Weekly Log Sheet
+                Book after HOD or Secretary approval of your current official placement.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     );
   }
@@ -217,8 +277,8 @@ export default function WeeklyLogbookPage() {
         <CardHeader>
           <CardTitle>Weekly Log Sheet Book</CardTitle>
           <CardDescription>
-            No approved official placement is available. Complete your official placement approval
-            first.
+            Your Weekly Log Sheet Book will appear here after HOD or Secretary approves your
+            current official placement.
           </CardDescription>
         </CardHeader>
       </Card>

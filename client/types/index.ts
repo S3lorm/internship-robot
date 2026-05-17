@@ -363,6 +363,8 @@ export interface InternshipPlacement {
   actionLogs?: PlacementActionLog[];
   emailSent?: boolean;
   lastEmailSentAt?: string;
+  weeklyLogbookStatus?: WeeklyLogbookStatus;
+  weeklyLogbookFinalizedAt?: string;
   createdAt: string;
   updatedAt: string;
 }

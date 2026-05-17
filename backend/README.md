@@ -30,6 +30,24 @@ npm run dev
 
 The API will run on `http://localhost:5000`.
 
+### IT user management
+
+Use this terminal menu to list users and roles, view one user's details, change passwords,
+activate/deactivate accounts, verify email, and deep-delete a user with related records:
+
+```bash
+cd backend
+npm run user:delete
+```
+
+Direct dry-run delete commands are also available, for example:
+
+```bash
+npm run user:delete -- --email student@example.com
+```
+
+Add `--confirm-delete` only after checking the dry-run summary.
+
 ### Run frontend (Next.js app)
 
 In a separate terminal:

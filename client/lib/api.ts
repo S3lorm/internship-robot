@@ -130,6 +130,12 @@ export const authApi = {
       body: JSON.stringify({ email }),
     }),
 
+  checkEmailForPasswordReset: (email: string) =>
+    fetchApi<{ exists: boolean }>('/auth/check-email-for-password-reset', {
+      method: 'POST',
+      body: JSON.stringify({ email }),
+    }),
+
   forgotPassword: (email: string) =>
     fetchApi('/auth/forgot-password', {
       method: 'POST',

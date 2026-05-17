@@ -110,7 +110,7 @@ const WeeklyLogbook = {
     return mapLogbook(data);
   },
 
-  async findApprovedPlacementForStudent(studentId, placementId) {
+  async findApprovedPlacementForStudent(studentId, placementId, options = {}) {
     let query = supabase
       .from('internship_placements')
       .select('*')
@@ -120,10 +120,51 @@ const WeeklyLogbook = {
       .limit(1);
 
     if (placementId) query = query.eq('id', placementId);
+    if (options.portalPayload?.isOpen && options.portalPayload.updatedAt) {
+      query = query.gte('created_at', options.portalPayload.updatedAt);
+    }
 
     const { data, error } = await query.maybeSingle();
     if (error && error.code !== 'PGRST116') throw error;
     return data || null;
+  },
+
+  async findFinalSubmissionForStudent(studentId) {
+    const { data, error } = await supabase
+      .from('weekly_logbooks')
+      .select('*')
+      .eq('student_id', studentId)
+      .in('status', FINAL_STATUSES)
+      .order('finalized_at', { ascending: false, nullsFirst: false })
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (error && error.code !== 'PGRST116') throw error;
+    return mapLogbook(data);
+  },
+
+  async findFinalSubmissionsByPlacementIds(placementIds) {
+    if (!Array.isArray(placementIds) || placementIds.length === 0) return new Map();
+
+    const { data, error } = await supabase
+      .from('weekly_logbooks')
+      .select('*')
+      .in('placement_id', placementIds)
+      .in('status', FINAL_STATUSES);
+    if (error) throw error;
+
+    const byPlacement = new Map();
+    for (const row of data || []) {
+      const logbook = mapLogbook(row);
+      const current = byPlacement.get(logbook.placementId);
+      const logbookTime = new Date(logbook.finalizedAt || logbook.updatedAt || 0).getTime();
+      const currentTime = new Date(current?.finalizedAt || current?.updatedAt || 0).getTime();
+      if (!current || logbookTime > currentTime) {
+        byPlacement.set(logbook.placementId, logbook);
+      }
+    }
+
+    return byPlacement;
   },
 
   async getOrCreateForPlacement(studentId, placementId) {

@@ -98,6 +98,63 @@ npm run staff:manage
 - Activate/deactivate HOD account
 - Create/update secutuary account (choose department first)
 
+## IT User Management (Terminal)
+
+Use this terminal menu for common IT team user operations: list users and roles, view a user's
+details, change passwords, activate/deactivate accounts, mark email as verified, and deep-delete
+a user with related records.
+
+### Prerequisites
+
+- Run from the backend folder.
+- Ensure `backend/.env` contains:
+  - `SUPABASE_URL`
+  - `SUPABASE_SERVICE_ROLE_KEY`
+
+### Open the menu
+
+```bash
+cd backend
+npm run user:delete
+```
+
+The menu includes:
+
+- List users and roles
+- View one user and related record counts
+- Change user password
+- Activate/deactivate user
+- Mark email as verified
+- Deep-delete user and all details
+
+### Deep-delete preview from command line
+
+For direct delete operations, the script is still a dry run by default:
+
+```bash
+cd backend
+npm run user:delete -- --email student@example.com
+```
+
+You can also target by student ID or UUID:
+
+```bash
+cd backend
+npm run user:delete -- --student-id BCE12345
+npm run user:delete -- --id 00000000-0000-0000-0000-000000000000
+```
+
+### Permanently delete
+
+Add `--confirm-delete` only after checking the dry-run summary:
+
+```bash
+cd backend
+npm run user:delete -- --email student@example.com --confirm-delete
+```
+
+This action is permanent. Prefer `--id` if more than one account could share similar details.
+
 ## Key Differences from Express Backend
 
 ### Authentication

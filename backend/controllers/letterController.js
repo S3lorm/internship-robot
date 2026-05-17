@@ -10,6 +10,15 @@ const PDFDocument = require('pdfkit');
 const fs = require('fs');
 const path = require('path');
 
+function isInCurrentPortalCycle(createdAt, portalPayload) {
+  if (!portalPayload?.isOpen || !portalPayload.updatedAt) return true;
+  if (!createdAt) return false;
+  const createdTime = new Date(createdAt).getTime();
+  const portalTime = new Date(portalPayload.updatedAt).getTime();
+  if (Number.isNaN(createdTime) || Number.isNaN(portalTime)) return true;
+  return createdTime >= portalTime;
+}
+
 // Pre-load the logo as base64 for HTML embedding to prevent relative path breakage
 let crestBase64 = '';
 try {
@@ -1425,17 +1434,23 @@ async function checkGeneralApproval(req, res) {
   try {
     const user = req.user;
     const { LetterRequest } = require('../models');
+    const { getPortalStatusPayload } = require('../services/internshipPortalService');
 
     if (!user || user.role !== 'student') {
       return res.status(403).json({ message: 'Only students can check approval status' });
     }
 
+    const portalPayload = await getPortalStatusPayload();
     const requests = await LetterRequest.findAll({
       where: { studentId: user.id, status: 'approved' },
     });
 
     // Filter for general requests
-    const approvedGeneral = requests.filter(r => r.requestType === 'general' || r.requestType === 'admin');
+    const approvedGeneral = requests.filter(
+      (r) =>
+        (r.requestType === 'general' || r.requestType === 'admin') &&
+        isInCurrentPortalCycle(r.createdAt, portalPayload)
+    );
 
     res.json({
       hasApprovedGeneral: approvedGeneral.length > 0,

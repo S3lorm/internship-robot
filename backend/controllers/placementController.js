@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { normalizeDepartmentName } = require('../constants/departments');
 const { studentBelongsToHodDepartment } = require('../constants/departmentCatalog');
 const { isEmailVerifiedStudent } = require('../utils/verifiedStudent');
 
@@ -17,6 +18,31 @@ function isApprovedPlacementInternshipActive(placement) {
   if (Number.isNaN(end.getTime())) return true;
   end.setHours(23, 59, 59, 999);
   return Date.now() <= end.getTime();
+}
+
+function isPortalOpenAfter(portalPayload, timestamp) {
+  if (!portalPayload?.isOpen || !portalPayload.updatedAt || !timestamp) return false;
+  const portalOpenedAt = new Date(portalPayload.updatedAt).getTime();
+  const lockedAt = new Date(timestamp).getTime();
+  return !Number.isNaN(portalOpenedAt) && !Number.isNaN(lockedAt) && portalOpenedAt > lockedAt;
+}
+
+function isWeeklyLogbookSubmissionLockActive(logbook, portalPayload) {
+  if (!logbook || !logbook.finalizedAt) return false;
+  return !isPortalOpenAfter(portalPayload, logbook.finalizedAt);
+}
+
+function isWeeklyLogbookSubmissionClearedByPortal(logbook, portalPayload) {
+  return Boolean(logbook?.finalizedAt) && isPortalOpenAfter(portalPayload, logbook.finalizedAt);
+}
+
+function isInCurrentPortalCycle(createdAt, portalPayload) {
+  if (!portalPayload?.isOpen || !portalPayload.updatedAt) return true;
+  if (!createdAt) return false;
+  const createdTime = new Date(createdAt).getTime();
+  const portalTime = new Date(portalPayload.updatedAt).getTime();
+  if (Number.isNaN(createdTime) || Number.isNaN(portalTime)) return true;
+  return createdTime >= portalTime;
 }
 
 function todayInputDateMin() {
@@ -50,15 +76,16 @@ function validateInternshipDateRange(start, end) {
 async function createPlacement(req, res) {
   try {
     const user = req.user;
-    const { LetterRequest, InternshipPlacement } = require('../models');
+    const { LetterRequest, InternshipPlacement, WeeklyLogbook } = require('../models');
     const { assertPortalOpenForStudentRequest, CLOSED_MESSAGE } = require('../services/internshipPortalService');
 
     if (!user || user.role !== 'student') {
       return res.status(403).json({ message: 'Only students can create placement requests' });
     }
 
+    let portalPayload;
     try {
-      await assertPortalOpenForStudentRequest();
+      portalPayload = await assertPortalOpenForStudentRequest();
     } catch (portalErr) {
       return res.status(portalErr.statusCode || 403).json({
         message: portalErr.message || CLOSED_MESSAGE,
@@ -103,9 +130,17 @@ async function createPlacement(req, res) {
     if (generalRequest.status !== 'approved') {
       return res.status(400).json({ message: 'General request must be approved before submitting official placement' });
     }
+    if (!isInCurrentPortalCycle(generalRequest.createdAt, portalPayload)) {
+      return res.status(400).json({
+        message: 'Submit and receive approval for a fresh Stage 1 general letter request in the current internship portal cycle before registering an official placement.',
+      });
+    }
 
     const existingPlacements = await InternshipPlacement.findAll({ where: { studentId: user.id } });
-    const blockingPlacement = existingPlacements.find((p) =>
+    const currentCyclePlacements = existingPlacements.filter((p) =>
+      isInCurrentPortalCycle(p.createdAt, portalPayload)
+    );
+    const blockingPlacement = currentCyclePlacements.find((p) =>
       p.status === 'pending' || p.status === 'modification_requested'
     );
     if (blockingPlacement) {
@@ -116,8 +151,19 @@ async function createPlacement(req, res) {
       return res.status(409).json({ message: msg });
     }
 
-    const approvedPlacement = existingPlacements.find((p) => p.status === 'approved');
-    if (approvedPlacement && isApprovedPlacementInternshipActive(approvedPlacement)) {
+    const finalLogbook = await WeeklyLogbook.findFinalSubmissionForStudent(user.id);
+    if (isWeeklyLogbookSubmissionLockActive(finalLogbook, portalPayload)) {
+      return res.status(409).json({
+        message: 'Your Weekly Log Sheet Book has been submitted to your supervisor. Official placement registration is read-only until the internship request portal is opened for the next cycle.',
+      });
+    }
+
+    const approvedPlacement = currentCyclePlacements.find((p) => p.status === 'approved');
+    if (
+      approvedPlacement &&
+      isApprovedPlacementInternshipActive(approvedPlacement) &&
+      !isWeeklyLogbookSubmissionClearedByPortal(finalLogbook, portalPayload)
+    ) {
       const endLabel = approvedPlacement.internshipEndDate
         ? new Date(approvedPlacement.internshipEndDate).toLocaleDateString('en-GB')
         : 'your internship end date';
@@ -142,33 +188,73 @@ async function createPlacement(req, res) {
       status: 'pending',
     });
 
-    // Notify admins
+    // Notify admins + department HOD / secretary (same pattern as Stage 1 letter requests)
     const { createNotification } = require('../services/notificationService');
     const { User } = require('../models');
-    const admins = await User.findAll({ where: { role: 'admin' } });
 
+    async function safeCreateNotification(payload) {
+      try {
+        await createNotification(payload);
+      } catch (notifyErr) {
+        console.error('[createPlacement] Notification insert failed:', notifyErr.message || notifyErr);
+      }
+    }
+
+    let studentForNotify = { ...user };
+    try {
+      const full = await User.findByPk(user.id);
+      if (full) {
+        const canonDept = normalizeDepartmentName(full.department || '');
+        studentForNotify = {
+          ...full,
+          department: canonDept || full.department,
+        };
+      }
+    } catch (reloadErr) {
+      console.warn('[createPlacement] Could not reload student for notifications:', reloadErr.message);
+    }
+
+    const admins = await User.findAll({ where: { role: 'admin' } });
     for (const admin of admins) {
-      await createNotification({
+      if (admin.isActive === false) continue;
+      await safeCreateNotification({
         userId: admin.id,
         type: 'letter_request',
         title: 'New official placement request',
-        message: `${user.firstName} ${user.lastName} (${user.studentId || 'student'}) submitted an official placement for ${organizationName}. The department HOD is notified first; if they deny, ignore the request, or you need to step in, you have the same tools in Official placements — approve or deny with a reason, and on approval the official letter and evaluation link are emailed to the organization.`,
+        message: `${studentForNotify.firstName} ${studentForNotify.lastName} (${studentForNotify.studentId || 'student'}) submitted an official placement for ${organizationName}. Department staff are notified; you can also approve or deny under Official placements.`,
         relatedId: placement.id,
         link: '/admin/official-placement-management',
+        actionRequired: true,
+        priority: 'high',
       });
     }
 
-    const hods = await User.findAll({ where: { role: 'hod' } });
-    const secutuaries = await User.findAll({ where: { role: 'secutuary' } });
-    for (const staff of [...hods, ...secutuaries]) {
-      if (!studentBelongsToHodDepartment(user, staff.department)) continue;
-      await createNotification({
+    const allHods = await User.findAll({ where: { role: 'hod' } });
+    const allSecretaries = await User.findAll({ where: { role: 'secutuary' } });
+    const deptStaff = [...allHods, ...allSecretaries].filter(
+      (staff) =>
+        staff.isActive !== false &&
+        staff.department &&
+        studentBelongsToHodDepartment(studentForNotify, staff.department)
+    );
+
+    for (const staff of deptStaff) {
+      await safeCreateNotification({
         userId: staff.id,
         type: 'letter_request',
-        title: 'Official placement request — your department',
-        message: `${user.firstName} ${user.lastName} (${user.studentId || 'student'}) submitted an official placement for ${organizationName}. Approve or deny with a reason; if approved, the official letter and evaluation link are emailed to the organization.`,
+        title: 'Official placement submitted — review required',
+        message: `${studentForNotify.firstName} ${studentForNotify.lastName} (${studentForNotify.studentId || 'student'}) submitted an official placement for ${organizationName}. Open Official placements to approve or request changes.`,
         relatedId: placement.id,
         link: '/admin/official-placement-management',
+        actionRequired: true,
+        priority: 'high',
+      });
+    }
+
+    if (deptStaff.length === 0) {
+      console.warn('[createPlacement] No HOD/secretary matched for placement notification.', {
+        studentUserId: user.id,
+        studentDepartment: studentForNotify.department,
       });
     }
 
@@ -186,7 +272,7 @@ async function createPlacement(req, res) {
 async function getPlacements(req, res) {
   try {
     const user = req.user;
-    const { InternshipPlacement } = require('../models');
+    const { InternshipPlacement, WeeklyLogbook } = require('../models');
     const { status } = req.query;
 
     let where = {};
@@ -198,6 +284,19 @@ async function getPlacements(req, res) {
     }
 
     let placements = await InternshipPlacement.findAll({ where });
+
+    const finalLogbooksByPlacement = await WeeklyLogbook.findFinalSubmissionsByPlacementIds(
+      placements.map((placement) => placement.id)
+    );
+    placements = placements.map((placement) => {
+      const finalLogbook = finalLogbooksByPlacement.get(placement.id);
+      if (!finalLogbook) return placement;
+      return {
+        ...placement,
+        weeklyLogbookStatus: finalLogbook.status,
+        weeklyLogbookFinalizedAt: finalLogbook.finalizedAt,
+      };
+    });
 
     // Load related student data
     const { User } = require('../models');

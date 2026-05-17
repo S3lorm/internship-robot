@@ -189,7 +189,7 @@ function ResetPasswordForm() {
         <CardFooter className="flex flex-col space-y-4">
           <div className="text-center text-sm text-muted-foreground">
             Didn&apos;t receive the code?{' '}
-            <Link href="/forgot-password" className="font-medium text-primary hover:underline">
+            <Link href="/login?forgot=1" className="font-medium text-primary hover:underline">
               Request again
             </Link>
           </div>

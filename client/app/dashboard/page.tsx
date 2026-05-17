@@ -81,6 +81,15 @@ const formatPlacementDates = (start?: string, end?: string) => {
   return start ? fmt(start) : end ? fmt(end) : "Dates not set";
 };
 
+function isInCurrentPortalCycle(createdAt?: string, portalUpdatedAt?: string): boolean {
+  if (!portalUpdatedAt) return true;
+  if (!createdAt) return false;
+  const createdTime = new Date(createdAt).getTime();
+  const portalTime = new Date(portalUpdatedAt).getTime();
+  if (Number.isNaN(createdTime) || Number.isNaN(portalTime)) return true;
+  return createdTime >= portalTime;
+}
+
 type ApplicationStats = {
   total: number;
   pending: number;
@@ -211,6 +220,18 @@ export default function DashboardPage() {
     });
   }, [notices, user?.department]);
 
+  const currentCycleApprovedGeneralLetters = useMemo(
+    () =>
+      letterRequests.filter(
+        (request) =>
+          request.status === "approved" &&
+          request.requestType === "general" &&
+          portal.isOpen &&
+          isInCurrentPortalCycle(request.createdAt, portal.updatedAt)
+      ),
+    [letterRequests, portal.isOpen, portal.updatedAt]
+  );
+
 
   const handleDownloadLetter = async (id: string, ref?: string, isGeneral?: boolean) => {
     try {
@@ -283,7 +304,7 @@ export default function DashboardPage() {
       />
 
       {/* Available Documents */}
-      {!loading && letterRequests.some(r => r.status === 'approved' && r.requestType === 'general') && (
+      {!loading && currentCycleApprovedGeneralLetters.length > 0 && (
         <DashboardAnimatedCard index={1}>
           <Card className="border-0 bg-transparent shadow-none">
           <CardHeader>
@@ -297,9 +318,7 @@ export default function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {letterRequests
-                .filter(r => r.status === 'approved' && r.requestType === 'general')
-                .map(request => (
+              {currentCycleApprovedGeneralLetters.map(request => (
                   <div key={request.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-4 bg-background border rounded-xl gap-4">
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-10 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -381,7 +400,7 @@ export default function DashboardPage() {
                       <div className="flex min-w-0 flex-1 items-start gap-3">
                         {getStatusIcon(placement.status)}
                         <div className="min-w-0">
-                          <p className="font-medium break-words">
+                          <p className="font-medium wrap-break-word">
                             {placement.organizationName || "Organisation"}
                           </p>
                           {placement.departmentRole && (

@@ -24,7 +24,7 @@ import { buildPageDraftsFromBundle } from "@/lib/weekly-logbook-schedule";
 import { countWeeksInPeriod } from "@/lib/weekly-logbook-weeks";
 import { WeeklyLogSheet } from "@/components/weekly-log-sheet";
 import { toast } from "sonner";
-import { Archive, BookOpen, ClipboardList, Download, Eye, Loader2 } from "lucide-react";
+import { Archive, BookOpen, Building2, ClipboardList, Download, Eye, Loader2, UserRound } from "lucide-react";
 
 type StaffTab = "review" | "archive";
 
@@ -217,6 +217,10 @@ export default function WeeklyLogbooksAdminPage() {
   const header = selected ? sheetHeaderFromBundle(selected) : null;
   const isArchiveView = selected?.logbook.status === "hod_approved";
   const canDecide = selected?.logbook.status === "supervisor_reviewed";
+  const selectedOrganization =
+    selected?.placement?.organization_name ||
+    selected?.placement?.organizationName ||
+    "N/A";
 
   return (
     <div className="space-y-6">
@@ -318,8 +322,8 @@ export default function WeeklyLogbooksAdminPage() {
       </Tabs>
 
       <Dialog open={!!selected} onOpenChange={(open) => !open && setSelected(null)}>
-        <DialogContent className="max-h-[90vh] max-w-5xl overflow-y-auto">
-          <DialogHeader>
+        <DialogContent className="max-h-[92vh] max-w-7xl overflow-hidden p-0">
+          <DialogHeader className="border-b bg-muted/30 px-6 py-5">
             <DialogTitle>
               {isArchiveView ? "Archived logbook" : "Institutional logbook review"}
             </DialogTitle>
@@ -329,7 +333,59 @@ export default function WeeklyLogbooksAdminPage() {
             </DialogDescription>
           </DialogHeader>
           {selected && header && (
-            <div className="space-y-6">
+            <div className="max-h-[calc(92vh-11rem)] space-y-6 overflow-y-auto px-6 py-5">
+              <div className="grid gap-3 md:grid-cols-3">
+                <Card className="border-muted bg-background">
+                  <CardContent className="flex items-start gap-3 p-4">
+                    <UserRound className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Student
+                      </p>
+                      <p className="truncate font-medium">
+                        {selected.student?.firstName} {selected.student?.lastName}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {selected.student?.studentId || selected.student?.department || "N/A"}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-muted bg-background">
+                  <CardContent className="flex items-start gap-3 p-4">
+                    <Building2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Placement
+                      </p>
+                      <p className="truncate font-medium">{selectedOrganization}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {selected.placement?.department_role ||
+                          selected.placement?.departmentRole ||
+                          "Role not set"}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card className="border-muted bg-background">
+                  <CardContent className="flex items-start gap-3 p-4">
+                    <ClipboardList className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+                        Logsheet
+                      </p>
+                      <p className="font-medium">
+                        {selectedPages.length || selected.entries.length} page
+                        {(selectedPages.length || selected.entries.length) === 1 ? "" : "s"}
+                      </p>
+                      <Badge variant="secondary" className="mt-1 capitalize">
+                        {formatStatusLabel(selected.logbook.status)}
+                      </Badge>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
               {selected.review?.supervisorRecommendation && (
                 <Card className="border-blue-200 bg-blue-50/50">
                   <CardHeader className="py-3">
@@ -341,45 +397,62 @@ export default function WeeklyLogbooksAdminPage() {
                 </Card>
               )}
 
-              {selectedPages.length > 0
-                ? selectedPages.map((page) => {
-                    const lastWeek = page.firstWeekNumber + page.weekCount - 1;
-                    const weekLabel =
-                      page.weekCount === 1
-                        ? `Week ${page.firstWeekNumber}`
-                        : `Weeks ${page.firstWeekNumber}–${lastWeek}`;
-                    return (
-                      <WeeklyLogSheet
-                        key={page.pageNumber}
-                        mode="readonly"
-                        header={header}
-                        weekLabel={`Page ${page.pageNumber} (${weekLabel})`}
-                        values={page.values}
-                        firstWeekNumber={page.firstWeekNumber}
-                        weekCount={page.weekCount}
-                        lockPeriodDates
-                      />
-                    );
-                  })
-                : selected.entries.map((entry) => (
-                    <WeeklyLogSheet
-                      key={entry.id}
-                      mode="readonly"
-                      header={header}
-                      weekLabel={`Week ${entry.weekNumber}`}
-                      values={{
-                        weekBeginning: entry.weekBeginning,
-                        weekEnding: entry.weekEnding,
-                        studentRemark: entry.studentRemark || "",
-                        supervisorRemark: entry.supervisorRemark,
-                        supervisorName: entry.supervisorName,
-                        supervisorStatus: entry.supervisorStatus,
-                        activities: entry.activities,
-                      }}
-                      firstWeekNumber={entry.weekNumber}
-                      weekCount={1}
-                    />
-                  ))}
+              <div className="space-y-6 rounded-xl border bg-slate-50/70 p-4">
+                {selectedPages.length > 0
+                  ? selectedPages.map((page) => {
+                      const lastWeek = page.firstWeekNumber + page.weekCount - 1;
+                      const weekLabel =
+                        page.weekCount === 1
+                          ? `Week ${page.firstWeekNumber}`
+                          : `Weeks ${page.firstWeekNumber}–${lastWeek}`;
+                      return (
+                        <div key={page.pageNumber} className="space-y-3">
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <h3 className="text-sm font-semibold">
+                              Page {page.pageNumber} ({weekLabel})
+                            </h3>
+                            <Badge variant="outline">
+                              {page.weekCount} week{page.weekCount === 1 ? "" : "s"}
+                            </Badge>
+                          </div>
+                          <div className="overflow-x-auto rounded-lg border bg-white p-3">
+                            <WeeklyLogSheet
+                              mode="readonly"
+                              header={header}
+                              weekLabel={`Page ${page.pageNumber} (${weekLabel})`}
+                              values={page.values}
+                              firstWeekNumber={page.firstWeekNumber}
+                              weekCount={page.weekCount}
+                              lockPeriodDates
+                            />
+                          </div>
+                        </div>
+                      );
+                    })
+                  : selected.entries.map((entry) => (
+                      <div key={entry.id} className="space-y-3">
+                        <h3 className="text-sm font-semibold">Week {entry.weekNumber}</h3>
+                        <div className="overflow-x-auto rounded-lg border bg-white p-3">
+                          <WeeklyLogSheet
+                            mode="readonly"
+                            header={header}
+                            weekLabel={`Week ${entry.weekNumber}`}
+                            values={{
+                              weekBeginning: entry.weekBeginning,
+                              weekEnding: entry.weekEnding,
+                              studentRemark: entry.studentRemark || "",
+                              supervisorRemark: entry.supervisorRemark,
+                              supervisorName: entry.supervisorName,
+                              supervisorStatus: entry.supervisorStatus,
+                              activities: entry.activities,
+                            }}
+                            firstWeekNumber={entry.weekNumber}
+                            weekCount={1}
+                          />
+                        </div>
+                      </div>
+                    ))}
+              </div>
 
               {selected.logbook.archiveReference && (
                 <p className="rounded-lg border bg-muted/40 px-4 py-3 text-sm">
@@ -402,7 +475,7 @@ export default function WeeklyLogbooksAdminPage() {
               )}
             </div>
           )}
-          <DialogFooter className="gap-2 sm:gap-0">
+          <DialogFooter className="border-t bg-background px-6 py-4 gap-2 sm:gap-0">
             {canDecide ? (
               <>
                 <Button variant="destructive" onClick={() => decide("rejected")} disabled={submitting}>

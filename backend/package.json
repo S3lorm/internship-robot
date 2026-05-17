@@ -8,6 +8,7 @@
     "db:create": "node scripts/create-db.js",
     "admin:create": "node scripts/create-admin.js",
     "staff:manage": "node scripts/manage-staff.js",
+    "user:delete": "node scripts/delete-user-deep.js",
     "smtp:configure": "node scripts/configure-smtp.js",
     "smtp:fix": "node scripts/fix-smtp-config.js",
     "email:test": "node scripts/test-email.js",

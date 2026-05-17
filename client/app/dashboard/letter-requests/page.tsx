@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -73,6 +73,94 @@ function calculateSixWeeksEndDate(startDate: string): string {
   const month = String(end.getMonth() + 1).padStart(2, "0");
   const day = String(end.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function isInCurrentPortalCycle(createdAt?: string, portalUpdatedAt?: string): boolean {
+  if (!portalUpdatedAt) return true;
+  if (!createdAt) return false;
+  const createdTime = new Date(createdAt).getTime();
+  const portalTime = new Date(portalUpdatedAt).getTime();
+  if (Number.isNaN(createdTime) || Number.isNaN(portalTime)) return true;
+  return createdTime >= portalTime;
+}
+
+function formatDateDisplay(dateStr?: string): string {
+  if (!dateStr) return "";
+  const parsed = new Date(`${dateStr}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const day = String(parsed.getDate()).padStart(2, "0");
+  const month = String(parsed.getMonth() + 1).padStart(2, "0");
+  const year = String(parsed.getFullYear());
+  return `${day}/${month}/${year}`;
+}
+
+type DatePickerInputProps = {
+  id: string;
+  name?: string;
+  value: string;
+  min?: string;
+  disabled?: boolean;
+  required?: boolean;
+  placeholder?: string;
+  onChange: (value: string) => void;
+};
+
+function DatePickerInput({
+  id,
+  name,
+  value,
+  min,
+  disabled,
+  required,
+  placeholder = "dd/mm/yyyy",
+  onChange,
+}: DatePickerInputProps) {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const openPicker = () => {
+    if (disabled) return;
+    const input = inputRef.current;
+    if (!input) return;
+    if (typeof input.showPicker === "function") {
+      input.showPicker();
+    } else {
+      input.click();
+    }
+  };
+
+  return (
+    <div className="relative">
+      <Input
+        type="text"
+        value={formatDateDisplay(value)}
+        placeholder={placeholder}
+        readOnly
+        disabled={disabled}
+        onClick={openPicker}
+        onKeyDown={(event) => {
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            openPicker();
+          }
+        }}
+        className="cursor-pointer bg-background"
+      />
+      <input
+        ref={inputRef}
+        id={id}
+        name={name}
+        type="date"
+        lang="en-GB"
+        value={value}
+        min={min}
+        disabled={disabled}
+        required={required}
+        onChange={(event) => onChange(event.target.value)}
+        className="sr-only"
+        tabIndex={-1}
+      />
+    </div>
+  );
 }
 
 export default function LetterRequestsPage() {
@@ -158,25 +246,39 @@ export default function LetterRequestsPage() {
   };
 
   // Derived state
-  const hasPendingOrApprovedGeneral = generalRequests.some(
+  const currentCycleGeneralRequests = useMemo(
+    () => generalRequests.filter((r) => isInCurrentPortalCycle(r.createdAt, portal.updatedAt)),
+    [generalRequests, portal.updatedAt]
+  );
+  const currentCyclePlacements = useMemo(
+    () => placements.filter((p) => isInCurrentPortalCycle(p.createdAt, portal.updatedAt)),
+    [placements, portal.updatedAt]
+  );
+  const hasPendingOrApprovedGeneral = currentCycleGeneralRequests.some(
     (r) => r.status === "pending" || r.status === "approved"
   );
-  const hasApprovedGeneral = generalRequests.some((r) => r.status === "approved");
+  const hasApprovedGeneral = currentCycleGeneralRequests.some((r) => r.status === "approved");
   
   const placementFormLock = useMemo(
-    () => getPlacementFormLockState(placements),
-    [placements]
+    () =>
+      getPlacementFormLockState(currentCyclePlacements, {
+        portalIsOpen: portalOpen,
+        portalUpdatedAt: portal.updatedAt,
+      }),
+    [currentCyclePlacements, portal.updatedAt, portalOpen]
   );
   const minPlacementStartDate = todayInputDateMin();
   const minPlacementEndDate = internshipEndDateMin(placementForm.internshipStartDate);
+  const minGeneralStartDate = todayInputDateMin();
+  const minGeneralEndDate = internshipEndDateMin(generalForm.internshipStartDate);
 
   const portalClosed = !portalOpen;
   const stage1Locked = hasPendingOrApprovedGeneral || portalClosed;
   const stage2LockedByPlacement = placementFormLock.locked;
   const stage2Unlocked = hasApprovedGeneral && !stage2LockedByPlacement && portalOpen;
 
-  const latestGeneralRequest = generalRequests.length > 0
-    ? generalRequests.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
+  const latestGeneralRequest = currentCycleGeneralRequests.length > 0
+    ? [...currentCycleGeneralRequests].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())[0]
     : null;
 
   // Stage 1 handlers
@@ -192,6 +294,14 @@ export default function LetterRequestsPage() {
     }
     if (!generalForm.internshipEndDate) {
       toast.error("Please select your internship end date.");
+      return;
+    }
+    const dateError = validateInternshipDateRange(
+      generalForm.internshipStartDate,
+      generalForm.internshipEndDate
+    );
+    if (dateError) {
+      toast.error(dateError);
       return;
     }
     setIsSubmittingGeneral(true);
@@ -280,10 +390,31 @@ export default function LetterRequestsPage() {
     }
   };
 
-  if (isLoadingGeneral) {
+  if (isLoadingGeneral || portalLoading) {
     return (
       <div className="flex items-center justify-center py-20">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (portalClosed) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center px-4">
+        <Card className="w-full max-w-xl border-red-200 bg-red-50/70 text-center shadow-sm">
+          <CardContent className="py-12">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100 text-red-700">
+              <AlertCircle className="h-7 w-7" />
+            </div>
+            <h1 className="text-2xl font-bold text-red-950">Internship Portal Closed</h1>
+            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-red-800">
+              {portal.closedMessage || PORTAL_CLOSED_MESSAGE}
+            </p>
+            <p className="mx-auto mt-2 max-w-md text-sm text-red-700">
+              When the admin opens the portal again, you can start a fresh internship letter request.
+            </p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
@@ -406,7 +537,7 @@ export default function LetterRequestsPage() {
                   )}
                   {latestGeneralRequest.internshipStartDate && latestGeneralRequest.internshipEndDate && (
                     <p className="text-xs mt-2 opacity-75">
-                      Period: {new Date(latestGeneralRequest.internshipStartDate as string).toLocaleDateString()} - {new Date(latestGeneralRequest.internshipEndDate as string).toLocaleDateString()}
+                      Period: {formatDateDisplay(latestGeneralRequest.internshipStartDate as string)} - {formatDateDisplay(latestGeneralRequest.internshipEndDate as string)}
                     </p>
                   )}
                 </div>
@@ -456,18 +587,18 @@ export default function LetterRequestsPage() {
                   </h3>
                   <div className="grid gap-4 md:grid-cols-2">
                     <div className="space-y-2">
-                      <Label htmlFor="internshipStartDate">Start Date <span className="text-destructive">*</span></Label>
-                      <Input
+                      <Label htmlFor="internshipStartDate">Start Date (dd/mm/yyyy) <span className="text-destructive">*</span></Label>
+                      <DatePickerInput
                         id="internshipStartDate"
                         name="internshipStartDate"
-                        type="date"
                         value={generalForm.internshipStartDate}
-                        onChange={(e) =>
+                        min={minGeneralStartDate}
+                        onChange={(value) =>
                           setGeneralForm((prev) => ({
                             ...prev,
-                            internshipStartDate: e.target.value,
-                            internshipEndDate: e.target.value
-                              ? calculateSixWeeksEndDate(e.target.value)
+                            internshipStartDate: value,
+                            internshipEndDate: value
+                              ? calculateSixWeeksEndDate(value)
                               : "",
                           }))
                         }
@@ -475,13 +606,13 @@ export default function LetterRequestsPage() {
                       />
                     </div>
                     <div className="space-y-2">
-                      <Label htmlFor="internshipEndDate">End Date (Auto: 6 weeks) <span className="text-destructive">*</span></Label>
-                      <Input
+                      <Label htmlFor="internshipEndDate">End Date (dd/mm/yyyy, auto: 6 weeks) <span className="text-destructive">*</span></Label>
+                      <DatePickerInput
                         id="internshipEndDate"
                         name="internshipEndDate"
-                        type="date"
                         value={generalForm.internshipEndDate}
-                        onChange={(e) => setGeneralForm({ ...generalForm, internshipEndDate: e.target.value })}
+                        min={minGeneralEndDate}
+                        onChange={(value) => setGeneralForm({ ...generalForm, internshipEndDate: value })}
                         required
                       />
                       <p className="text-xs text-muted-foreground">
@@ -540,6 +671,8 @@ export default function LetterRequestsPage() {
                     ? "Locked — Awaiting review"
                     : placementFormLock.reason === "modification_requested"
                       ? "Locked — Changes requested"
+                      : placementFormLock.reason === "weekly_logbook_submitted"
+                        ? "Read only — Logsheet submitted"
                       : "Locked — Active placement"
                 : "Locked — Stage 1 approval required"}
             </Badge>
@@ -592,6 +725,8 @@ export default function LetterRequestsPage() {
                       ? "Placement awaiting HOD / Secretary review"
                       : placementFormLock.reason === "modification_requested"
                         ? "Placement needs changes"
+                        : placementFormLock.reason === "weekly_logbook_submitted"
+                          ? "Placement read-only — weekly logsheet submitted"
                         : "Official placement locked"}
                 </h3>
                 <p
@@ -607,6 +742,8 @@ export default function LetterRequestsPage() {
                       ? "You already submitted an official placement. Wait until HOD or Secretary approves or rejects it before registering another."
                       : placementFormLock.reason === "modification_requested"
                         ? "Staff requested changes on your placement. Resolve that request before registering another."
+                        : placementFormLock.reason === "weekly_logbook_submitted"
+                          ? "Your Weekly Log Sheet Book has been submitted to your supervisor, so your official placement registration is read-only until the portal opens for the next internship request cycle."
                         : "You cannot register another official placement at this time."}
                 </p>
                 {placementFormLock.placement && (
@@ -769,14 +906,12 @@ export default function LetterRequestsPage() {
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       <div className="space-y-2">
-                        <Label htmlFor="placementStartDate">Confirmed Start Date <span className="text-destructive">*</span></Label>
-                        <Input
+                        <Label htmlFor="placementStartDate">Confirmed Start Date (dd/mm/yyyy) <span className="text-destructive">*</span></Label>
+                        <DatePickerInput
                           id="placementStartDate"
-                          type="date"
                           value={placementForm.internshipStartDate}
                           min={minPlacementStartDate}
-                          onChange={(e) => {
-                            const start = e.target.value;
+                          onChange={(start) => {
                             setPlacementForm((prev) => {
                               const next = { ...prev, internshipStartDate: start };
                               if (next.internshipEndDate) {
@@ -790,18 +925,20 @@ export default function LetterRequestsPage() {
                         />
                       </div>
                       <div className="space-y-2">
-                        <Label htmlFor="placementEndDate">Confirmed End Date <span className="text-destructive">*</span></Label>
-                        <Input
+                        <Label htmlFor="placementEndDate">Confirmed End Date (dd/mm/yyyy) <span className="text-destructive">*</span></Label>
+                        <DatePickerInput
                           id="placementEndDate"
-                          type="date"
                           value={placementForm.internshipEndDate}
                           min={minPlacementEndDate}
                           disabled={!placementForm.internshipStartDate}
-                          onChange={(e) =>
-                            setPlacementForm({ ...placementForm, internshipEndDate: e.target.value })
+                          onChange={(value) =>
+                            setPlacementForm({ ...placementForm, internshipEndDate: value })
                           }
                           required
                         />
+                        <p className="text-xs text-muted-foreground">
+                          Select a start date first. Past dates are not allowed.
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -847,15 +984,15 @@ export default function LetterRequestsPage() {
           )}
 
           {/* Existing Placements */}
-            {placements.length > 0 && (
+            {currentCyclePlacements.length > 0 && (
               <Card className="border-muted shadow-sm">
                 <CardHeader className="bg-muted/30 border-b">
-                  <CardTitle className="text-base">My Placements ({placements.length})</CardTitle>
+                  <CardTitle className="text-base">My Placements ({currentCyclePlacements.length})</CardTitle>
                   <CardDescription>Track your registered placements.</CardDescription>
                 </CardHeader>
                 <CardContent className="pt-6">
                   <div className="space-y-4">
-                    {placements.map((placement) => {
+                    {currentCyclePlacements.map((placement) => {
                       const status = statusConfig[placement.status] || statusConfig.pending;
                       const StatusIcon = status.icon;
                       return (

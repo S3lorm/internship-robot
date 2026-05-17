@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { hodApi } from "@/lib/api";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Users, Briefcase, UserX } from "lucide-react";
+import { CalendarCheck2, FileCheck2, FileText, Loader2, Users, UserX } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 type DeptStudent = {
@@ -19,8 +19,30 @@ type DeptStudent = {
   yearOfStudy?: string;
   internshipStatus: string;
   internshipLabel: string;
-  activePlacement?: { organizationName: string } | null;
+  activePlacement?: {
+    organizationName: string;
+    internshipStartDate?: string;
+    internshipEndDate?: string;
+  } | null;
+  hasPlacementSubmission?: boolean;
+  missedPlacementSubmission?: boolean;
+  approvedLetterCount?: number;
+  hasTakenInternshipLetter?: boolean;
+  completedInternshipCount?: number;
+  internshipCount?: number;
+  placementCategory?:
+    | "placement_submitted"
+    | "no_placement_submitted"
+    | "internship_ended"
+    | "awaiting_submission_window";
 };
+
+type StudentFilter =
+  | "all"
+  | "letter_taken"
+  | "placement_submitted"
+  | "internship_ended"
+  | "not_on_internship";
 
 type ProgramGroup = {
   program: string;
@@ -32,10 +54,16 @@ type DeptPayload = {
   department: string;
   summary: {
     totalStudents: number;
+    tookInternshipLetters?: number;
+    completedInternships?: number;
+    placementSubmitted?: number;
     onInternship: number;
     notOnInternship: number;
     placementPending: number;
     internshipEnded: number;
+    placementSubmissionGraceDays?: number;
+    placementSubmissionGraceOver?: boolean;
+    portalOpenedAt?: string;
   };
   groups: ProgramGroup[];
 };
@@ -55,6 +83,34 @@ function statusBadge(status: string, label: string) {
       </Badge>
     );
   }
+  if (status === "internship_ended") {
+    return (
+      <Badge className="border-blue-200 bg-blue-50 text-blue-900 dark:border-blue-800 dark:bg-blue-950 dark:text-blue-100">
+        {label}
+      </Badge>
+    );
+  }
+  if (status === "not_on_internship") {
+    return (
+      <Badge className="border-red-200 bg-red-50 text-red-900 dark:border-red-800 dark:bg-red-950 dark:text-red-100">
+        {label}
+      </Badge>
+    );
+  }
+  if (status === "placement_window_open") {
+    return (
+      <Badge className="border-purple-200 bg-purple-50 text-purple-900 dark:border-purple-800 dark:bg-purple-950 dark:text-purple-100">
+        {label}
+      </Badge>
+    );
+  }
+  if (status === "letter_not_taken") {
+    return (
+      <Badge className="border-slate-200 bg-slate-50 text-slate-700 dark:border-slate-800 dark:bg-slate-950 dark:text-slate-200">
+        {label}
+      </Badge>
+    );
+  }
   return (
     <Badge variant="outline" className="text-muted-foreground">
       {label}
@@ -62,11 +118,22 @@ function statusBadge(status: string, label: string) {
   );
 }
 
+function formatDate(date?: string) {
+  if (!date) return null;
+  const parsed = new Date(date);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 export default function DepartmentStudentsPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DeptPayload | null>(null);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<"all" | "on_internship" | "not_on_internship">("all");
+  const [filter, setFilter] = useState<StudentFilter>("all");
 
   useEffect(() => {
     if (user?.role !== "hod") return;
@@ -84,9 +151,11 @@ export default function DepartmentStudentsPage() {
       .map((g) => ({
         ...g,
         students: g.students.filter((s) => {
-          if (filter === "on_internship") return s.internshipStatus === "on_internship";
+          if (filter === "letter_taken") return s.hasTakenInternshipLetter === true;
+          if (filter === "placement_submitted") return s.placementCategory === "placement_submitted";
+          if (filter === "internship_ended") return s.internshipStatus === "internship_ended";
           if (filter === "not_on_internship")
-            return s.internshipStatus === "not_on_internship" || s.internshipStatus === "internship_ended";
+            return s.missedPlacementSubmission === true;
           return true;
         }),
       }))
@@ -115,7 +184,7 @@ export default function DepartmentStudentsPage() {
 
       {data && (
         <>
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
             <Card>
               <CardContent className="flex items-center gap-4 p-5">
                 <Users className="h-8 w-8 text-primary" />
@@ -127,10 +196,34 @@ export default function DepartmentStudentsPage() {
             </Card>
             <Card>
               <CardContent className="flex items-center gap-4 p-5">
-                <Briefcase className="h-8 w-8 text-emerald-600" />
+                <FileText className="h-8 w-8 text-sky-600" />
                 <div>
-                  <p className="text-2xl font-bold tabular-nums">{data.summary.onInternship}</p>
-                  <p className="text-sm text-muted-foreground">On internship</p>
+                  <p className="text-2xl font-bold tabular-nums">
+                    {data.summary.tookInternshipLetters || 0}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Took internship letters</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-4 p-5">
+                <FileCheck2 className="h-8 w-8 text-emerald-600" />
+                <div>
+                  <p className="text-2xl font-bold tabular-nums">
+                    {data.summary.placementSubmitted ?? data.summary.onInternship}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Submitted official placement</p>
+                </div>
+              </CardContent>
+            </Card>
+            <Card>
+              <CardContent className="flex items-center gap-4 p-5">
+                <CalendarCheck2 className="h-8 w-8 text-blue-600" />
+                <div>
+                  <p className="text-2xl font-bold tabular-nums">
+                    {data.summary.completedInternships ?? data.summary.internshipEnded}
+                  </p>
+                  <p className="text-sm text-muted-foreground">Internship completed</p>
                 </div>
               </CardContent>
             </Card>
@@ -139,18 +232,31 @@ export default function DepartmentStudentsPage() {
                 <UserX className="h-8 w-8 text-muted-foreground" />
                 <div>
                   <p className="text-2xl font-bold tabular-nums">{data.summary.notOnInternship}</p>
-                  <p className="text-sm text-muted-foreground">Not on internship</p>
+                  <p className="text-sm text-muted-foreground">No placement submitted</p>
                 </div>
               </CardContent>
             </Card>
           </div>
 
+          {!data.summary.placementSubmissionGraceOver && (
+            <Card className="border-blue-200 bg-blue-50/70 dark:border-blue-900 dark:bg-blue-950/30">
+              <CardContent className="py-4 text-sm text-blue-900 dark:text-blue-100">
+                The “No placement after 2 weeks” list becomes active after the internship portal
+                has been open for {data.summary.placementSubmissionGraceDays || 14} days. Students
+                are listed there only if they have not submitted any official placement request in
+                the current cycle.
+              </CardContent>
+            </Card>
+          )}
+
           <div className="flex flex-wrap gap-2">
             {(
               [
                 ["all", "All students"],
-                ["on_internship", "On internship"],
-                ["not_on_internship", "Not on internship"],
+                ["letter_taken", "Took internship letter"],
+                ["placement_submitted", "Submitted official placement"],
+                ["internship_ended", "Internship completed"],
+                ["not_on_internship", "No placement submitted"],
               ] as const
             ).map(([key, label]) => (
               <button
@@ -200,10 +306,28 @@ export default function DepartmentStudentsPage() {
                               {s.firstName} {s.lastName}
                             </p>
                             <p className="font-mono text-xs text-muted-foreground">{s.studentId}</p>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              <Badge variant="outline" className="text-xs">
+                                Letters: {s.approvedLetterCount || 0}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                Internships: {s.internshipCount || 0}
+                              </Badge>
+                              <Badge variant="outline" className="text-xs">
+                                Completed: {s.completedInternshipCount || 0}
+                              </Badge>
+                            </div>
                             {s.activePlacement?.organizationName && (
-                              <p className="mt-1 text-xs text-muted-foreground">
-                                {s.activePlacement.organizationName}
-                              </p>
+                              <div className="mt-1 space-y-0.5 text-xs text-muted-foreground">
+                                <p>{s.activePlacement.organizationName}</p>
+                                {(s.activePlacement.internshipStartDate ||
+                                  s.activePlacement.internshipEndDate) && (
+                                  <p>
+                                    {formatDate(s.activePlacement.internshipStartDate) || "Start N/A"} -{" "}
+                                    {formatDate(s.activePlacement.internshipEndDate) || "End N/A"}
+                                  </p>
+                                )}
+                              </div>
                             )}
                           </div>
                           {statusBadge(s.internshipStatus, s.internshipLabel)}

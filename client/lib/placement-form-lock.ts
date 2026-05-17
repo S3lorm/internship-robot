@@ -3,13 +3,19 @@ import type { InternshipPlacement } from "@/types";
 export type PlacementFormLockReason =
   | "approved_active"
   | "pending_review"
-  | "modification_requested";
+  | "modification_requested"
+  | "weekly_logbook_submitted";
 
 export type PlacementFormLockState = {
   locked: boolean;
   reason?: PlacementFormLockReason;
   placement?: InternshipPlacement;
   unlockAfter?: string;
+};
+
+export type PlacementFormLockContext = {
+  portalIsOpen?: boolean;
+  portalUpdatedAt?: string;
 };
 
 function endOfPlacementDay(dateStr: string): Date {
@@ -27,9 +33,54 @@ export function isApprovedPlacementInternshipActive(placement: InternshipPlaceme
 }
 
 const BLOCKING_PLACEMENT_STATUSES = ["pending", "modification_requested"] as const;
+const FINAL_WEEKLY_LOGBOOK_STATUSES = [
+  "submitted_final",
+  "supervisor_reviewed",
+  "hod_approved",
+] as const;
+
+function isPortalOpenAfter(
+  context: PlacementFormLockContext | undefined,
+  timestamp: string
+): boolean {
+  if (!context?.portalIsOpen || !context.portalUpdatedAt) return false;
+  const portalOpenedAt = new Date(context.portalUpdatedAt).getTime();
+  const lockedAt = new Date(timestamp).getTime();
+  return !Number.isNaN(portalOpenedAt) && !Number.isNaN(lockedAt) && portalOpenedAt > lockedAt;
+}
+
+function hasFinalWeeklyLogbookSubmission(placement: InternshipPlacement): boolean {
+  return Boolean(
+    placement.weeklyLogbookStatus &&
+      FINAL_WEEKLY_LOGBOOK_STATUSES.includes(
+        placement.weeklyLogbookStatus as (typeof FINAL_WEEKLY_LOGBOOK_STATUSES)[number]
+      ) &&
+      placement.weeklyLogbookFinalizedAt
+  );
+}
+
+function isWeeklyLogbookSubmissionLockActive(
+  placement: InternshipPlacement,
+  context?: PlacementFormLockContext
+): boolean {
+  if (!hasFinalWeeklyLogbookSubmission(placement) || !placement.weeklyLogbookFinalizedAt) return false;
+  return !isPortalOpenAfter(context, placement.weeklyLogbookFinalizedAt);
+}
+
+function isWeeklyLogbookSubmissionClearedByPortal(
+  placement: InternshipPlacement,
+  context?: PlacementFormLockContext
+): boolean {
+  return (
+    hasFinalWeeklyLogbookSubmission(placement) &&
+    Boolean(placement.weeklyLogbookFinalizedAt) &&
+    isPortalOpenAfter(context, placement.weeklyLogbookFinalizedAt as string)
+  );
+}
 
 export function getPlacementFormLockState(
-  placements: InternshipPlacement[]
+  placements: InternshipPlacement[],
+  context?: PlacementFormLockContext
 ): PlacementFormLockState {
   const awaitingReview = placements.find((p) =>
     BLOCKING_PLACEMENT_STATUSES.includes(
@@ -47,7 +98,22 @@ export function getPlacementFormLockState(
     };
   }
 
-  const activeApproved = placements.find((p) => isApprovedPlacementInternshipActive(p));
+  const submittedLogbookPlacement = placements.find((p) =>
+    isWeeklyLogbookSubmissionLockActive(p, context)
+  );
+  if (submittedLogbookPlacement) {
+    return {
+      locked: true,
+      reason: "weekly_logbook_submitted",
+      placement: submittedLogbookPlacement,
+    };
+  }
+
+  const activeApproved = placements.find(
+    (p) =>
+      isApprovedPlacementInternshipActive(p) &&
+      !isWeeklyLogbookSubmissionClearedByPortal(p, context)
+  );
   if (activeApproved) {
     return {
       locked: true,

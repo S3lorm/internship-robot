@@ -17,6 +17,12 @@ router.post(
   validate,
   authController.resendVerification
 );
+router.post(
+  '/check-email-for-password-reset',
+  authController.checkEmailForPasswordResetValidators,
+  validate,
+  authController.checkEmailForPasswordReset
+);
 router.post('/forgot-password', authController.forgotPasswordValidators, validate, authController.forgotPassword);
 router.post('/reset-password', authController.resetPasswordValidators, validate, authController.resetPassword);
 router.get('/me', auth, authController.me);

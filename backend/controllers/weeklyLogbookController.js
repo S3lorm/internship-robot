@@ -33,7 +33,11 @@ async function getMyLogbook(req, res) {
     }
 
     const { WeeklyLogbook } = require('../models');
-    const placement = await WeeklyLogbook.findApprovedPlacementForStudent(user.id, req.query.placementId);
+    const { getPortalStatusPayload } = require('../services/internshipPortalService');
+    const portalPayload = await getPortalStatusPayload();
+    const placement = await WeeklyLogbook.findApprovedPlacementForStudent(user.id, req.query.placementId, {
+      portalPayload,
+    });
     if (!placement) {
       return res.status(404).json({ message: 'No approved official placement was found for this student.' });
     }

@@ -75,7 +75,7 @@ export function ContactContent() {
             <h3 className="mb-2 font-semibold text-foreground">Already registered?</h3>
             <p className="text-sm text-muted-foreground">
               Sign in to track requests from your dashboard. Need a password reset? Use the{" "}
-              <Link href="/forgot-password">forgot password</Link> page.
+              <Link href="/login?forgot=1">forgot password</Link> flow from the login page.
             </p>
           </div>
         </FadeIn>

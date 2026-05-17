@@ -177,8 +177,7 @@ export default function PortalManagementPage() {
                   <Button
                     onClick={handleOpen}
                     disabled={updating || portal.isOpen}
-                    className="transition-transform hover:scale-[1.02]"
-                    style={{ backgroundColor: theme.accent, color: theme.navy }}
+                    className="bg-[#4dabf7] text-[#0a1930] transition-transform hover:scale-[1.02] hover:bg-[#75c3fb] hover:text-[#0a1930]"
                   >
                     {updating && portal.isOpen ? (
                       <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -191,7 +190,7 @@ export default function PortalManagementPage() {
                     variant="outline"
                     onClick={() => setConfirmClose(true)}
                     disabled={updating || !portal.isOpen}
-                    className="border-red-200 text-red-700 hover:bg-red-50 transition-transform hover:scale-[1.02]"
+                    className="border-red-200 text-red-700 transition-transform hover:scale-[1.02] hover:bg-red-50 hover:text-red-800"
                   >
                     <DoorClosed className="mr-2 h-4 w-4" />
                     Close internship portal
@@ -261,7 +260,7 @@ export default function PortalManagementPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleCloseConfirmed}
-              className="bg-red-600 hover:bg-red-700"
+              className="bg-red-600 text-white hover:bg-red-700 hover:text-white"
             >
               Yes, close portal
             </AlertDialogAction>

@@ -342,12 +342,27 @@ async function resendVerification(req, res) {
   }
 }
 
+const checkEmailForPasswordResetValidators = [body('email').isEmail()];
+
+async function checkEmailForPasswordReset(req, res) {
+  try {
+    const normalizedEmail =
+      typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : '';
+    const user = await User.findOne({ where: { email: normalizedEmail } });
+    return res.json({ exists: Boolean(user) });
+  } catch (error) {
+    console.error('Error in checkEmailForPasswordReset:', error);
+    return res.status(500).json({ message: 'An unexpected server error occurred. Please try again later.' });
+  }
+}
+
 const forgotPasswordValidators = [body('email').isEmail()];
 
 async function forgotPassword(req, res) {
   try {
-    const { email } = req.body;
-    const user = await User.findOne({ email });
+    const normalizedEmail =
+      typeof req.body.email === 'string' ? req.body.email.trim().toLowerCase() : req.body.email;
+    const user = await User.findOne({ where: { email: normalizedEmail } });
 
     if (!user) {
       // Security: return success even if user doesn't exist to prevent email enumeration
@@ -382,7 +397,9 @@ const resetPasswordValidators = [
 
 async function resetPassword(req, res) {
   const { email, token, password } = req.body;
-  const user = await User.findOne({ email });
+  const normalizedEmail =
+    typeof email === 'string' ? email.trim().toLowerCase() : email;
+  const user = await User.findOne({ where: { email: normalizedEmail } });
   if (!user) return res.status(400).json({ message: 'Invalid request' });
   if (user.passwordResetToken !== token) return res.status(400).json({ message: 'Invalid or expired code' });
 
@@ -415,6 +432,8 @@ module.exports = {
   verifyEmail,
   resendVerificationValidators,
   resendVerification,
+  checkEmailForPasswordResetValidators,
+  checkEmailForPasswordReset,
   forgotPasswordValidators,
   forgotPassword,
   resetPasswordValidators,

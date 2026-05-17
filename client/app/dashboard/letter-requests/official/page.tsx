@@ -55,6 +55,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useRouter } from "next/navigation";
+import { usePortalStatus } from "@/hooks/use-portal-status";
 
 const statusConfig = {
   pending: { label: "Pending", color: "bg-amber-100 text-amber-800 border-amber-200", icon: Clock },
@@ -66,6 +67,7 @@ const statusConfig = {
 export default function OfficialPlacementsPage() {
   const { user } = useAuth();
   const router = useRouter();
+  const { portal, isOpen: portalOpen } = usePortalStatus();
   const [placements, setPlacements] = useState<InternshipPlacement[]>([]);
   const [approvedGeneralRequests, setApprovedGeneralRequests] = useState<any[]>([]);
   const [hasApprovedGeneral, setHasApprovedGeneral] = useState<boolean | null>(null);
@@ -90,7 +92,14 @@ export default function OfficialPlacementsPage() {
     departmentRole: "",
   });
 
-  const formLock = useMemo(() => getPlacementFormLockState(placements), [placements]);
+  const formLock = useMemo(
+    () =>
+      getPlacementFormLockState(placements, {
+        portalIsOpen: portalOpen,
+        portalUpdatedAt: portal.updatedAt,
+      }),
+    [placements, portal.updatedAt, portalOpen]
+  );
   const minStartDate = todayInputDateMin();
   const minEndDate = internshipEndDateMin(formData.internshipStartDate);
 
@@ -297,6 +306,8 @@ export default function OfficialPlacementsPage() {
                       ? "You have a placement request awaiting HOD or Secretary review. You cannot register another until it is approved or rejected."
                       : formLock.reason === "modification_requested"
                         ? "Your placement needs changes from staff review. Resolve that request before registering another official placement."
+                        : formLock.reason === "weekly_logbook_submitted"
+                          ? "Your Weekly Log Sheet Book has been submitted to your supervisor. Official placement registration is read-only until the portal opens for the next internship request cycle."
                         : "Your official placement was approved by HOD or Secretary. Registration is locked while this placement is active."}
                   </CardDescription>
                 </CardHeader>
