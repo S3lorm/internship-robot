@@ -216,6 +216,32 @@ const WeeklyLogbook = {
     return mapEntry(data);
   },
 
+  async clearPriorSupervisorCycle(logbookId) {
+    const now = new Date().toISOString();
+
+    await supabase.from('weekly_log_reviews').delete().eq('logbook_id', logbookId);
+
+    await supabase
+      .from('weekly_log_supervisor_tokens')
+      .update({ used_at: now })
+      .eq('logbook_id', logbookId)
+      .is('used_at', null);
+
+    const entries = await this.listEntries(logbookId);
+    for (const entry of entries) {
+      const { error } = await supabase
+        .from('weekly_log_entries')
+        .update({
+          supervisor_remark: null,
+          supervisor_name: null,
+          supervisor_status: null,
+          updated_at: now,
+        })
+        .eq('id', entry.id);
+      if (error) throw error;
+    }
+  },
+
   async finalize(logbook) {
     if (!EDITABLE_STATUSES.includes(logbook.status)) {
       const err = new Error('This Weekly Log Sheet Book has already been finalized.');
@@ -230,12 +256,62 @@ const WeeklyLogbook = {
       throw err;
     }
 
+    if (logbook.status === 'rejected') {
+      await this.clearPriorSupervisorCycle(logbook.id);
+    }
+
+    const now = new Date().toISOString();
     const { data, error } = await supabase
       .from('weekly_logbooks')
       .update({
         status: 'submitted_final',
-        finalized_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
+        finalized_at: now,
+        updated_at: now,
+        supervisor_reviewed_at: null,
+        hod_reviewed_at: null,
+        hod_reviewed_by: null,
+        hod_decision_note: null,
+        archive_reference: null,
+      })
+      .eq('id', logbook.id)
+      .select()
+      .single();
+    if (error) throw error;
+    return mapLogbook(data);
+  },
+
+  /** Resubmit after HOD rejection or resend while awaiting supervisor (new hosted review link). */
+  async resubmitToSupervisor(logbook) {
+    const allowed = ['rejected', 'submitted_final'];
+    if (!allowed.includes(logbook.status)) {
+      const err = new Error(
+        'Only rejected logbooks or books awaiting supervisor review can be resubmitted.'
+      );
+      err.status = 409;
+      throw err;
+    }
+
+    const entries = await this.listEntries(logbook.id);
+    if (entries.length === 0) {
+      const err = new Error('At least one weekly entry is required before resubmission.');
+      err.status = 400;
+      throw err;
+    }
+
+    await this.clearPriorSupervisorCycle(logbook.id);
+
+    const now = new Date().toISOString();
+    const { data, error } = await supabase
+      .from('weekly_logbooks')
+      .update({
+        status: 'submitted_final',
+        finalized_at: now,
+        updated_at: now,
+        supervisor_reviewed_at: null,
+        hod_reviewed_at: null,
+        hod_reviewed_by: null,
+        hod_decision_note: null,
+        archive_reference: null,
       })
       .eq('id', logbook.id)
       .select()

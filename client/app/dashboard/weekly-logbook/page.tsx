@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatStatusLabel } from "@/lib/utils";
 import { toast } from "sonner";
-import { BookOpen, Loader2, Lock, Send } from "lucide-react";
+import { BookOpen, Loader2, Lock, RefreshCw, Send } from "lucide-react";
 
 const editableStatuses = ["draft", "ongoing", "rejected"];
 
@@ -27,9 +27,12 @@ export default function WeeklyLogbookPage() {
   const [loading, setLoading] = useState(true);
   const [savingWeek, setSavingWeek] = useState<number | null>(null);
   const [finalizing, setFinalizing] = useState(false);
+  const [resubmitting, setResubmitting] = useState(false);
   const [pageDrafts, setPageDrafts] = useState<WeeklyLogPageDraft[]>([]);
 
   const editable = bundle ? editableStatuses.includes(bundle.logbook.status) : false;
+  const isRejected = bundle?.logbook.status === "rejected";
+  const awaitingSupervisor = bundle?.logbook.status === "submitted_final";
   const bypassAllWeeks = schedule?.bypassWeekSchedule === true;
   const header = useMemo(() => (bundle ? sheetHeaderFromBundle(bundle) : null), [bundle]);
 
@@ -148,23 +151,49 @@ export default function WeeklyLogbookPage() {
 
   const finalize = async () => {
     if (!bundle) return;
+    const confirmMessage = isRejected
+      ? "Resubmit your revised Weekly Log Sheet Book to your supervisor? A new secure hosted review link will be emailed. Your book will be locked again until they respond."
+      : "Submit the complete Weekly Log Sheet Book to your supervisor by email? Your entries and remarks will be locked and cannot be edited afterward.";
+    if (!confirm(confirmMessage)) return;
+
+    setFinalizing(true);
+    const result = isRejected
+      ? await weeklyLogbooksApi.resubmit(bundle.logbook.id)
+      : await weeklyLogbooksApi.finalize(bundle.logbook.id);
+    if (result.error) {
+      toast.error(result.error);
+    } else {
+      toast.success(
+        isRejected
+          ? "Logbook resubmitted — supervisor will receive a new review link"
+          : "Logbook sent to supervisor for remarks"
+      );
+      const data = result.data as { bundle: WeeklyLogbookBundle };
+      setBundle(data.bundle);
+      await load();
+    }
+    setFinalizing(false);
+  };
+
+  const resubmitToSupervisor = async () => {
+    if (!bundle) return;
     if (
       !confirm(
-        "Submit the complete Weekly Log Sheet Book to your supervisor by email? Your entries and remarks will be locked and cannot be edited afterward."
+        "Send a new supervisor review email? The previous link will stop working and a fresh hosted review page will be emailed to your supervisor."
       )
     ) {
       return;
     }
-    setFinalizing(true);
-    const result = await weeklyLogbooksApi.finalize(bundle.logbook.id);
+    setResubmitting(true);
+    const result = await weeklyLogbooksApi.resubmit(bundle.logbook.id);
     if (result.error) {
       toast.error(result.error);
     } else {
-      toast.success("Logbook sent to supervisor for remarks");
+      toast.success("New supervisor review link sent by email");
       const data = result.data as { bundle: WeeklyLogbookBundle };
       setBundle(data.bundle);
     }
-    setFinalizing(false);
+    setResubmitting(false);
   };
 
   if (loading) {
@@ -233,18 +262,35 @@ export default function WeeklyLogbookPage() {
 
       {locked && (
         <Card className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
-          <CardContent className="flex items-start gap-3 pt-6 text-amber-950 dark:text-amber-100">
-            <Lock className="mt-0.5 h-5 w-5 shrink-0" />
-            <div>
-              <p className="font-medium">Your entries are locked</p>
-              <p className="text-sm opacity-90">
-                {bundle.logbook.status === "submitted_final"
-                  ? "Awaiting supervisor remarks. You cannot change student fields or credentials."
-                  : bundle.logbook.status === "supervisor_reviewed"
-                    ? "With HOD / Secretary for institutional review and archiving."
-                    : "This logbook is read-only."}
-              </p>
+          <CardContent className="flex flex-col gap-4 pt-6 text-amber-950 dark:text-amber-100 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex items-start gap-3">
+              <Lock className="mt-0.5 h-5 w-5 shrink-0" />
+              <div>
+                <p className="font-medium">Your entries are locked</p>
+                <p className="text-sm opacity-90">
+                  {awaitingSupervisor
+                    ? "Awaiting supervisor remarks on the hosted review page. You cannot change student fields until they respond."
+                    : bundle.logbook.status === "supervisor_reviewed"
+                      ? "With HOD / Secretary for institutional review and archiving."
+                      : "This logbook is read-only."}
+                </p>
+              </div>
             </div>
+            {awaitingSupervisor && (
+              <Button
+                variant="outline"
+                className="shrink-0 border-amber-300 bg-white"
+                onClick={() => void resubmitToSupervisor()}
+                disabled={resubmitting}
+              >
+                {resubmitting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                )}
+                Resend supervisor email
+              </Button>
+            )}
           </CardContent>
         </Card>
       )}
@@ -328,14 +374,16 @@ export default function WeeklyLogbookPage() {
                 variant="default"
                 className="bg-primary"
                 onClick={finalize}
-                disabled={finalizing || savedWeekCount === 0}
+                disabled={finalizing || resubmitting || savedWeekCount === 0}
               >
                 {finalizing ? (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : isRejected ? (
+                  <RefreshCw className="mr-2 h-4 w-4" />
                 ) : (
                   <Send className="mr-2 h-4 w-4" />
                 )}
-                Submit book to supervisor
+                {isRejected ? "Resubmit to supervisor" : "Submit book to supervisor"}
               </Button>
               <p className="text-sm text-muted-foreground self-center">
                 {savedWeekCount} of {totalWeeks} week{totalWeeks === 1 ? "" : "s"} saved

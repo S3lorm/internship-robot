@@ -620,6 +620,11 @@ export const weeklyLogbooksApi = {
       method: 'POST',
     }),
 
+  resubmit: (id: string) =>
+    fetchApi(`/weekly-logbooks/${id}/resubmit`, {
+      method: 'POST',
+    }),
+
   listForStaff: (status = 'supervisor_reviewed') =>
     fetchApi(`/weekly-logbooks/staff/reviews?status=${encodeURIComponent(status)}`),
 

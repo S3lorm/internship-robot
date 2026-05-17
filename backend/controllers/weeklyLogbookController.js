@@ -89,44 +89,98 @@ async function saveWeek(req, res) {
   }
 }
 
+async function sendLogbookToSupervisor(logbook, studentUser, ipAddress, auditAction) {
+  const { WeeklyLogbook } = require('../models');
+  const { sendWeeklyLogbookReviewEmail } = require('../services/emailService');
+
+  const bundle = await WeeklyLogbook.bundle(logbook.id);
+  const { token } = await WeeklyLogbook.createSupervisorToken(logbook);
+  const to = supervisorEmailForPlacement(bundle.placement);
+
+  if (!to) {
+    const err = new Error(
+      'Supervisor email is missing on your placement. Update your official placement supervisor email first.'
+    );
+    err.status = 400;
+    throw err;
+  }
+
+  await sendWeeklyLogbookReviewEmail({
+    to,
+    supervisorName: bundle.placement?.supervisor_name,
+    student: bundle.student,
+    placement: bundle.placement,
+    token,
+  });
+
+  await WeeklyLogbook.audit({
+    logbookId: logbook.id,
+    actorId: studentUser.id,
+    actorRole: 'student',
+    action: auditAction,
+    metadata: { status: 'submitted_final', supervisorEmail: to },
+    ipAddress,
+  });
+
+  return { bundle: await WeeklyLogbook.bundle(logbook.id), supervisorEmail: to };
+}
+
 async function finalizeLogbook(req, res) {
   try {
     const user = req.user;
     if (user.role !== 'student') return res.status(403).json({ message: 'Only students can finalize weekly logbooks.' });
 
     const { WeeklyLogbook } = require('../models');
-    const { sendWeeklyLogbookReviewEmail } = require('../services/emailService');
 
     const logbook = await WeeklyLogbook.findById(req.params.id);
     if (!logbook) return res.status(404).json({ message: 'Weekly Log Sheet Book not found' });
     if (logbook.studentId !== user.id) return res.status(403).json({ message: 'Access denied' });
 
     const finalized = await WeeklyLogbook.finalize(logbook);
-    const bundle = await WeeklyLogbook.bundle(finalized.id);
-    const { token } = await WeeklyLogbook.createSupervisorToken(finalized);
-    const to = supervisorEmailForPlacement(bundle.placement);
+    const { bundle } = await sendLogbookToSupervisor(finalized, user, req.ip, 'final_submission');
 
-    await sendWeeklyLogbookReviewEmail({
-      to,
-      supervisorName: bundle.placement?.supervisor_name,
-      student: bundle.student,
-      placement: bundle.placement,
-      token,
+    res.json({
+      message: 'Weekly Log Sheet Book finalized and sent to supervisor',
+      bundle,
     });
-
-    await WeeklyLogbook.audit({
-      logbookId: finalized.id,
-      actorId: user.id,
-      actorRole: 'student',
-      action: 'final_submission',
-      metadata: { status: 'submitted_final', supervisorEmail: to },
-      ipAddress: req.ip,
-    });
-
-    res.json({ message: 'Weekly Log Sheet Book finalized and sent to supervisor', bundle: await WeeklyLogbook.bundle(finalized.id) });
   } catch (error) {
     console.error('Error finalizing weekly logbook:', error);
     res.status(error.status || 500).json({ message: error.message || 'Failed to finalize weekly logbook' });
+  }
+}
+
+async function resubmitLogbook(req, res) {
+  try {
+    const user = req.user;
+    if (user.role !== 'student') {
+      return res.status(403).json({ message: 'Only students can resubmit weekly logbooks.' });
+    }
+
+    const { WeeklyLogbook } = require('../models');
+
+    const logbook = await WeeklyLogbook.findById(req.params.id);
+    if (!logbook) return res.status(404).json({ message: 'Weekly Log Sheet Book not found' });
+    if (logbook.studentId !== user.id) return res.status(403).json({ message: 'Access denied' });
+
+    const wasRejected = logbook.status === 'rejected';
+    const updated = await WeeklyLogbook.resubmitToSupervisor(logbook);
+    const { bundle, supervisorEmail } = await sendLogbookToSupervisor(
+      updated,
+      user,
+      req.ip,
+      wasRejected ? 'resubmitted_after_rejection' : 'resubmitted_to_supervisor'
+    );
+
+    res.json({
+      message: wasRejected
+        ? 'Weekly Log Sheet Book resubmitted to your supervisor'
+        : 'A new supervisor review link has been sent by email',
+      bundle,
+      supervisorEmail,
+    });
+  } catch (error) {
+    console.error('Error resubmitting weekly logbook:', error);
+    res.status(error.status || 500).json({ message: error.message || 'Failed to resubmit weekly logbook' });
   }
 }
 
@@ -167,6 +221,22 @@ async function staffDecision(req, res) {
       metadata: { remark },
       ipAddress: req.ip,
     });
+
+    if (decision === 'rejected' && bundle.student?.id) {
+      const { createNotification } = require('../services/notificationService');
+      await createNotification({
+        userId: bundle.student.id,
+        type: 'weekly_logbook',
+        title: 'Weekly Log Sheet Book returned for revision',
+        message: remark
+          ? `Your Weekly Log Sheet Book was not approved. Reason: ${remark}. Update your entries and resubmit to your supervisor.`
+          : 'Your Weekly Log Sheet Book was not approved. Update your entries and resubmit to your supervisor.',
+        relatedId: updated.id,
+        link: '/dashboard/weekly-logbook',
+        priority: 'high',
+        actionRequired: true,
+      });
+    }
 
     res.json({ message: 'Institutional decision saved', bundle: await WeeklyLogbook.bundle(updated.id) });
   } catch (error) {
@@ -271,6 +341,7 @@ module.exports = {
   getLogbook,
   saveWeek,
   finalizeLogbook,
+  resubmitLogbook,
   listStaffLogbooks,
   staffDecision,
   exportPdf,

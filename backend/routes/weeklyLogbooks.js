@@ -10,6 +10,7 @@ router.get('/staff/reviews', controller.listStaffLogbooks);
 router.get('/:id', controller.getLogbook);
 router.post('/:id/weeks', controller.saveWeek);
 router.post('/:id/finalize', controller.finalizeLogbook);
+router.post('/:id/resubmit', controller.resubmitLogbook);
 router.patch('/:id/institutional-review', controller.staffDecision);
 router.get('/:id/pdf', controller.exportPdf);
 
