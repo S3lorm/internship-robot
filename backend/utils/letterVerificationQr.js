@@ -14,6 +14,12 @@ function getLetterVerifyUrl(verificationCode) {
   return `${getFrontendBaseUrl()}/verify/${encodeURIComponent(code)}`;
 }
 
+/** Hosted supervisor weekly logbook review (never localhost in emails). */
+function getWeeklyLogbookReviewUrl(token) {
+  const raw = String(token || '').trim();
+  return `${getFrontendBaseUrl()}/weekly-log-review/${encodeURIComponent(raw)}`;
+}
+
 async function generateQrDataUrl(url) {
   return QRCode.toDataURL(url, {
     width: 160,
@@ -76,6 +82,7 @@ function renderVerificationHtmlBlock(assets) {
 module.exports = {
   getFrontendBaseUrl,
   getLetterVerifyUrl,
+  getWeeklyLogbookReviewUrl,
   buildLetterVerificationAssets,
   renderVerificationHtmlBlock,
 };

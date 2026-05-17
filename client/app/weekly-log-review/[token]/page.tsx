@@ -3,6 +3,11 @@
 import { use, useEffect, useMemo, useState } from "react";
 import { weeklyLogbooksApi } from "@/lib/api";
 import { entryToSheetValues, sheetHeaderFromBundle } from "@/lib/weekly-logbook-ui";
+import {
+  buildPageDraftsFromBundle,
+  type WeeklyLogPageDraft,
+} from "@/lib/weekly-logbook-schedule";
+import { countWeeksInPeriod } from "@/lib/weekly-logbook-weeks";
 import type { WeeklyLogbookBundle } from "@/types";
 import {
   WeeklyLogSheet,
@@ -16,6 +21,28 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { CheckCircle2, Loader2, Lock, ShieldCheck } from "lucide-react";
+
+function entryByWeekNumber(bundle: WeeklyLogbookBundle, weekNumber: number) {
+  return bundle.entries.find((e) => e.weekNumber === weekNumber);
+}
+
+function pageValuesWithSupervisorForms(
+  page: WeeklyLogPageDraft,
+  bundle: WeeklyLogbookBundle,
+  entryForms: Record<string, WeeklyLogSheetValues>
+): WeeklyLogSheetValues {
+  const base = { ...page.values };
+  for (let i = 0; i < page.weekCount; i += 1) {
+    const entry = entryByWeekNumber(bundle, page.firstWeekNumber + i);
+    if (!entry) continue;
+    const form = entryForms[entry.id];
+    if (!form) continue;
+    if (form.supervisorRemark) base.supervisorRemark = form.supervisorRemark;
+    if (form.supervisorName) base.supervisorName = form.supervisorName;
+    if (form.supervisorStatus) base.supervisorStatus = form.supervisorStatus;
+  }
+  return base;
+}
 
 export default function WeeklyLogSupervisorReviewPage({
   params,
@@ -32,6 +59,22 @@ export default function WeeklyLogSupervisorReviewPage({
   const [entryForms, setEntryForms] = useState<Record<string, WeeklyLogSheetValues>>({});
 
   const header = useMemo(() => (bundle ? sheetHeaderFromBundle(bundle) : null), [bundle]);
+
+  const pageDrafts = useMemo(() => {
+    if (!bundle) return [];
+    const placement = bundle.placement || {};
+    const start =
+      placement.internship_start_date || placement.internshipStartDate || "";
+    const end = placement.internship_end_date || placement.internshipEndDate || "";
+    const totalWeeks =
+      countWeeksInPeriod(start, end) || bundle.entries.length || 1;
+    return buildPageDraftsFromBundle(bundle, {
+      bypassWeekSchedule: true,
+      totalWeeks,
+      currentOpenWeek: null,
+      weeks: [],
+    });
+  }, [bundle]);
 
   useEffect(() => {
     const load = async () => {
@@ -59,8 +102,21 @@ export default function WeeklyLogSupervisorReviewPage({
     void load();
   }, [token]);
 
-  const updateEntry = (entryId: string, values: WeeklyLogSheetValues) => {
-    setEntryForms((current) => ({ ...current, [entryId]: values }));
+  const updatePageSupervisorFields = (page: WeeklyLogPageDraft, values: WeeklyLogSheetValues) => {
+    setEntryForms((current) => {
+      const next = { ...current };
+      for (let i = 0; i < page.weekCount; i += 1) {
+        const entry = entryByWeekNumber(bundle!, page.firstWeekNumber + i);
+        if (!entry) continue;
+        next[entry.id] = {
+          ...(next[entry.id] || entryToSheetValues(entry)),
+          supervisorRemark: values.supervisorRemark,
+          supervisorName: values.supervisorName,
+          supervisorStatus: values.supervisorStatus,
+        };
+      }
+      return next;
+    });
   };
 
   const submit = async () => {
@@ -131,6 +187,12 @@ export default function WeeklyLogSupervisorReviewPage({
     );
   }
 
+  const placement = bundle.placement || {};
+  const hasPlacementDates = Boolean(
+    (placement.internship_start_date || placement.internshipStartDate) &&
+      (placement.internship_end_date || placement.internshipEndDate)
+  );
+
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8">
       <div className="mx-auto max-w-5xl space-y-6">
@@ -138,12 +200,12 @@ export default function WeeklyLogSupervisorReviewPage({
           <CardHeader className="text-center">
             <Badge className="mx-auto mb-2 w-fit" variant="secondary">
               <ShieldCheck className="mr-1 h-3.5 w-3.5" />
-              Supervisor review
+              Supervisor review — hosted portal
             </Badge>
             <CardTitle className="text-xl">Weekly Log Sheet Book</CardTitle>
             <CardDescription>
-              Student entries are locked. Complete only the supervisor remark, name, and status on
-              each sheet.
+              Student entries are locked. Complete the supervisor remark, name, and status on
+              each sheet (official log book layout).
             </CardDescription>
           </CardHeader>
           <CardContent className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
@@ -155,16 +217,27 @@ export default function WeeklyLogSupervisorReviewPage({
           </CardContent>
         </Card>
 
-        {bundle.entries.map((entry) => (
-          <WeeklyLogSheet
-            key={entry.id}
-            mode="supervisor"
-            header={header}
-            weekLabel={`Week ${entry.weekNumber}`}
-            values={entryForms[entry.id] || entryToSheetValues(entry)}
-            onChange={(values) => updateEntry(entry.id, values)}
-          />
-        ))}
+        {pageDrafts.map((page) => {
+          const lastWeek = page.firstWeekNumber + page.weekCount - 1;
+          const weekLabel =
+            page.weekCount === 1
+              ? `Week ${page.firstWeekNumber}`
+              : `Weeks ${page.firstWeekNumber}–${lastWeek}`;
+
+          return (
+            <WeeklyLogSheet
+              key={page.pageNumber}
+              mode="supervisor"
+              header={header}
+              weekLabel={`Page ${page.pageNumber} (${weekLabel})`}
+              values={pageValuesWithSupervisorForms(page, bundle, entryForms)}
+              firstWeekNumber={page.firstWeekNumber}
+              weekCount={page.weekCount}
+              lockPeriodDates={hasPlacementDates}
+              onChange={(values) => updatePageSupervisorFields(page, values)}
+            />
+          );
+        })}
 
         <Card>
           <CardHeader>

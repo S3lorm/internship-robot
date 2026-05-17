@@ -1,4 +1,5 @@
 const transporter = require('../config/email');
+const { getWeeklyLogbookReviewUrl } = require('../utils/letterVerificationQr');
 
 async function sendVerificationEmail(user, token, verificationCode) {
   // Check if SMTP is configured
@@ -291,8 +292,7 @@ async function sendWeeklyLogbookReviewEmail({ to, supervisorName, student, place
     throw new Error('Supervisor email is required before sending a weekly logbook review link.');
   }
 
-  const frontend = process.env.FRONTEND_URL || 'http://localhost:3000';
-  const reviewUrl = `${frontend}/weekly-log-review/${encodeURIComponent(token)}`;
+  const reviewUrl = getWeeklyLogbookReviewUrl(token);
   const emailFrom = process.env.EMAIL_FROM || `"RMU Internship Portal" <${process.env.SMTP_USER}>`;
   const studentName = `${student?.firstName || ''} ${student?.lastName || ''}`.trim() || 'the student';
 

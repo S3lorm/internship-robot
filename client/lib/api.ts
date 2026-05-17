@@ -1,8 +1,4 @@
-// API base URL - configure this for your backend
-// In browser, NEXT_PUBLIC_* vars are available at runtime
-const getApiBaseUrl = () => {
-  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
-};
+import { getApiBaseUrl } from "@/lib/api-base-url";
 
 export const API_BASE_URL = getApiBaseUrl();
 
@@ -22,7 +18,8 @@ async function fetchApi<T = any>(
       ...options.headers,
     };
 
-    const fullUrl = `${API_BASE_URL}${endpoint}`;
+    const apiBase = getApiBaseUrl();
+    const fullUrl = `${apiBase}${endpoint}`;
 
     if (typeof window !== 'undefined' && DEBUG_API) {
       console.log(`[API] ${options.method || 'GET'} ${fullUrl}`, {
