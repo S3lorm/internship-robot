@@ -95,10 +95,26 @@ function buildPageValues(
     }
   }
 
+  let studentRemark = "";
+  let supervisorRemark = "";
+  let supervisorName = "";
+  let supervisorStatus = "";
+  for (let i = 0; i < weekCount; i += 1) {
+    const existing = entryByWeek.get(firstWeekNumber + i);
+    if (!existing) continue;
+    if (!studentRemark && existing.studentRemark) studentRemark = existing.studentRemark;
+    if (!supervisorRemark && existing.supervisorRemark) supervisorRemark = existing.supervisorRemark;
+    if (!supervisorName && existing.supervisorName) supervisorName = existing.supervisorName;
+    if (!supervisorStatus && existing.supervisorStatus) supervisorStatus = existing.supervisorStatus;
+  }
+
   return {
     weekBeginning: periodStart,
     weekEnding: periodEnd,
-    studentRemark: "",
+    studentRemark,
+    supervisorRemark: supervisorRemark || undefined,
+    supervisorName: supervisorName || undefined,
+    supervisorStatus: supervisorStatus || undefined,
     activities: withDates.slice(0, weekCount),
   };
 }

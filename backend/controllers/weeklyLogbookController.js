@@ -137,11 +137,17 @@ async function finalizeLogbook(req, res) {
     if (logbook.studentId !== user.id) return res.status(403).json({ message: 'Access denied' });
 
     const finalized = await WeeklyLogbook.finalize(logbook);
-    const { bundle } = await sendLogbookToSupervisor(finalized, user, req.ip, 'final_submission');
+    const { bundle, supervisorEmail } = await sendLogbookToSupervisor(
+      finalized,
+      user,
+      req.ip,
+      'final_submission'
+    );
 
     res.json({
       message: 'Weekly Log Sheet Book finalized and sent to supervisor',
       bundle,
+      supervisorEmail,
     });
   } catch (error) {
     console.error('Error finalizing weekly logbook:', error);

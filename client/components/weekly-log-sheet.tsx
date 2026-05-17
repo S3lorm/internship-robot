@@ -52,6 +52,8 @@ type WeeklyLogSheetProps = {
   weekCount?: number;
   lockPeriodDates?: boolean;
   editableWeekNumbers?: number[];
+  /** When false, hides supervisor remark/name/status (e.g. separate evaluation card). */
+  showSupervisorSection?: boolean;
   className?: string;
 };
 
@@ -174,6 +176,7 @@ export function WeeklyLogSheet({
   weekCount: weekCountProp,
   lockPeriodDates = false,
   editableWeekNumbers,
+  showSupervisorSection = true,
   className,
 }: WeeklyLogSheetProps) {
   const studentEditable = mode === "student-edit";
@@ -400,6 +403,8 @@ export function WeeklyLogSheet({
             rows={3}
           />
 
+          {showSupervisorSection && (
+            <>
           <RemarkBlock
             label="Supervisor's Remarks"
             locked={studentLocked}
@@ -460,6 +465,8 @@ export function WeeklyLogSheet({
               )}
             </div>
           </div>
+            </>
+          )}
         </footer>
       </div>
     </article>

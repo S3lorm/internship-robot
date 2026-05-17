@@ -17,7 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatStatusLabel } from "@/lib/utils";
 import { toast } from "sonner";
-import { BookOpen, Loader2, Lock, RefreshCw, Send } from "lucide-react";
+import { BookOpen, CheckCircle2, Loader2, Lock, Mail, RefreshCw, Send } from "lucide-react";
 
 const editableStatuses = ["draft", "ongoing", "rejected"];
 
@@ -29,6 +29,10 @@ export default function WeeklyLogbookPage() {
   const [finalizing, setFinalizing] = useState(false);
   const [resubmitting, setResubmitting] = useState(false);
   const [pageDrafts, setPageDrafts] = useState<WeeklyLogPageDraft[]>([]);
+  const [sendSuccess, setSendSuccess] = useState<{
+    email: string;
+    resent?: boolean;
+  } | null>(null);
 
   const editable = bundle ? editableStatuses.includes(bundle.logbook.status) : false;
   const isRejected = bundle?.logbook.status === "rejected";
@@ -189,9 +193,12 @@ export default function WeeklyLogbookPage() {
     if (result.error) {
       toast.error(result.error);
     } else {
-      toast.success("New supervisor review link sent by email");
-      const data = result.data as { bundle: WeeklyLogbookBundle };
+      const data = result.data as { bundle: WeeklyLogbookBundle; supervisorEmail?: string };
       setBundle(data.bundle);
+      if (data.supervisorEmail) {
+        setSendSuccess({ email: data.supervisorEmail, resent: true });
+      }
+      toast.success("New supervisor review link sent by email");
     }
     setResubmitting(false);
   };
@@ -256,6 +263,31 @@ export default function WeeklyLogbookPage() {
               ? ` — you can edit week ${editableWeekNumbers[0]} now`
               : ""}
             .
+          </CardContent>
+        </Card>
+      )}
+
+      {sendSuccess && (awaitingSupervisor || bundle.logbook.status === "submitted_final") && (
+        <Card className="border-emerald-300 bg-emerald-50 shadow-sm dark:border-emerald-800 dark:bg-emerald-950/40">
+          <CardContent className="flex items-start gap-4 pt-6">
+            <CheckCircle2 className="mt-0.5 h-8 w-8 shrink-0 text-emerald-600" />
+            <div className="space-y-1">
+              <p className="font-semibold text-emerald-950 dark:text-emerald-100">
+                {sendSuccess.resent
+                  ? "Supervisor review link sent successfully"
+                  : "Weekly log sheet book sent successfully"}
+              </p>
+              <p className="flex items-center gap-2 text-sm text-emerald-900/90 dark:text-emerald-100/90">
+                <Mail className="h-4 w-4 shrink-0" />
+                A secure hosted review link was emailed to{" "}
+                <span className="font-medium">{sendSuccess.email}</span>.
+              </p>
+              <p className="text-sm text-emerald-800/80 dark:text-emerald-200/80">
+                Your entries are locked until the supervisor completes their evaluation. After
+                that, the book will appear on the HOD / Secretary logbook page for approval and
+                archiving.
+              </p>
+            </div>
           </CardContent>
         </Card>
       )}

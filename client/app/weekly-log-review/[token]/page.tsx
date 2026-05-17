@@ -9,10 +9,8 @@ import {
 } from "@/lib/weekly-logbook-schedule";
 import { countWeeksInPeriod } from "@/lib/weekly-logbook-weeks";
 import type { WeeklyLogbookBundle } from "@/types";
-import {
-  WeeklyLogSheet,
-  type WeeklyLogSheetValues,
-} from "@/components/weekly-log-sheet";
+import { WeeklyLogSheet, type WeeklyLogSheetValues } from "@/components/weekly-log-sheet";
+import { SupervisorEvaluationCard } from "@/components/supervisor-evaluation-card";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,28 +18,43 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CheckCircle2, Loader2, Lock, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Loader2, Lock, Send, ShieldCheck } from "lucide-react";
 
 function entryByWeekNumber(bundle: WeeklyLogbookBundle, weekNumber: number) {
   return bundle.entries.find((e) => e.weekNumber === weekNumber);
 }
 
-function pageValuesWithSupervisorForms(
+function pageEvaluationValues(
   page: WeeklyLogPageDraft,
   bundle: WeeklyLogbookBundle,
   entryForms: Record<string, WeeklyLogSheetValues>
-): WeeklyLogSheetValues {
-  const base = { ...page.values };
+): Pick<WeeklyLogSheetValues, "supervisorRemark" | "supervisorName" | "supervisorStatus"> {
   for (let i = 0; i < page.weekCount; i += 1) {
     const entry = entryByWeekNumber(bundle, page.firstWeekNumber + i);
     if (!entry) continue;
     const form = entryForms[entry.id];
-    if (!form) continue;
-    if (form.supervisorRemark) base.supervisorRemark = form.supervisorRemark;
-    if (form.supervisorName) base.supervisorName = form.supervisorName;
-    if (form.supervisorStatus) base.supervisorStatus = form.supervisorStatus;
+    if (form?.supervisorRemark || form?.supervisorName || form?.supervisorStatus) {
+      return {
+        supervisorRemark: form.supervisorRemark || "",
+        supervisorName: form.supervisorName || "",
+        supervisorStatus: form.supervisorStatus || "",
+      };
+    }
   }
-  return base;
+  return { supervisorRemark: "", supervisorName: "", supervisorStatus: "" };
+}
+
+function studentSheetValues(
+  page: WeeklyLogPageDraft,
+  bundle: WeeklyLogbookBundle
+): WeeklyLogSheetValues {
+  const base = { ...page.values };
+  return {
+    ...base,
+    supervisorRemark: undefined,
+    supervisorName: undefined,
+    supervisorStatus: undefined,
+  };
 }
 
 export default function WeeklyLogSupervisorReviewPage({
@@ -102,7 +115,7 @@ export default function WeeklyLogSupervisorReviewPage({
     void load();
   }, [token]);
 
-  const updatePageSupervisorFields = (page: WeeklyLogPageDraft, values: WeeklyLogSheetValues) => {
+  const updatePageEvaluation = (page: WeeklyLogPageDraft, partial: Partial<WeeklyLogSheetValues>) => {
     setEntryForms((current) => {
       const next = { ...current };
       for (let i = 0; i < page.weekCount; i += 1) {
@@ -110,9 +123,7 @@ export default function WeeklyLogSupervisorReviewPage({
         if (!entry) continue;
         next[entry.id] = {
           ...(next[entry.id] || entryToSheetValues(entry)),
-          supervisorRemark: values.supervisorRemark,
-          supervisorName: values.supervisorName,
-          supervisorStatus: values.supervisorStatus,
+          ...partial,
         };
       }
       return next;
@@ -142,7 +153,6 @@ export default function WeeklyLogSupervisorReviewPage({
       toast.error(result.error);
     } else {
       setSubmitted(true);
-      toast.success("Supervisor section submitted to RMU for review");
     }
     setSubmitting(false);
   };
@@ -157,16 +167,20 @@ export default function WeeklyLogSupervisorReviewPage({
 
   if (submitted) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl items-center px-4">
-        <Card>
+      <main className="mx-auto flex min-h-screen max-w-2xl items-center px-4 py-12">
+        <Card className="w-full border-emerald-200 shadow-lg">
           <CardHeader className="text-center">
-            <CheckCircle2 className="mx-auto h-12 w-12 text-emerald-600" />
-            <CardTitle>Thank you</CardTitle>
-            <CardDescription>
-              Your remarks have been recorded. This secure link is now inactive and the logbook
-              has been forwarded to the HOD and Secretary for review.
+            <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-600" />
+            <CardTitle className="text-xl">Review submitted successfully</CardTitle>
+            <CardDescription className="text-base leading-relaxed">
+              Your evaluation has been recorded. This secure link is now inactive. The logbook
+              has been forwarded to the HOD and Secretary for institutional review and archiving.
             </CardDescription>
           </CardHeader>
+          <CardContent className="rounded-lg border border-emerald-100 bg-emerald-50/80 p-4 text-center text-sm text-emerald-950">
+            You may close this page. The student will be notified when the institution completes
+            their review.
+          </CardContent>
         </Card>
       </main>
     );
@@ -204,15 +218,14 @@ export default function WeeklyLogSupervisorReviewPage({
             </Badge>
             <CardTitle className="text-xl">Weekly Log Sheet Book</CardTitle>
             <CardDescription>
-              Student entries are locked. Complete the supervisor remark, name, and status on
-              each sheet (official log book layout).
+              Review each page below, then complete the evaluation cards and submit.
             </CardDescription>
           </CardHeader>
           <CardContent className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
             <Lock className="mt-0.5 h-4 w-4 shrink-0" />
             <p>
-              You cannot edit student activities, dates, credentials, or student remarks. Those
-              fields were locked when the student submitted this book.
+              Student activities and remarks are locked. Complete the evaluation card on each
+              page, then confirm your details at the bottom.
             </p>
           </CardContent>
         </Card>
@@ -223,33 +236,55 @@ export default function WeeklyLogSupervisorReviewPage({
             page.weekCount === 1
               ? `Week ${page.firstWeekNumber}`
               : `Weeks ${page.firstWeekNumber}–${lastWeek}`;
+          const pageLabel = `Page ${page.pageNumber} (${weekLabel})`;
 
           return (
-            <WeeklyLogSheet
-              key={page.pageNumber}
-              mode="supervisor"
-              header={header}
-              weekLabel={`Page ${page.pageNumber} (${weekLabel})`}
-              values={pageValuesWithSupervisorForms(page, bundle, entryForms)}
-              firstWeekNumber={page.firstWeekNumber}
-              weekCount={page.weekCount}
-              lockPeriodDates={hasPlacementDates}
-              onChange={(values) => updatePageSupervisorFields(page, values)}
-            />
+            <div key={page.pageNumber} className="space-y-4">
+              <Card className="overflow-hidden border-slate-200 shadow-sm">
+                <CardHeader className="border-b bg-slate-50 py-3">
+                  <CardTitle className="text-sm font-semibold">Student log — {pageLabel}</CardTitle>
+                  <CardDescription>Read-only weekly activities and student remarks</CardDescription>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  <WeeklyLogSheet
+                    mode="student-locked"
+                    header={header}
+                    weekLabel={pageLabel}
+                    values={studentSheetValues(page, bundle)}
+                    firstWeekNumber={page.firstWeekNumber}
+                    weekCount={page.weekCount}
+                    lockPeriodDates={hasPlacementDates}
+                    showSupervisorSection={false}
+                  />
+                </CardContent>
+              </Card>
+
+              <SupervisorEvaluationCard
+                pageLabel={pageLabel}
+                values={pageEvaluationValues(page, bundle, entryForms)}
+                onChange={(partial) => updatePageEvaluation(page, partial)}
+              />
+            </div>
           );
         })}
 
-        <Card>
+        <Card className="border-primary/20 shadow-md">
           <CardHeader>
-            <CardTitle>Final supervisor confirmation</CardTitle>
-            <CardDescription>Used for the institutional record and email trail.</CardDescription>
+            <CardTitle className="flex items-center gap-2">
+              <Send className="h-5 w-5 text-primary" />
+              Final supervisor confirmation
+            </CardTitle>
+            <CardDescription>
+              Used for the institutional record and forwarded to HOD / Secretary.
+            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label>Confirmed supervisor full name</Label>
+              <Label>Confirmed supervisor full name *</Label>
               <Input
                 value={supervisorFullName}
                 onChange={(e) => setSupervisorFullName(e.target.value)}
+                className="bg-white"
               />
             </div>
             <div className="space-y-2">
@@ -257,11 +292,18 @@ export default function WeeklyLogSupervisorReviewPage({
               <Textarea
                 value={supervisorRecommendation}
                 onChange={(e) => setSupervisorRecommendation(e.target.value)}
+                placeholder="Summary comment for the institution…"
+                rows={3}
+                className="resize-y bg-white"
               />
             </div>
-            <Button onClick={submit} disabled={submitting} className="w-full sm:w-auto">
-              {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Submit supervisor section
+            <Button onClick={submit} disabled={submitting} size="lg" className="w-full sm:w-auto">
+              {submitting ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Send className="mr-2 h-4 w-4" />
+              )}
+              Submit supervisor review
             </Button>
           </CardContent>
         </Card>
