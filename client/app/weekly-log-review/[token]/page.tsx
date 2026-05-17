@@ -166,22 +166,47 @@ export default function WeeklyLogSupervisorReviewPage({
   }
 
   if (submitted) {
+    const studentName = bundle
+      ? `${bundle.student?.firstName || ""} ${bundle.student?.lastName || ""}`.trim()
+      : "";
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl items-center px-4 py-12">
-        <Card className="w-full border-emerald-200 shadow-lg">
-          <CardHeader className="text-center">
-            <CheckCircle2 className="mx-auto h-14 w-14 text-emerald-600" />
-            <CardTitle className="text-xl">Review submitted successfully</CardTitle>
-            <CardDescription className="text-base leading-relaxed">
-              Your evaluation has been recorded. This secure link is now inactive. The logbook
-              has been forwarded to the HOD and Secretary for institutional review and archiving.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="rounded-lg border border-emerald-100 bg-emerald-50/80 p-4 text-center text-sm text-emerald-950">
-            You may close this page. The student will be notified when the institution completes
-            their review.
-          </CardContent>
-        </Card>
+      <main className="flex min-h-screen items-center justify-center bg-slate-100 px-4 py-10 sm:py-16">
+        <div className="w-full max-w-md">
+          <Card className="overflow-hidden border-emerald-200 shadow-xl">
+            <div className="bg-emerald-600 px-6 py-10 text-center text-white">
+              <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-white/20">
+                <CheckCircle2 className="h-9 w-9" aria-hidden />
+              </div>
+              <h1 className="text-xl font-bold sm:text-2xl">Review submitted successfully</h1>
+              <p className="mt-2 text-sm text-emerald-50 sm:text-base">
+                Your supervisor evaluation has been saved.
+              </p>
+            </div>
+            <CardContent className="space-y-4 p-6 text-sm leading-relaxed text-slate-700">
+              {studentName ? (
+                <p>
+                  The weekly log sheet book for{" "}
+                  <span className="font-semibold text-slate-900">{studentName}</span> has been
+                  forwarded to the student&apos;s department HOD and the Secretary for institutional
+                  review.
+                </p>
+              ) : (
+                <p>
+                  The weekly log sheet book has been forwarded to the department HOD and Secretary
+                  for institutional review.
+                </p>
+              )}
+              <ul className="list-inside list-disc space-y-1 text-slate-600">
+                <li>This secure review link is now inactive.</li>
+                <li>You cannot change your submission from this page.</li>
+                <li>The institution will approve or return the book after review.</li>
+              </ul>
+              <p className="rounded-md border border-slate-200 bg-slate-50 px-4 py-3 text-center text-slate-600">
+                You may safely close this browser tab.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     );
   }

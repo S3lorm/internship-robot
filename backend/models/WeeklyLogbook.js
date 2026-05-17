@@ -74,7 +74,9 @@ async function getPlacement(placementId) {
 async function getStudent(studentId) {
   const { data, error } = await supabase
     .from('user_profiles')
-    .select('id, first_name, last_name, email, student_id, department, program, year_of_study, phone')
+    .select(
+      'id, first_name, last_name, email, student_id, department, program, year_of_study, phone, role, is_email_verified'
+    )
     .eq('id', studentId)
     .maybeSingle();
   if (error && error.code !== 'PGRST116') throw error;
@@ -89,6 +91,8 @@ async function getStudent(studentId) {
     program: data.program,
     yearOfStudy: data.year_of_study,
     phone: data.phone,
+    role: data.role || 'student',
+    isEmailVerified: Boolean(data.is_email_verified),
   };
 }
 

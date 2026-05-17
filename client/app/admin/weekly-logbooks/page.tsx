@@ -278,15 +278,15 @@ export default function WeeklyLogbooksAdminPage() {
             <CardHeader>
               <CardTitle>Supervisor-reviewed logbooks</CardTitle>
               <CardDescription>
-                These appear here after the supervisor submits their evaluation on the hosted
-                review page.
+                Logbooks appear here after a supervisor submits their evaluation. Department HODs
+                only see students from their department; the Secretary sees all departments.
               </CardDescription>
             </CardHeader>
             <CardContent>
               <LogbookTable
                 items={reviewItems}
                 loading={loadingReview}
-                emptyMessage="No logbooks awaiting institutional review."
+                emptyMessage="No logbooks awaiting institutional review for your department."
                 onView={setSelected}
                 onPdf={openPdf}
               />

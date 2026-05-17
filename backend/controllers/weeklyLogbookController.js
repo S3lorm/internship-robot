@@ -1,14 +1,22 @@
 const { studentBelongsToHodDepartment } = require('../constants/departmentCatalog');
 const { isEmailVerifiedStudent } = require('../utils/verifiedStudent');
 
+function isDepartmentHod(user) {
+  if (!user) return false;
+  if (user.originalRole === 'secutuary' || user.role === 'secutuary') return false;
+  return user.role === 'hod' && Boolean(user.department);
+}
+
 function canStaffAccess(user, bundle) {
   if (!user || !bundle?.student) return false;
   if (user.originalRole === 'secutuary' || user.role === 'secutuary') return true;
   if (user.role === 'hod') {
-    return (
-      isEmailVerifiedStudent(bundle.student) &&
-      studentBelongsToHodDepartment(bundle.student, user.department)
-    );
+    if (!user.department) return false;
+    if (!studentBelongsToHodDepartment(bundle.student, user.department)) return false;
+    // Logbook bundles load student from user_profiles; require verified when that flag is present.
+    if (bundle.student.isEmailVerified === false) return false;
+    if (bundle.student.role && bundle.student.role !== 'student') return false;
+    return true;
   }
   return false;
 }
@@ -197,7 +205,7 @@ async function listStaffLogbooks(req, res) {
 
     const { WeeklyLogbook } = require('../models');
     let bundles = await WeeklyLogbook.listForStaff(req.query.status || 'supervisor_reviewed');
-    if (user.role === 'hod' && user.originalRole !== 'secutuary') {
+    if (isDepartmentHod(user)) {
       bundles = bundles.filter((bundle) => canStaffAccess(user, bundle));
     }
     res.json({ logbooks: bundles });
