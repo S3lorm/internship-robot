@@ -212,14 +212,16 @@ export default function DashboardPage() {
   }, [notices, user?.department]);
 
 
-  const handleDownloadLetter = async (id: string, ref?: string) => {
+  const handleDownloadLetter = async (id: string, ref?: string, isGeneral?: boolean) => {
     try {
-      const html = await lettersApi.downloadLetterPDF(id);
-      const blob = new Blob([html], { type: "text/html" });
+      const blob = await lettersApi.downloadLetterPDF(id);
+      if (!(blob instanceof Blob)) return;
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `Internship_Letter_${ref || id}.html`;
+      a.download = isGeneral
+        ? `General_Introduction_Letter_${ref || id}.pdf`
+        : `Internship_Letter_${ref || id}.pdf`;
       document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
@@ -231,10 +233,10 @@ export default function DashboardPage() {
 
   const handleViewLetter = async (id: string) => {
     try {
-      const html = await lettersApi.downloadLetterPDF(id);
-      const blob = new Blob([html], { type: "text/html" });
+      const blob = await lettersApi.downloadLetterPDF(id);
+      if (!(blob instanceof Blob)) return;
       const url = window.URL.createObjectURL(blob);
-      window.open(url, '_blank');
+      window.open(url, "_blank", "noopener,noreferrer");
     } catch (err: any) {
       toast.error(err.message || "Failed to view letter");
     }
@@ -242,8 +244,9 @@ export default function DashboardPage() {
 
   const handlePrintLetter = async (id: string) => {
     try {
-      const html = await lettersApi.downloadLetterPDF(id);
-      const printWindow = window.open('', '_blank');
+      const html = await lettersApi.downloadLetterPDF(id, { format: "html" });
+      if (typeof html !== "string") return;
+      const printWindow = window.open("", "_blank");
       if (printWindow) {
         printWindow.document.write(html);
         printWindow.document.close();
@@ -312,9 +315,15 @@ export default function DashboardPage() {
                         <Eye className="mr-2 h-4 w-4" />
                         View
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleDownloadLetter(request.id, request.referenceNumber)}>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() =>
+                          handleDownloadLetter(request.id, request.referenceNumber, true)
+                        }
+                      >
                         <Download className="mr-2 h-4 w-4" />
-                        Download
+                        Download PDF
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => handlePrintLetter(request.id)}>
                         <Printer className="mr-2 h-4 w-4" />

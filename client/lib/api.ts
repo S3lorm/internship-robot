@@ -420,20 +420,32 @@ export const lettersApi = {
       body: JSON.stringify(payload),
     }),
 
-  downloadLetterPDF: (id: string) => {
-    return fetch(`${API_BASE_URL}/letters/requests/${id}/download`, {
-      method: 'GET',
-      headers:
-        typeof window !== 'undefined' && localStorage.getItem('rmu_token')
-          ? { Authorization: `Bearer ${localStorage.getItem('rmu_token')}` }
-          : undefined,
-    }).then(async res => {
-      if (!res.ok) {
-        const json = await res.json();
-        throw new Error(json.message || 'Failed to download letter');
+  downloadLetterPDF: async (
+    id: string,
+    options?: { format?: 'pdf' | 'html' }
+  ): Promise<Blob | string> => {
+    const format = options?.format ?? 'pdf';
+    const res = await fetch(
+      `${API_BASE_URL}/letters/requests/${id}/download?format=${format}`,
+      {
+        method: 'GET',
+        headers:
+          typeof window !== 'undefined' && localStorage.getItem('rmu_token')
+            ? { Authorization: `Bearer ${localStorage.getItem('rmu_token')}` }
+            : undefined,
       }
-      return res.text();
-    });
+    );
+    if (!res.ok) {
+      let message = 'Failed to download letter';
+      try {
+        const json = await res.json();
+        message = json.message || message;
+      } catch {
+        /* non-JSON error body */
+      }
+      throw new Error(message);
+    }
+    return format === 'pdf' ? res.blob() : res.text();
   },
 
   markEmailSent: (id: string) =>

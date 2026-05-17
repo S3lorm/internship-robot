@@ -381,23 +381,27 @@ export default function LetterRequestsPage() {
                       className="mt-3"
                       onClick={async () => {
                         try {
-                          const html = await lettersApi.downloadLetterPDF(latestGeneralRequest.id);
-                          const blob = new Blob([html], { type: "text/html" });
+                          const blob = await lettersApi.downloadLetterPDF(latestGeneralRequest.id);
+                          if (!(blob instanceof Blob)) return;
+                          const ref =
+                            latestGeneralRequest.referenceNumber ||
+                            latestGeneralRequest.id;
                           const url = window.URL.createObjectURL(blob);
                           const a = document.createElement("a");
                           a.href = url;
-                          a.download = `General_Introduction_Letter.html`;
+                          a.download = `General_Introduction_Letter_${ref}.pdf`;
                           document.body.appendChild(a);
                           a.click();
                           window.URL.revokeObjectURL(url);
                           document.body.removeChild(a);
+                          toast.success("General request letter downloaded as PDF");
                         } catch (error: any) {
                           toast.error(error.message || "Failed to download letter");
                         }
                       }}
                     >
                       <FileText className="mr-2 h-4 w-4" />
-                      Download Letter
+                      Download PDF
                     </Button>
                   )}
                   {latestGeneralRequest.internshipStartDate && latestGeneralRequest.internshipEndDate && (

@@ -1196,6 +1196,14 @@ async function downloadLetterPDF(req, res) {
     ? await buildLetterVerificationAssets(letterRequest.verificationCode)
     : null;
   const html = await generateLetterHTML(student, null, letterRequest, signature, vAssets);
+    const wantsHtml = String(req.query.format || 'pdf').toLowerCase() === 'html';
+    const isGeneral = letterRequest.requestType === 'general';
+    const refSlug = (letterRequest.referenceNumber || letterRequest.id || 'letter')
+      .toString()
+      .replace(/[^a-zA-Z0-9_-]+/g, '_');
+    const baseFilename = isGeneral
+      ? `General_Introduction_Letter_${refSlug}`
+      : `Internship_Letter_${refSlug}`;
 
     // Log document download
     const { logActivity } = require('../services/activityLogService');
@@ -1236,10 +1244,17 @@ async function downloadLetterPDF(req, res) {
       lastDownloadedAt: new Date().toISOString(),
     });
 
-    // Return HTML (can be printed to PDF by browser)
-    res.setHeader('Content-Type', 'text/html');
-    res.setHeader('Content-Disposition', `attachment; filename="Internship_Letter_${letterRequest.referenceNumber || letterRequest.id}.html"`);
-    res.send(html);
+    if (wantsHtml) {
+      res.setHeader('Content-Type', 'text/html; charset=utf-8');
+      res.setHeader('Content-Disposition', `inline; filename="${baseFilename}.html"`);
+      return res.send(html);
+    }
+
+    const pdfBuffer = await generatePDFBuffer(student, letterRequest, signature, vAssets);
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename="${baseFilename}.pdf"`);
+    res.setHeader('Content-Length', pdfBuffer.length);
+    res.send(pdfBuffer);
   } catch (error) {
     console.error('Error downloading letter PDF:', error);
     res.status(500).json({
