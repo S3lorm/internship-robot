@@ -158,7 +158,7 @@ function FieldLine({
         {label}:
       </span>
       {children ?? (
-        <span className="min-h-[1.35rem] flex-1 border-b border-dotted border-black/70 pb-0.5 text-sm font-medium text-black">
+        <span className="min-h-[1.35rem] min-w-0 flex-1 wrap-break-word border-b border-dotted border-black/70 pb-0.5 text-sm font-medium text-black">
           {value || "\u00a0"}
         </span>
       )}
@@ -256,7 +256,7 @@ export function WeeklyLogSheet({
   return (
     <article
       className={cn(
-        "logsheet-paper relative mx-auto w-full max-w-[820px] bg-white font-serif text-black shadow-md print:max-w-none print:shadow-none",
+        "logsheet-paper relative mx-auto w-full min-w-0 max-w-[820px] bg-white font-serif text-black shadow-md print:max-w-none print:shadow-none",
         className
       )}
     >
@@ -365,7 +365,7 @@ export function WeeklyLogSheet({
                 return (
                   <tr key={index} className="border-b border-black last:border-b-0">
                     <td className="border-r border-black align-top px-2 py-2">
-                      <p className="min-h-[4.5rem] text-sm font-medium leading-snug">
+        <p className="min-h-[4.5rem] wrap-break-word text-sm font-medium leading-snug">
                         {dateLabel || "\u00a0"}
                       </p>
                     </td>

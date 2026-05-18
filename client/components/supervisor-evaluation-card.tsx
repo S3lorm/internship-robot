@@ -22,15 +22,15 @@ export function SupervisorEvaluationCard({
   onChange,
 }: SupervisorEvaluationCardProps) {
   return (
-    <Card className="border-emerald-200 bg-gradient-to-b from-emerald-50/90 to-white shadow-sm">
+    <Card className="border-emerald-200 bg-linear-to-b from-emerald-50/90 to-white shadow-sm">
       <CardHeader className="pb-3">
         <div className="flex items-start gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white">
             <ClipboardCheck className="h-5 w-5" />
           </div>
-          <div>
-            <CardTitle className="text-base">Supervisor evaluation</CardTitle>
-            <CardDescription>{pageLabel}</CardDescription>
+          <div className="min-w-0 flex-1 space-y-1">
+            <CardTitle className="text-base leading-snug">Supervisor evaluation</CardTitle>
+            <CardDescription className="wrap-break-word leading-snug">{pageLabel}</CardDescription>
           </div>
         </div>
       </CardHeader>

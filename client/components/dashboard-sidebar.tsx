@@ -18,7 +18,6 @@ import {
   User,
   LogOut,
   Anchor,
-  Settings,
   ClipboardCheck,
 } from "lucide-react";
 
@@ -270,17 +269,6 @@ export function DashboardSidebar({ className, onNavigate }: DashboardSidebarProp
         </div>
 
         <div className="space-y-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-            asChild
-          >
-            <Link href="/dashboard/profile" onClick={onNavigate}>
-              <Settings className="mr-2 h-4 w-4" />
-              Settings
-            </Link>
-          </Button>
           <Button
             variant="ghost"
             size="sm"

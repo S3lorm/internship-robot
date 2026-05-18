@@ -3,6 +3,13 @@
 import React, { useState, useEffect } from 'react';
 import { useParams } from 'next/navigation';
 import { toast } from 'sonner';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
 
@@ -61,7 +68,7 @@ export default function EvaluatePage() {
   }, [token]);
 
   function setRating(key: string, value: number) {
-    setForm(prev => ({ ...prev, [key]: value }));
+    setForm((prev) => ({ ...prev, [key]: value }));
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -71,8 +78,7 @@ export default function EvaluatePage() {
       return;
     }
 
-    // Validate
-    const allRated = RATING_CATEGORIES.every(c => Number(form[c.key as keyof typeof form]) > 0);
+    const allRated = RATING_CATEGORIES.every((c) => Number(form[c.key as keyof typeof form]) > 0);
     if (!form.supervisorName.trim()) {
       toast.error('Please enter your name');
       return;
@@ -107,26 +113,21 @@ export default function EvaluatePage() {
     }
   }
 
-  // Star rating component
   function StarRating({ category }: { category: string }) {
     const currentRating = form[category as keyof typeof form] as number;
     return (
-      <div style={{ display: 'flex', gap: '6px' }}>
-        {[1, 2, 3, 4, 5].map(n => (
+      <div className="flex flex-wrap gap-1.5 sm:justify-end" role="group" aria-label="Rating 1 to 5">
+        {[1, 2, 3, 4, 5].map((n) => (
           <button
             key={n}
             type="button"
             onClick={() => setRating(category, n)}
-            style={{
-              width: '40px', height: '40px', borderRadius: '8px',
-              border: 'none', cursor: 'pointer', fontSize: '18px',
-              background: n <= currentRating
-                ? 'linear-gradient(135deg, #f59e0b, #f97316)'
-                : 'rgba(255,255,255,0.08)',
-              color: n <= currentRating ? 'white' : 'rgba(255,255,255,0.3)',
-              transition: 'all 0.2s',
-              fontWeight: '700',
-            }}
+            className={cn(
+              'h-10 min-w-9 flex-1 rounded-lg border-0 text-sm font-bold transition-all sm:h-10 sm:w-10 sm:flex-none',
+              n <= currentRating
+                ? 'bg-linear-to-br from-amber-500 to-orange-500 text-white shadow-sm'
+                : 'bg-white/10 text-white/35 hover:bg-white/15'
+            )}
           >
             {n}
           </button>
@@ -135,269 +136,247 @@ export default function EvaluatePage() {
     );
   }
 
-  const containerStyle: React.CSSProperties = {
-    minHeight: '100vh',
-    background: 'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #0f172a 100%)',
-    padding: '40px 20px',
-    fontFamily: 'var(--font-quicksand), sans-serif',
-  };
-
-  const cardStyle: React.CSSProperties = {
-    maxWidth: '700px', width: '100%', margin: '0 auto',
-    background: 'rgba(255,255,255,0.05)',
-    backdropFilter: 'blur(20px)',
-    borderRadius: '20px',
-    border: '1px solid rgba(255,255,255,0.1)',
-    padding: '40px',
-    boxShadow: '0 25px 50px rgba(0,0,0,0.3)',
-  };
+  const shellClass =
+    'min-h-screen bg-linear-to-br from-slate-950 via-slate-900 to-slate-950 px-4 py-8 pb-12 text-slate-50';
 
   if (loading) {
     return (
-      <div style={{ ...containerStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={cardStyle}>
-          <p style={{ color: 'white', textAlign: 'center' }}>Loading evaluation form...</p>
-        </div>
+      <div className={cn(shellClass, 'flex items-center justify-center')}>
+        <Card className="w-full max-w-md border-white/10 bg-white/5 backdrop-blur-xl">
+          <CardContent className="flex items-center justify-center gap-3 py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-emerald-400" aria-hidden />
+            <p className="text-center text-sm text-white/80">Loading evaluation form…</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={{ ...containerStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={cardStyle}>
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ fontSize: '48px' }}>⚠️</span>
-            <h2 style={{ color: 'white', marginTop: '16px' }}>{error}</h2>
-            <p style={{ color: 'rgba(255,255,255,0.5)' }}>
+      <div className={cn(shellClass, 'flex items-center justify-center')}>
+        <Card className="w-full max-w-md border-white/10 bg-white/5 backdrop-blur-xl">
+          <CardHeader className="space-y-3 text-center">
+            <div className="text-4xl" aria-hidden>
+              ⚠️
+            </div>
+            <CardTitle className="text-xl text-white">{error}</CardTitle>
+            <CardDescription className="text-pretty text-white/55">
               If you believe this is an error, please contact the university for assistance.
-            </p>
-          </div>
-        </div>
+            </CardDescription>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
 
   if (success) {
     return (
-      <div style={{ ...containerStyle, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={cardStyle}>
-          <div style={{ textAlign: 'center' }}>
-            <span style={{ fontSize: '48px' }}>🎉</span>
-            <h2 style={{ color: '#22c55e', marginTop: '16px' }}>Evaluation Submitted Successfully!</h2>
-            <p style={{ color: 'rgba(255,255,255,0.6)', marginTop: '8px' }}>
-              Thank you for taking the time to evaluate the student&apos;s performance.
-              Your feedback is invaluable to their academic development.
-            </p>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '13px', marginTop: '20px' }}>
-              You may close this page now.
-            </p>
-          </div>
-        </div>
+      <div className={cn(shellClass, 'flex items-center justify-center')}>
+        <Card className="w-full max-w-md border-white/10 bg-white/5 backdrop-blur-xl">
+          <CardHeader className="space-y-3 text-center">
+            <div className="text-4xl" aria-hidden>
+              🎉
+            </div>
+            <CardTitle className="text-xl text-emerald-400">Evaluation submitted successfully</CardTitle>
+            <CardDescription className="text-pretty text-white/65">
+              Thank you for evaluating the student&apos;s performance. Your feedback supports their
+              academic development.
+            </CardDescription>
+            <p className="text-xs text-white/40">You may close this page now.</p>
+          </CardHeader>
+        </Card>
       </div>
     );
   }
-
-  const inputStyle: React.CSSProperties = {
-    width: '100%', padding: '12px 16px',
-    background: 'rgba(255,255,255,0.08)',
-    border: '1px solid rgba(255,255,255,0.15)',
-    borderRadius: '10px', color: 'white', fontSize: '14px', outline: 'none',
-    boxSizing: 'border-box',
-  };
-
-  const labelStyle: React.CSSProperties = {
-    color: 'rgba(255,255,255,0.7)', fontSize: '13px', fontWeight: '600',
-    display: 'block', marginBottom: '6px',
-  };
 
   const submitLocked = Boolean(formData && formData.isSubmitWindowOpen === false);
   const daysLeft = typeof formData?.daysUntilEnd === 'number' ? formData.daysUntilEnd : null;
 
   return (
-    <div style={containerStyle}>
-      <div style={cardStyle}>
-        {/* Header */}
-        <div style={{ textAlign: 'center', marginBottom: '30px' }}>
-          <div style={{
-            width: '60px', height: '60px', borderRadius: '16px',
-            background: 'linear-gradient(135deg, #22c55e, #16a34a)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            margin: '0 auto 16px', fontSize: '24px',
-          }}>📋</div>
-          <h1 style={{ color: 'white', fontSize: '22px', fontWeight: '700', margin: '0 0 8px' }}>
-            Internship Evaluation Form
-          </h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: 0 }}>
-            Regional Maritime University — Supervisor Assessment
-          </p>
-        </div>
-
-        {/* Student info banner */}
-        {formData?.student && (
-          <div style={{
-            background: 'rgba(59,130,246,0.1)', border: '1px solid rgba(59,130,246,0.2)',
-            borderRadius: '12px', padding: '16px', marginBottom: '24px',
-          }}>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', margin: '0 0 6px', textTransform: 'uppercase', letterSpacing: '1px' }}>
-              Evaluating Student
-            </p>
-            <p style={{ color: 'white', fontSize: '16px', fontWeight: '600', margin: 0 }}>
-              {formData.student.firstName} {formData.student.lastName}
-            </p>
-            <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '13px', margin: '4px 0 0' }}>
-              {formData.student.program} — {formData.placement?.organizationName}
-            </p>
-          </div>
-        )}
-
-        {submitLocked && (
-          <div style={{
-            background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.35)',
-            borderRadius: '12px', padding: '14px 16px', marginBottom: '20px',
-          }}>
-            <p style={{ color: '#fcd34d', fontSize: '14px', fontWeight: 600, margin: '0 0 6px' }}>
-              Submission opens in the final two weeks of the internship
-            </p>
-            <p style={{ color: 'rgba(255,255,255,0.55)', fontSize: '13px', margin: 0, lineHeight: 1.5 }}>
-              {daysLeft != null
-                ? `There are still ${daysLeft} day${daysLeft === 1 ? '' : 's'} until the internship end date. You can review this page now; the university will rely on this same link when you submit the evaluation closer to the end of the placement.`
-                : 'You can review this page now. The university will rely on this same link when you submit the evaluation closer to the end of the placement.'}
-            </p>
-          </div>
-        )}
-
-        <form onSubmit={handleSubmit}>
-          {/* Supervisor Info */}
-          <div style={{
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
-            paddingBottom: '24px', marginBottom: '24px',
-          }}>
-            <h3 style={{ color: 'white', fontSize: '16px', fontWeight: '600', margin: '0 0 16px' }}>
-              Supervisor Information
-            </h3>
-            <div style={{ display: 'grid', gap: '14px' }}>
-              <div>
-                <label style={labelStyle}>Your Name *</label>
-                <input
-                  type="text" value={form.supervisorName}
-                  onChange={e => setForm(p => ({ ...p, supervisorName: e.target.value }))}
-                  style={inputStyle} placeholder="e.g. John Mensah" required
-                />
-              </div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '14px' }}>
-                <div>
-                  <label style={labelStyle}>Position</label>
-                  <input
-                    type="text" value={form.supervisorPosition}
-                    onChange={e => setForm(p => ({ ...p, supervisorPosition: e.target.value }))}
-                    style={inputStyle} placeholder="e.g. Senior Engineer"
-                  />
-                </div>
-                <div>
-                  <label style={labelStyle}>Department</label>
-                  <input
-                    type="text" value={form.supervisorDepartment}
-                    onChange={e => setForm(p => ({ ...p, supervisorDepartment: e.target.value }))}
-                    style={inputStyle} placeholder="e.g. Engineering"
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Ratings */}
-          <div style={{
-            borderBottom: '1px solid rgba(255,255,255,0.1)',
-            paddingBottom: '24px', marginBottom: '24px',
-          }}>
-            <h3 style={{ color: 'white', fontSize: '16px', fontWeight: '600', margin: '0 0 4px' }}>
-              Performance Ratings
-            </h3>
-            <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '12px', margin: '0 0 16px' }}>
-              Rate each category from 1 (Poor) to 5 (Excellent)
-            </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-              {RATING_CATEGORIES.map(cat => (
-                <div key={cat.key} style={{
-                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-                  padding: '12px 16px', borderRadius: '10px',
-                  background: 'rgba(255,255,255,0.03)',
-                }}>
-                  <div>
-                    <p style={{ color: 'white', fontSize: '14px', fontWeight: '600', margin: '0 0 2px' }}>
-                      {cat.label}
-                    </p>
-                    <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: '11px', margin: 0 }}>
-                      {cat.description}
-                    </p>
-                  </div>
-                  <StarRating category={cat.key} />
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Comments */}
-          <div style={{ marginBottom: '24px' }}>
-            <label style={labelStyle}>Comments</label>
-            <textarea
-              value={form.supervisorComments}
-              onChange={e => setForm(p => ({ ...p, supervisorComments: e.target.value }))}
-              placeholder="Please share additional observations about the student's performance..."
-              rows={4}
-              style={{ ...inputStyle, resize: 'vertical' as const }}
-            />
-          </div>
-
-          {/* Final Recommendation */}
-          <div style={{ marginBottom: '30px' }}>
-            <label style={labelStyle}>Final Recommendation *</label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px' }}>
-              {RECOMMENDATIONS.map(rec => (
-                <button
-                  key={rec} type="button"
-                  onClick={() => setForm(p => ({ ...p, finalRecommendation: rec }))}
-                  style={{
-                    padding: '12px', borderRadius: '10px', cursor: 'pointer',
-                    border: form.finalRecommendation === rec
-                      ? '2px solid #3b82f6'
-                      : '1px solid rgba(255,255,255,0.15)',
-                    background: form.finalRecommendation === rec
-                      ? 'rgba(59,130,246,0.15)'
-                      : 'rgba(255,255,255,0.05)',
-                    color: form.finalRecommendation === rec ? '#60a5fa' : 'rgba(255,255,255,0.6)',
-                    fontSize: '13px', fontWeight: '600',
-                    transition: 'all 0.2s',
-                  }}
-                >
-                  {rec}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Submit */}
-          <button
-            type="submit"
-            disabled={submitting || submitLocked}
-            style={{
-              width: '100%', padding: '16px',
-              background: (submitting || submitLocked) ? 'rgba(34,197,94,0.45)' : 'linear-gradient(135deg, #22c55e, #16a34a)',
-              color: 'white', border: 'none', borderRadius: '12px',
-              fontSize: '16px', fontWeight: '700',
-              cursor: (submitting || submitLocked) ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-            }}
+    <div className={shellClass}>
+      <Card className="mx-auto w-full max-w-2xl border-white/10 bg-white/5 shadow-2xl backdrop-blur-xl">
+        <CardHeader className="space-y-3 border-b border-white/10 px-5 pb-6 pt-8 text-center sm:px-8">
+          <div
+            className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-linear-to-br from-emerald-500 to-green-600 text-2xl shadow-lg"
+            aria-hidden
           >
-            {submitting ? 'Submitting...' : submitLocked ? 'Submission locked until final two weeks' : 'Submit Evaluation'}
-          </button>
-        </form>
+            📋
+          </div>
+          <CardTitle className="text-balance text-xl font-bold text-white sm:text-2xl">
+            Internship evaluation form
+          </CardTitle>
+          <CardDescription className="mx-auto max-w-md text-pretty text-sm text-white/50">
+            Regional Maritime University — supervisor assessment
+          </CardDescription>
+        </CardHeader>
 
-        <p style={{ textAlign: 'center', color: 'rgba(255,255,255,0.25)', fontSize: '11px', marginTop: '20px' }}>
-          This is a secure evaluation form. Your response will be recorded and shared with the university.
-        </p>
-      </div>
+        <CardContent className="space-y-6 px-5 py-6 sm:px-8 sm:py-8">
+          {formData?.student && (
+            <div className="rounded-xl border border-blue-400/25 bg-blue-500/10 p-4 text-left">
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
+                Evaluating student
+              </p>
+              <p className="mt-1 wrap-break-word text-base font-semibold text-white">
+                {formData.student.firstName} {formData.student.lastName}
+              </p>
+              <p className="mt-1 wrap-break-word text-sm leading-relaxed text-white/55">
+                {formData.student.program}
+                {formData.placement?.organizationName ? (
+                  <>
+                    {' '}
+                    — <span className="text-white/75">{formData.placement.organizationName}</span>
+                  </>
+                ) : null}
+              </p>
+            </div>
+          )}
+
+          {submitLocked && (
+            <div className="rounded-xl border border-amber-400/35 bg-amber-500/10 p-4 text-left">
+              <p className="text-sm font-semibold text-amber-200">
+                Submission opens in the final two weeks of the internship
+              </p>
+              <p className="mt-2 text-pretty text-sm leading-relaxed text-white/60">
+                {daysLeft != null
+                  ? `There are still ${daysLeft} day${daysLeft === 1 ? '' : 's'} until the internship end date. You can review this page now; use this same link to submit closer to the end of the placement.`
+                  : 'You can review this page now. Use this same link to submit closer to the end of the placement.'}
+              </p>
+            </div>
+          )}
+
+          <form className="space-y-8" onSubmit={handleSubmit}>
+            <section className="space-y-4 border-b border-white/10 pb-8">
+              <h3 className="text-base font-semibold text-white">Supervisor information</h3>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="supervisor-name" className="text-white/70">
+                    Your name *
+                  </Label>
+                  <Input
+                    id="supervisor-name"
+                    type="text"
+                    value={form.supervisorName}
+                    onChange={(e) => setForm((p) => ({ ...p, supervisorName: e.target.value }))}
+                    placeholder="e.g. John Mensah"
+                    required
+                    className="border-white/15 bg-white/10 text-white placeholder:text-white/35"
+                  />
+                </div>
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <div className="space-y-2">
+                    <Label htmlFor="supervisor-position" className="text-white/70">
+                      Position
+                    </Label>
+                    <Input
+                      id="supervisor-position"
+                      type="text"
+                      value={form.supervisorPosition}
+                      onChange={(e) => setForm((p) => ({ ...p, supervisorPosition: e.target.value }))}
+                      placeholder="e.g. Senior Engineer"
+                      className="border-white/15 bg-white/10 text-white placeholder:text-white/35"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="supervisor-dept" className="text-white/70">
+                      Department
+                    </Label>
+                    <Input
+                      id="supervisor-dept"
+                      type="text"
+                      value={form.supervisorDepartment}
+                      onChange={(e) => setForm((p) => ({ ...p, supervisorDepartment: e.target.value }))}
+                      placeholder="e.g. Engineering"
+                      className="border-white/15 bg-white/10 text-white placeholder:text-white/35"
+                    />
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section className="space-y-4 border-b border-white/10 pb-8">
+              <div>
+                <h3 className="text-base font-semibold text-white">Performance ratings</h3>
+                <p className="mt-1 text-sm text-white/45">
+                  Rate each category from 1 (poor) to 5 (excellent)
+                </p>
+              </div>
+              <div className="flex flex-col gap-3">
+                {RATING_CATEGORIES.map((cat) => (
+                  <div
+                    key={cat.key}
+                    className="flex flex-col gap-3 rounded-xl bg-white/5 p-4 sm:flex-row sm:items-start sm:justify-between sm:gap-4"
+                  >
+                    <div className="min-w-0 flex-1 space-y-1">
+                      <p className="font-semibold text-white">{cat.label}</p>
+                      <p className="wrap-break-word text-xs leading-relaxed text-white/45">
+                        {cat.description}
+                      </p>
+                    </div>
+                    <StarRating category={cat.key} />
+                  </div>
+                ))}
+              </div>
+            </section>
+
+            <section className="space-y-2">
+              <Label htmlFor="comments" className="text-white/70">
+                Comments
+              </Label>
+              <Textarea
+                id="comments"
+                value={form.supervisorComments}
+                onChange={(e) => setForm((p) => ({ ...p, supervisorComments: e.target.value }))}
+                placeholder="Additional observations about the student's performance…"
+                rows={4}
+                className="resize-y border-white/15 bg-white/10 text-white placeholder:text-white/35"
+              />
+            </section>
+
+            <section className="space-y-3">
+              <Label className="text-white/70">Final recommendation *</Label>
+              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                {RECOMMENDATIONS.map((rec) => (
+                  <button
+                    key={rec}
+                    type="button"
+                    onClick={() => setForm((p) => ({ ...p, finalRecommendation: rec }))}
+                    className={cn(
+                      'wrap-break-word rounded-xl px-4 py-3 text-sm font-semibold transition-colors',
+                      form.finalRecommendation === rec
+                        ? 'border-2 border-blue-400 bg-blue-500/20 text-blue-200'
+                        : 'border border-white/15 bg-white/5 text-white/65 hover:bg-white/10'
+                    )}
+                  >
+                    {rec}
+                  </button>
+                ))}
+              </div>
+            </section>
+
+            <Button
+              type="submit"
+              disabled={submitting || submitLocked}
+              className="h-12 w-full bg-linear-to-br from-emerald-500 to-green-600 text-base font-bold text-white hover:from-emerald-600 hover:to-green-700 disabled:opacity-50"
+            >
+              {submitting ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Submitting…
+                </>
+              ) : submitLocked ? (
+                'Submission locked until final two weeks'
+              ) : (
+                'Submit evaluation'
+              )}
+            </Button>
+          </form>
+
+          <p className="text-center text-[11px] leading-relaxed text-white/30">
+            Secure form. Your response is recorded and shared with the university.
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 }

@@ -184,16 +184,15 @@ export default function WeeklyLogSupervisorReviewPage({
             </div>
             <CardContent className="space-y-4 p-6 text-sm leading-relaxed text-slate-700">
               {studentName ? (
-                <p>
-                  The weekly log sheet book for{" "}
-                  <span className="font-semibold text-slate-900">{studentName}</span> has been
-                  forwarded to the student&apos;s department HOD and the Secretary for institutional
-                  review.
+                <p className="text-pretty wrap-break-word">
+                  The weekly log sheet book for{' '}
+                  <span className="font-semibold text-slate-900">{studentName}</span> has been forwarded
+                  to the student&apos;s department HOD and the Secretary for institutional review.
                 </p>
               ) : (
-                <p>
-                  The weekly log sheet book has been forwarded to the department HOD and Secretary
-                  for institutional review.
+                <p className="text-pretty wrap-break-word">
+                  The weekly log sheet book has been forwarded to the department HOD and Secretary for
+                  institutional review.
                 </p>
               )}
               <ul className="list-inside list-disc space-y-1 text-slate-600">
@@ -234,23 +233,25 @@ export default function WeeklyLogSupervisorReviewPage({
 
   return (
     <main className="min-h-screen bg-slate-100 px-4 py-8">
-      <div className="mx-auto max-w-5xl space-y-6">
-        <Card>
-          <CardHeader className="text-center">
-            <Badge className="mx-auto mb-2 w-fit" variant="secondary">
-              <ShieldCheck className="mr-1 h-3.5 w-3.5" />
-              Supervisor review — hosted portal
+      <div className="mx-auto max-w-5xl min-w-0 space-y-6">
+        <Card className="min-w-0 overflow-visible shadow-sm">
+          <CardHeader className="space-y-2 px-4 pt-6 text-center sm:px-6">
+            <Badge className="mx-auto mb-1 w-fit" variant="secondary">
+              <ShieldCheck className="mr-1 h-3.5 w-3.5 shrink-0" />
+              <span className="wrap-break-word text-left">
+                Supervisor review — hosted portal
+              </span>
             </Badge>
-            <CardTitle className="text-xl">Weekly Log Sheet Book</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-xl leading-snug">Weekly Log Sheet Book</CardTitle>
+            <CardDescription className="mx-auto max-w-lg wrap-break-word text-pretty">
               Review each page below, then complete the evaluation cards and submit.
             </CardDescription>
           </CardHeader>
-          <CardContent className="flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
-            <Lock className="mt-0.5 h-4 w-4 shrink-0" />
-            <p>
-              Student activities and remarks are locked. Complete the evaluation card on each
-              page, then confirm your details at the bottom.
+          <CardContent className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm leading-relaxed text-amber-950 sm:mx-6 sm:mb-6">
+            <Lock className="mt-0.5 h-4 w-4 shrink-0" aria-hidden />
+            <p className="min-w-0 wrap-break-word text-pretty">
+              Student activities and remarks are locked. Complete the evaluation card on each page,
+              then confirm your details at the bottom.
             </p>
           </CardContent>
         </Card>
@@ -265,12 +266,16 @@ export default function WeeklyLogSupervisorReviewPage({
 
           return (
             <div key={page.pageNumber} className="space-y-4">
-              <Card className="overflow-hidden border-slate-200 shadow-sm">
-                <CardHeader className="border-b bg-slate-50 py-3">
-                  <CardTitle className="text-sm font-semibold">Student log — {pageLabel}</CardTitle>
-                  <CardDescription>Read-only weekly activities and student remarks</CardDescription>
+              <Card className="min-w-0 overflow-x-auto border-slate-200 shadow-sm">
+                <CardHeader className="border-b bg-slate-50 px-4 py-3 sm:px-6">
+                  <CardTitle className="wrap-break-word text-sm font-semibold leading-snug">
+                    Student log — {pageLabel}
+                  </CardTitle>
+                  <CardDescription className="wrap-break-word leading-snug">
+                    Read-only weekly activities and student remarks
+                  </CardDescription>
                 </CardHeader>
-                <CardContent className="p-4 sm:p-6">
+                <CardContent className="min-w-0 p-3 sm:p-6">
                   <WeeklyLogSheet
                     mode="student-locked"
                     header={header}
@@ -293,13 +298,13 @@ export default function WeeklyLogSupervisorReviewPage({
           );
         })}
 
-        <Card className="border-primary/20 shadow-md">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Send className="h-5 w-5 text-primary" />
-              Final supervisor confirmation
+        <Card className="min-w-0 border-primary/20 shadow-md">
+          <CardHeader className="space-y-1 px-4 pt-6 sm:px-6">
+            <CardTitle className="flex flex-wrap items-center gap-2 text-lg leading-snug">
+              <Send className="h-5 w-5 shrink-0 text-primary" aria-hidden />
+              <span className="wrap-break-word">Final supervisor confirmation</span>
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="wrap-break-word text-pretty leading-relaxed">
               Used for the institutional record and forwarded to HOD / Secretary.
             </CardDescription>
           </CardHeader>

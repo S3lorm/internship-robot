@@ -17,7 +17,16 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { formatStatusLabel } from "@/lib/utils";
 import { toast } from "sonner";
-import { AlertCircle, BookOpen, CheckCircle2, Loader2, Lock, Mail, RefreshCw, Send } from "lucide-react";
+import {
+  AlertCircle,
+  BookOpen,
+  CheckCircle2,
+  Loader2,
+  Lock,
+  Mail,
+  RefreshCw,
+  Send,
+} from "lucide-react";
 import { usePortalStatus } from "@/hooks/use-portal-status";
 import { PORTAL_CLOSED_MESSAGE } from "@/lib/internship-portal";
 

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { evaluationsApi } from "@/lib/api";
@@ -17,6 +18,7 @@ import {
   ExternalLink,
   Loader2,
   AlertCircle,
+  User,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -39,6 +41,133 @@ interface Evaluation {
   acknowledgmentDeadline?: string;
   createdAt: string;
   updatedAt: string;
+  supervisorName?: string | null;
+  supervisorPosition?: string | null;
+  supervisorDepartment?: string | null;
+  workEthicRating?: number | null;
+  communicationRating?: number | null;
+  technicalSkillsRating?: number | null;
+  teamworkRating?: number | null;
+  punctualityRating?: number | null;
+  problemSolvingRating?: number | null;
+  supervisorComments?: string | null;
+  finalRecommendation?: string | null;
+  submittedAt?: string | null;
+}
+
+const SUPERVISOR_RATING_ROWS: { key: keyof Evaluation; label: string; hint: string }[] = [
+  { key: "workEthicRating", label: "Work ethic", hint: "Dedication and consistency" },
+  { key: "communicationRating", label: "Communication", hint: "Written and verbal skills" },
+  { key: "technicalSkillsRating", label: "Technical skills", hint: "Role-specific ability" },
+  { key: "teamworkRating", label: "Teamwork", hint: "Collaboration" },
+  { key: "punctualityRating", label: "Punctuality", hint: "Attendance and timeliness" },
+  { key: "problemSolvingRating", label: "Problem solving", hint: "Critical thinking" },
+];
+
+function ratingScore(v: unknown): number | undefined {
+  if (v == null || v === "") return undefined;
+  const n = Number(v);
+  if (!Number.isFinite(n)) return undefined;
+  const rounded = Math.round(n);
+  if (rounded < 1 || rounded > 5) return undefined;
+  return rounded;
+}
+
+function hasSupervisorSubmission(ev: Evaluation): boolean {
+  if (!ev.submittedAt || !String(ev.supervisorName || "").trim()) return false;
+  return SUPERVISOR_RATING_ROWS.every((row) => ratingScore(ev[row.key]) != null);
+}
+
+function SupervisorEvaluationDetails({ ev }: { ev: Evaluation }) {
+  if (!hasSupervisorSubmission(ev)) return null;
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 sm:p-5">
+      <div className="mb-4 flex items-start gap-2">
+        <ClipboardCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+        <div>
+          <h3 className="font-semibold text-foreground">Supervisor evaluation</h3>
+          <p className="text-sm text-muted-foreground">
+            Submitted through your host organisation&apos;s secure evaluation link (not editable).
+          </p>
+          {ev.submittedAt ? (
+            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <Clock className="h-3.5 w-3.5 shrink-0" />
+              Received{" "}
+              {new Date(ev.submittedAt).toLocaleString("en-GB", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+                hour: "2-digit",
+                minute: "2-digit",
+              })}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="rounded-lg border bg-background/80 p-4">
+        <div className="flex items-center gap-2 text-sm font-medium text-foreground">
+          <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span className="wrap-break-word">{ev.supervisorName}</span>
+        </div>
+        {(ev.supervisorPosition || ev.supervisorDepartment) ? (
+          <p className="mt-1 pl-6 text-sm text-muted-foreground wrap-break-word">
+            {[ev.supervisorPosition, ev.supervisorDepartment].filter(Boolean).join(" · ")}
+          </p>
+        ) : null}
+      </div>
+
+      <Separator className="my-4" />
+
+      <h4 className="mb-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+        Ratings (1 = poor, 5 = excellent)
+      </h4>
+      <ul className="space-y-2">
+        {SUPERVISOR_RATING_ROWS.map((row) => {
+          const score = ratingScore(ev[row.key]);
+          return (
+            <li
+              key={row.key}
+              className="flex flex-col gap-0.5 rounded-md bg-background/60 px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{row.label}</p>
+                <p className="text-xs text-muted-foreground">{row.hint}</p>
+              </div>
+              <p className="shrink-0 text-sm font-semibold tabular-nums text-primary sm:text-right">
+                {score ?? "—"}/5
+              </p>
+            </li>
+          );
+        })}
+      </ul>
+
+      {ev.finalRecommendation ? (
+        <>
+          <Separator className="my-4" />
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Final recommendation
+          </h4>
+          <p className="rounded-lg border bg-background px-4 py-3 text-sm font-semibold text-foreground wrap-break-word">
+            {ev.finalRecommendation}
+          </p>
+        </>
+      ) : null}
+
+      {ev.supervisorComments ? (
+        <>
+          <Separator className="my-4" />
+          <h4 className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+            Supervisor comments
+          </h4>
+          <p className="whitespace-pre-wrap wrap-break-word rounded-lg border bg-muted/30 px-4 py-3 text-sm leading-relaxed text-foreground">
+            {ev.supervisorComments}
+          </p>
+        </>
+      ) : null}
+    </div>
+  );
 }
 
 export default function EvaluationsPage() {
@@ -76,6 +205,10 @@ export default function EvaluationsPage() {
 
   const handleViewEvaluation = async (evaluation: Evaluation) => {
     setSelectedEvaluation(evaluation);
+    const detail = await evaluationsApi.getById(evaluation.id);
+    if (!detail.error && detail.data?.evaluation) {
+      setSelectedEvaluation(detail.data.evaluation as Evaluation);
+    }
     // Mark as viewed if not already viewed
     if (!evaluation.viewedAt) {
       try {
@@ -206,6 +339,11 @@ export default function EvaluationsPage() {
                       {getTypeBadge(evaluation.evaluationType)}
                       {getStatusBadge(evaluation)}
                     </div>
+                    {hasSupervisorSubmission(evaluation) && (
+                      <p className="mb-2 text-xs font-medium text-emerald-700 dark:text-emerald-400">
+                        Supervisor evaluation received — open for full details
+                      </p>
+                    )}
                   </div>
                 </div>
                 {evaluation.description && (
@@ -296,6 +434,8 @@ export default function EvaluationsPage() {
                   </div>
                 )}
               </div>
+
+              <SupervisorEvaluationDetails ev={selectedEvaluation} />
 
               {selectedEvaluation.submissionUrl && (
                 <div>
