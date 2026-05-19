@@ -88,7 +88,7 @@ type DeptPayload = {
   groups: ProgramGroup[];
 };
 
-const LEVEL_FILTERS: LevelFilter[] = ["all", "1", "2", "3", "4", "unknown"];
+const LEVEL_FILTERS: LevelFilter[] = ["all", "1", "2", "3", "4"];
 
 function statusBadge(status: string, label: string) {
   if (status === "on_internship") {
@@ -309,10 +309,7 @@ export default function DepartmentStudentsPage() {
                 const count =
                   key === "all"
                     ? data.summary.totalStudents
-                    : data.summary.levelBreakdown?.[key] ??
-                      (key === "unknown"
-                        ? data.summary.levelBreakdown?.unknown ?? 0
-                        : 0);
+                    : data.summary.levelBreakdown?.[key] ?? 0;
                 return (
                   <button
                     key={key}

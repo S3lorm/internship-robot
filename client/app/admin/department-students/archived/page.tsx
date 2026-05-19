@@ -51,7 +51,7 @@ type ArchivedPayload = {
   groups: ProgramGroup[];
 };
 
-const LEVEL_FILTERS: LevelFilter[] = ["all", "1", "2", "3", "4", "unknown"];
+const LEVEL_FILTERS: LevelFilter[] = ["all", "1", "2", "3", "4"];
 
 function formatDate(date?: string) {
   if (!date) return "—";

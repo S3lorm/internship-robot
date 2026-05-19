@@ -1,4 +1,4 @@
-export type LevelFilter = "all" | "1" | "2" | "3" | "4" | "unknown";
+export type LevelFilter = "all" | "1" | "2" | "3" | "4";
 
 export function formatStudentLevel(yearOfStudy?: number | string | null) {
   const year = yearOfStudy != null ? Number(yearOfStudy) : NaN;
@@ -14,7 +14,6 @@ export function formatStudentLevel(yearOfStudy?: number | string | null) {
 
 export function levelFilterLabel(filter: LevelFilter) {
   if (filter === "all") return "All levels";
-  if (filter === "unknown") return "Unknown level";
   const year = Number(filter);
   return `Year ${year} · Level ${year * 100}`;
 }
@@ -24,9 +23,5 @@ export function studentMatchesLevelFilter(
   filter: LevelFilter
 ) {
   if (filter === "all") return true;
-  if (filter === "unknown") {
-    const year = yearOfStudy != null ? Number(yearOfStudy) : NaN;
-    return !year || Number.isNaN(year);
-  }
   return String(yearOfStudy) === filter;
 }
