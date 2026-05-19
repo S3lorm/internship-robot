@@ -1,12 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useAuth } from "@/contexts/auth-context";
 import { hodApi } from "@/lib/api";
+import {
+  type LevelFilter,
+  levelFilterLabel,
+  studentMatchesLevelFilter,
+} from "@/lib/student-level";
+import { DepartmentStudentsNav } from "@/components/department-students-nav";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { CalendarCheck2, FileCheck2, FileText, Loader2, Users, UserX } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { CalendarCheck2, FileCheck2, FileText, Loader2, Users, UserX, Archive } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { toast } from "sonner";
 
 type DeptStudent = {
   id: string;
@@ -14,9 +30,12 @@ type DeptStudent = {
   lastName: string;
   studentId: string;
   email: string;
+  phone?: string | null;
   program: string;
   programGroup: string;
-  yearOfStudy?: string;
+  yearOfStudy?: number | null;
+  level?: number | null;
+  levelLabel?: string;
   internshipStatus: string;
   internshipLabel: string;
   activePlacement?: {
@@ -64,9 +83,12 @@ type DeptPayload = {
     placementSubmissionGraceDays?: number;
     placementSubmissionGraceOver?: boolean;
     portalOpenedAt?: string;
+    levelBreakdown?: Record<string, number>;
   };
   groups: ProgramGroup[];
 };
+
+const LEVEL_FILTERS: LevelFilter[] = ["all", "1", "2", "3", "4", "unknown"];
 
 function statusBadge(status: string, label: string) {
   if (status === "on_internship") {
@@ -132,18 +154,31 @@ function formatDate(date?: string) {
 export default function DepartmentStudentsPage() {
   const { user } = useAuth();
   const [data, setData] = useState<DeptPayload | null>(null);
+  const [archivedCount, setArchivedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<StudentFilter>("all");
+  const [levelFilter, setLevelFilter] = useState<LevelFilter>("all");
+  const [archiveTarget, setArchiveTarget] = useState<DeptStudent | null>(null);
+  const [archiving, setArchiving] = useState(false);
+
+  const loadStudents = useCallback(async () => {
+    setLoading(true);
+    const [activeRes, archivedRes] = await Promise.all([
+      hodApi.getDepartmentStudents(),
+      hodApi.getArchivedDepartmentStudents(),
+    ]);
+    if (activeRes.data) setData(activeRes.data as DeptPayload);
+    if (archivedRes.data) {
+      const archived = archivedRes.data as { summary?: { totalArchived?: number } };
+      setArchivedCount(archived.summary?.totalArchived ?? 0);
+    }
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
     if (user?.role !== "hod") return;
-    void (async () => {
-      setLoading(true);
-      const res = await hodApi.getDepartmentStudents();
-      if (res.data) setData(res.data as DeptPayload);
-      setLoading(false);
-    })();
-  }, [user?.role, user?.department]);
+    void loadStudents();
+  }, [user?.role, user?.department, loadStudents]);
 
   const filteredGroups = useMemo(() => {
     if (!data) return [];
@@ -151,16 +186,32 @@ export default function DepartmentStudentsPage() {
       .map((g) => ({
         ...g,
         students: g.students.filter((s) => {
+          if (!studentMatchesLevelFilter(s.yearOfStudy, levelFilter)) return false;
           if (filter === "letter_taken") return s.hasTakenInternshipLetter === true;
           if (filter === "placement_submitted") return s.placementCategory === "placement_submitted";
           if (filter === "internship_ended") return s.internshipStatus === "internship_ended";
-          if (filter === "not_on_internship")
-            return s.missedPlacementSubmission === true;
+          if (filter === "not_on_internship") return s.missedPlacementSubmission === true;
           return true;
         }),
       }))
       .filter((g) => g.students.length > 0);
-  }, [data, filter]);
+  }, [data, filter, levelFilter]);
+
+  const handleArchive = async () => {
+    if (!archiveTarget) return;
+    setArchiving(true);
+    const res = await hodApi.archiveDepartmentStudent(archiveTarget.id);
+    setArchiving(false);
+    if (res.error) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success(
+      `${archiveTarget.firstName} ${archiveTarget.lastName} archived. View credentials under Archived students.`
+    );
+    setArchiveTarget(null);
+    void loadStudents();
+  };
 
   if (user?.role !== "hod") return null;
 
@@ -177,10 +228,12 @@ export default function DepartmentStudentsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight md:text-3xl">Department students</h1>
         <p className="mt-1 text-muted-foreground">
-          All registered students in {data?.department || user.department}, grouped by course. Internship status is
-          based on approved official placements.
+          All registered students in {data?.department || user.department}, grouped by course and
+          filterable by level. Internship status is based on approved official placements.
         </p>
       </div>
+
+      <DepartmentStudentsNav archivedCount={archivedCount} />
 
       {data && (
         <>
@@ -249,37 +302,73 @@ export default function DepartmentStudentsPage() {
             </Card>
           )}
 
-          <div className="flex flex-wrap gap-2">
-            {(
-              [
-                ["all", "All students"],
-                ["letter_taken", "Took internship letter"],
-                ["placement_submitted", "Submitted official placement"],
-                ["internship_ended", "Internship completed"],
-                ["not_on_internship", "No placement submitted"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setFilter(key)}
-                className={cn(
-                  "rounded-full border px-3 py-1 text-sm font-medium transition-colors",
-                  filter === key
-                    ? "border-primary bg-primary text-primary-foreground"
-                    : "border-border bg-background text-muted-foreground hover:bg-muted"
-                )}
-              >
-                {label}
-              </button>
-            ))}
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Filter by level</p>
+            <div className="flex flex-wrap gap-2">
+              {LEVEL_FILTERS.map((key) => {
+                const count =
+                  key === "all"
+                    ? data.summary.totalStudents
+                    : data.summary.levelBreakdown?.[key] ??
+                      (key === "unknown"
+                        ? data.summary.levelBreakdown?.unknown ?? 0
+                        : 0);
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={() => setLevelFilter(key)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-sm font-medium transition-colors",
+                      levelFilter === key
+                        ? "border-primary bg-primary text-primary-foreground"
+                        : "border-border bg-background text-muted-foreground hover:bg-muted"
+                    )}
+                  >
+                    {levelFilterLabel(key)}
+                    {key !== "all" && count > 0 && (
+                      <span className="ml-1.5 tabular-nums opacity-80">({count})</span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="text-sm font-medium text-foreground">Internship status</p>
+            <div className="flex flex-wrap gap-2">
+              {(
+                [
+                  ["all", "All students"],
+                  ["letter_taken", "Took internship letter"],
+                  ["placement_submitted", "Submitted official placement"],
+                  ["internship_ended", "Internship completed"],
+                  ["not_on_internship", "No placement submitted"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilter(key)}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-sm font-medium transition-colors",
+                    filter === key
+                      ? "border-primary bg-primary text-primary-foreground"
+                      : "border-border bg-background text-muted-foreground hover:bg-muted"
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-6">
             {filteredGroups.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                  No students match this filter.
+                  No students match the selected filters.
                 </CardContent>
               </Card>
             ) : (
@@ -299,13 +388,19 @@ export default function DepartmentStudentsPage() {
                       {group.students.map((s) => (
                         <div
                           key={s.id}
-                          className="flex flex-col gap-2 px-4 py-3 sm:flex-row sm:items-center sm:justify-between"
+                          className="flex flex-col gap-3 px-4 py-3 sm:flex-row sm:items-start sm:justify-between"
                         >
-                          <div className="min-w-0">
-                            <p className="font-medium">
-                              {s.firstName} {s.lastName}
-                            </p>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="font-medium">
+                                {s.firstName} {s.lastName}
+                              </p>
+                              <Badge variant="secondary" className="text-xs">
+                                {s.levelLabel || "Unknown level"}
+                              </Badge>
+                            </div>
                             <p className="font-mono text-xs text-muted-foreground">{s.studentId}</p>
+                            <p className="text-xs text-muted-foreground">{s.email}</p>
                             <div className="mt-2 flex flex-wrap gap-1.5">
                               <Badge variant="outline" className="text-xs">
                                 Letters: {s.approvedLetterCount || 0}
@@ -323,14 +418,26 @@ export default function DepartmentStudentsPage() {
                                 {(s.activePlacement.internshipStartDate ||
                                   s.activePlacement.internshipEndDate) && (
                                   <p>
-                                    {formatDate(s.activePlacement.internshipStartDate) || "Start N/A"} -{" "}
-                                    {formatDate(s.activePlacement.internshipEndDate) || "End N/A"}
+                                    {formatDate(s.activePlacement.internshipStartDate) || "Start N/A"}{" "}
+                                    - {formatDate(s.activePlacement.internshipEndDate) || "End N/A"}
                                   </p>
                                 )}
                               </div>
                             )}
                           </div>
-                          {statusBadge(s.internshipStatus, s.internshipLabel)}
+                          <div className="flex shrink-0 flex-col items-stretch gap-2 sm:items-end">
+                            {statusBadge(s.internshipStatus, s.internshipLabel)}
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5"
+                              onClick={() => setArchiveTarget(s)}
+                            >
+                              <Archive className="h-3.5 w-3.5" />
+                              Archive account
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
@@ -341,6 +448,39 @@ export default function DepartmentStudentsPage() {
           </div>
         </>
       )}
+
+      <Dialog
+        open={!!archiveTarget}
+        onOpenChange={(open) => {
+          if (!open) setArchiveTarget(null);
+        }}
+      >
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Archive student account</DialogTitle>
+            <DialogDescription>
+              {archiveTarget
+                ? `Archive ${archiveTarget.firstName} ${archiveTarget.lastName} (${archiveTarget.studentId})? They will be removed from the active list. Login email and student ID will remain visible on the Archived students page.`
+                : ""}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setArchiveTarget(null)} disabled={archiving}>
+              Cancel
+            </Button>
+            <Button onClick={() => void handleArchive()} disabled={archiving}>
+              {archiving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Archiving…
+                </>
+              ) : (
+                "Archive account"
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

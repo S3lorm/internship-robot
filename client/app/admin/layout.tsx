@@ -74,6 +74,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                pathname.includes("/evaluations") ? "Evaluations" :
                pathname.includes("/signature") ? "Digital signature" :
                pathname.includes("/weekly-logbooks") ? "Logbook" :
+               pathname.includes("/department-students/archived") ? "Archived students" :
                pathname.includes("/department-students") ? "Department students" :
                pathname.includes("/letter-requests") ? "Letter Requests" :
                pathname.includes("/letter") ? "Application Letter" :

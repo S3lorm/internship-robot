@@ -675,6 +675,9 @@ export const portalApi = {
 
 export const hodApi = {
   getDepartmentStudents: () => fetchApi('/hod/department-students'),
+  getArchivedDepartmentStudents: () => fetchApi('/hod/department-students/archived'),
+  archiveDepartmentStudent: (id: string) =>
+    fetchApi(`/hod/department-students/${id}/archive`, { method: 'PATCH' }),
 };
 
 export const staffSignaturesApi = {

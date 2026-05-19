@@ -9,6 +9,18 @@ const { getPortalStatusPayload } = require('../services/internshipPortalService'
 
 const PLACEMENT_SUBMISSION_GRACE_DAYS = 14;
 
+function mapStudentLevel(yearOfStudy) {
+  const year = yearOfStudy != null ? Number(yearOfStudy) : null;
+  if (!year || Number.isNaN(year)) {
+    return { yearOfStudy: null, level: null, levelLabel: 'Unknown level' };
+  }
+  return {
+    yearOfStudy: year,
+    level: year * 100,
+    levelLabel: `Level ${year * 100} (Year ${year})`,
+  };
+}
+
 function isInCurrentPortalCycle(createdAt, portalPayload) {
   if (!portalPayload?.isOpen || !portalPayload.updatedAt) return true;
   if (!createdAt) return false;
@@ -113,16 +125,20 @@ async function getDepartmentStudents(req, res) {
                 status: 'letter_not_taken',
                 label: 'No internship letter yet',
             };
+      const levelInfo = mapStudentLevel(s.yearOfStudy);
       return {
         id: s.id,
         firstName: s.firstName,
         lastName: s.lastName,
         studentId: s.studentId,
         email: s.email,
+        phone: s.phone || null,
         department: s.department,
         program: s.program,
         programGroup: getStudentProgramGroup(s, hodDepartment),
-        yearOfStudy: s.yearOfStudy,
+        yearOfStudy: levelInfo.yearOfStudy,
+        level: levelInfo.level,
+        levelLabel: levelInfo.levelLabel,
         internshipStatus: internship.status,
         internshipLabel: internship.label,
         activePlacement: internship.organizationName
@@ -163,11 +179,17 @@ async function getDepartmentStudents(req, res) {
     const placementSubmitted = enriched.filter((s) => s.placementCategory === 'placement_submitted').length;
     const tookInternshipLetters = enriched.filter((s) => s.hasTakenInternshipLetter).length;
     const completedInternships = enriched.filter((s) => s.completedInternshipCount > 0).length;
+    const levelBreakdown = enriched.reduce((acc, s) => {
+      const key = s.yearOfStudy != null ? String(s.yearOfStudy) : 'unknown';
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
 
     return res.json({
       department: hodDepartment,
       summary: {
         totalStudents: enriched.length,
+        levelBreakdown,
         tookInternshipLetters,
         completedInternships,
         placementSubmitted,
@@ -187,6 +209,108 @@ async function getDepartmentStudents(req, res) {
   }
 }
 
+async function getArchivedDepartmentStudents(req, res) {
+  try {
+    const user = req.user;
+    if (user.role !== 'hod' || !user.department) {
+      return res.status(403).json({ message: 'Department staff access only' });
+    }
+
+    const hodDepartment = user.department;
+    const { rows: allStudents } = await User.findAndCountAll({
+      where: { role: 'student', isActive: false },
+      limit: 5000,
+      offset: 0,
+      order: [['updated_at', 'DESC']],
+    });
+
+    const students = allStudents
+      .filter((s) => studentBelongsToHodDepartment(s, hodDepartment))
+      .map((s) => {
+        const levelInfo = mapStudentLevel(s.yearOfStudy);
+        return {
+          id: s.id,
+          firstName: s.firstName,
+          lastName: s.lastName,
+          studentId: s.studentId,
+          email: s.email,
+          phone: s.phone || null,
+          program: s.program,
+          programGroup: getStudentProgramGroup(s, hodDepartment),
+          yearOfStudy: levelInfo.yearOfStudy,
+          level: levelInfo.level,
+          levelLabel: levelInfo.levelLabel,
+          archivedAt: s.updatedAt,
+          isEmailVerified: s.isEmailVerified,
+        };
+      });
+
+    const groups = groupStudentsByProgram(students, hodDepartment).map((g) => ({
+      program: g.program,
+      prefixes: g.prefixes,
+      students: g.students.sort((a, b) =>
+        String(a.lastName || '').localeCompare(String(b.lastName || ''))
+      ),
+    }));
+
+    return res.json({
+      department: hodDepartment,
+      summary: { totalArchived: students.length },
+      groups,
+    });
+  } catch (error) {
+    console.error('getArchivedDepartmentStudents error:', error);
+    return res.status(500).json({ message: 'Failed to load archived students' });
+  }
+}
+
+async function archiveDepartmentStudent(req, res) {
+  try {
+    const user = req.user;
+    if (user.role !== 'hod' || !user.department) {
+      return res.status(403).json({ message: 'Department staff access only' });
+    }
+
+    const student = await User.findByPk(req.params.id);
+    if (!student || student.role !== 'student') {
+      return res.status(404).json({ message: 'Student not found' });
+    }
+    if (!studentBelongsToHodDepartment(student, user.department)) {
+      return res.status(403).json({ message: 'Student is not in your department' });
+    }
+    if (!student.isActive) {
+      return res.status(400).json({ message: 'Student is already archived' });
+    }
+
+    student.isActive = false;
+    await student.save();
+
+    const levelInfo = mapStudentLevel(student.yearOfStudy);
+    const safe = student.toJSON();
+    return res.json({
+      message: 'Student account archived',
+      student: {
+        id: safe.id,
+        firstName: safe.firstName,
+        lastName: safe.lastName,
+        studentId: safe.studentId,
+        email: safe.email,
+        phone: safe.phone || null,
+        program: safe.program,
+        yearOfStudy: levelInfo.yearOfStudy,
+        level: levelInfo.level,
+        levelLabel: levelInfo.levelLabel,
+        archivedAt: safe.updatedAt,
+      },
+    });
+  } catch (error) {
+    console.error('archiveDepartmentStudent error:', error);
+    return res.status(500).json({ message: 'Failed to archive student' });
+  }
+}
+
 module.exports = {
   getDepartmentStudents,
+  getArchivedDepartmentStudents,
+  archiveDepartmentStudent,
 };
