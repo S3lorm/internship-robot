@@ -18,7 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { CheckCircle2, Loader2, Lock, Send, ShieldCheck } from "lucide-react";
+import { AlertCircle, CheckCircle2, Loader2, Lock, Send, ShieldCheck } from "lucide-react";
 
 function entryByWeekNumber(bundle: WeeklyLogbookBundle, weekNumber: number) {
   return bundle.entries.find((e) => e.weekNumber === weekNumber);
@@ -212,14 +212,25 @@ export default function WeeklyLogSupervisorReviewPage({
 
   if (!bundle || !header) {
     return (
-      <main className="mx-auto flex min-h-screen max-w-2xl items-center px-4">
-        <Card>
-          <CardHeader>
-            <CardTitle>Review link unavailable</CardTitle>
-            <CardDescription>
+      <main className="flex min-h-screen w-full flex-col items-center justify-center bg-slate-100 px-4 py-12">
+        <Card className="w-full max-w-lg min-w-0 border-slate-200 shadow-lg">
+          <CardHeader className="min-w-0 space-y-3 text-center sm:text-left">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-100 text-amber-700 sm:mx-0">
+              <AlertCircle className="h-7 w-7" aria-hidden />
+            </div>
+            <CardTitle className="text-xl leading-snug wrap-break-word">
+              Review link unavailable
+            </CardTitle>
+            <CardDescription className="text-base leading-relaxed wrap-break-word text-pretty text-muted-foreground">
               This link is invalid, expired, already used, or unavailable.
             </CardDescription>
           </CardHeader>
+          <CardContent className="pt-0">
+            <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-center text-sm text-slate-600 wrap-break-word sm:text-left">
+              Ask the student or university for a new supervisor review email if you still need to
+              complete this review.
+            </p>
+          </CardContent>
         </Card>
       </main>
     );
