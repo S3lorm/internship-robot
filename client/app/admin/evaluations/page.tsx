@@ -507,26 +507,38 @@ export default function EvaluationsManagementPage() {
                     <RatingBar label="Punctuality" rating={reviewEvaluation.punctualityRating} />
                     <RatingBar label="Problem Solving" rating={reviewEvaluation.problemSolvingRating} />
 
-                    {/* Average */}
-                    <div className="border-t pt-4 mt-4">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold">Overall Average</span>
-                        <span className="text-lg font-bold text-primary">
-                          {(() => {
-                            const ratings = [
-                              reviewEvaluation.workEthicRating,
-                              reviewEvaluation.communicationRating,
-                              reviewEvaluation.technicalSkillsRating,
-                              reviewEvaluation.teamworkRating,
-                              reviewEvaluation.punctualityRating,
-                              reviewEvaluation.problemSolvingRating,
-                            ].filter((r): r is number => r !== undefined && r !== null);
-                            if (ratings.length === 0) return "N/A";
-                            const avg = ratings.reduce((a, b) => a + b, 0) / ratings.length;
-                            return `${avg.toFixed(1)}/5`;
-                          })()}
-                        </span>
-                      </div>
+                    <div className="border-t pt-4 mt-4 space-y-3">
+                      {(() => {
+                        const ratings = [
+                          reviewEvaluation.workEthicRating,
+                          reviewEvaluation.communicationRating,
+                          reviewEvaluation.technicalSkillsRating,
+                          reviewEvaluation.teamworkRating,
+                          reviewEvaluation.punctualityRating,
+                          reviewEvaluation.problemSolvingRating,
+                        ].filter((r): r is number => r !== undefined && r !== null);
+                        if (ratings.length === 0) return null;
+                        const sum = ratings.reduce((a, b) => a + b, 0);
+                        const avg = sum / ratings.length;
+                        const percent =
+                          ratings.length === 6 ? Math.round((sum / 30) * 100) : Math.round((sum / (ratings.length * 5)) * 100);
+                        return (
+                          <>
+                            <div className="flex items-center justify-between">
+                              <span className="font-semibold">Overall mark (out of 100%)</span>
+                              <span className="text-lg font-bold text-primary tabular-nums">
+                                {ratings.length === 6 ? `${percent}%` : `${percent}% (partial)`}
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="text-muted-foreground">Average / raw points</span>
+                              <span className="font-semibold tabular-nums">
+                                {avg.toFixed(1)}/5 · {sum}/{ratings.length === 6 ? 30 : ratings.length * 5}
+                              </span>
+                            </div>
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 </CardContent>

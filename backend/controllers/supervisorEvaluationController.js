@@ -56,6 +56,8 @@ async function getEvaluationForm(req, res) {
         lastName: student.lastName,
         program: student.program,
         department: student.department,
+        studentId: student.studentId,
+        yearOfStudy: student.yearOfStudy,
       } : null,
       tokenValid: true,
       isSubmitWindowOpen,

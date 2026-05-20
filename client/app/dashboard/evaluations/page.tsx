@@ -78,6 +78,17 @@ function hasSupervisorSubmission(ev: Evaluation): boolean {
   return SUPERVISOR_RATING_ROWS.every((row) => ratingScore(ev[row.key]) != null);
 }
 
+function supervisorOverallScore(ev: Evaluation) {
+  const ratings = SUPERVISOR_RATING_ROWS.map((row) => ratingScore(ev[row.key])).filter(
+    (r): r is number => r != null
+  );
+  if (ratings.length !== SUPERVISOR_RATING_ROWS.length) return null;
+  const sum = ratings.reduce((a, b) => a + b, 0);
+  const percent = Math.round((sum / 30) * 100);
+  const average = sum / ratings.length;
+  return { percent, average, sum };
+}
+
 function SupervisorEvaluationDetails({ ev }: { ev: Evaluation }) {
   if (!hasSupervisorSubmission(ev)) return null;
 
@@ -117,6 +128,32 @@ function SupervisorEvaluationDetails({ ev }: { ev: Evaluation }) {
           </p>
         ) : null}
       </div>
+
+      {(() => {
+        const overall = supervisorOverallScore(ev);
+        if (!overall) return null;
+        return (
+          <>
+            <Separator className="my-4" />
+            <div className="mb-4 grid gap-3 rounded-lg border bg-background px-4 py-3 sm:grid-cols-3">
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Overall mark</p>
+                <p className="text-2xl font-bold tabular-nums text-primary">{overall.percent}%</p>
+                <p className="text-xs text-muted-foreground">Out of 100%</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Average</p>
+                <p className="text-2xl font-bold tabular-nums">{overall.average.toFixed(1)}/5</p>
+                <p className="text-xs text-muted-foreground">Raw {overall.sum}/30 points</p>
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase text-muted-foreground">Scale</p>
+                <p className="text-sm text-muted-foreground">Six equal criteria (16.7% each)</p>
+              </div>
+            </div>
+          </>
+        );
+      })()}
 
       <Separator className="my-4" />
 
